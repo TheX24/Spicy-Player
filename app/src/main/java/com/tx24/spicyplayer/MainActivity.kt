@@ -1,4 +1,4 @@
-package com.example.spicyplayer
+package com.tx24.spicyplayer
 
 import android.Manifest
 import android.os.Build
@@ -29,12 +29,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import com.example.spicyplayer.R
+import com.tx24.spicyplayer.R
 import androidx.compose.ui.unit.dp
-import com.example.spicyplayer.models.Line
-import com.example.spicyplayer.parser.TtmlParser
-import com.example.spicyplayer.player.AudioPlayer
-import com.example.spicyplayer.ui.SpicyCanvas
+import com.tx24.spicyplayer.models.Line
+import com.tx24.spicyplayer.parser.TtmlLyricsParser
+import com.tx24.spicyplayer.player.AudioPlayer
+import com.tx24.spicyplayer.ui.canvas.SpicyLyricsView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -154,7 +154,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                                 // TODO: Implement a proper file picker.
                                 val ttmlFile = File("/sdcard/Music/test.ttml")
                                 if (ttmlFile.exists()) {
-                                    lines = TtmlParser.parse(ttmlFile.inputStream()).lines
+                                    lines = TtmlLyricsParser.parse(ttmlFile.inputStream()).lines
                                 }
                                 val flacFile = File("/sdcard/Music/test.flac")
                                 if (flacFile.exists()) {
@@ -172,7 +172,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                 
                 // The main lyrics display area.
                 Box(modifier = Modifier.weight(1f)) {
-                    SpicyCanvas(
+                    SpicyLyricsView(
                         lines = lines,
                         currentTimeMs = currentTimeMs,
                         onSeekWord = { timeMs -> 

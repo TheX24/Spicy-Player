@@ -2,7 +2,7 @@
 
 - Lyrics aspect
   - [x] TTML parser
-    - [x] Set up [Word](file:///home/tx24/Spicy%20Player/app/src/main/java/com/example/spicyplayer/models/Models.kt#3-11) and [Line](file:///home/tx24/Spicy%20Player/app/src/main/java/com/example/spicyplayer/models/Models.kt#12-22) data classes
+    - [x] Set up Word and Line data classes
     - [x] Implement TTML `XmlPullParser` that handles nested spans
   - [x] Basic Compose lyrics list
     - [x] Render parsed lines in a basic list
@@ -17,7 +17,7 @@
     - [x] Tap word to seek to timestamp
   - [ ] Dynamic Background
   - [ ] Landscape view
-  - [ ] 3 Dots Instrum. Part indicator
+  - [x] 3 Dots Instrum. Part indicator
 - Audio player aspect
   - [x] ExoPlayer
     - [x] Set up ExoPlayer with `androidx.media3:media3-exoplayer` and `androidx.media3:media3-flac`

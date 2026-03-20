@@ -1,13 +1,16 @@
-package com.example.spicyplayer.animation
+package com.tx24.spicyplayer.animation
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.SpringSpec
-import com.example.spicyplayer.models.Letter
-import com.example.spicyplayer.models.Line
-import com.example.spicyplayer.models.Word
+import com.tx24.spicyplayer.models.Letter
+import com.tx24.spicyplayer.models.Line
+import com.tx24.spicyplayer.models.Word
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlin.math.abs
 
 /**
  * Core animation state machine ported from spicy-lyrics LyricsAnimator.ts.
@@ -97,57 +100,7 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
         const val SUNG_LETTER_GLOW = 0.2f
     }
 
-    /**
-     * Holds the spring simulations for a single word's animation properties.
-     */
-    data class WordSprings(
-        val scale: SpringSimulation = SpringSimulation(0.95f, SCALE_FREQUENCY, SCALE_DAMPING),
-        val yOffset: SpringSimulation = SpringSimulation(0.01f, Y_OFFSET_FREQUENCY, Y_OFFSET_DAMPING),
-        val glow: SpringSimulation = SpringSimulation(0f, GLOW_FREQUENCY, GLOW_DAMPING),
-        val activeFactor: SpringSimulation = SpringSimulation(0f, 1.5f, 0.8f) // Controls alpha transition
-    )
 
-    /**
-     * Represents the animation state of a single letter within a word.
-     */
-    data class LetterAnimState(
-        val gradientPosition: Float,
-        val scale: Float,
-        val yOffset: Float,
-        val glow: Float,
-    )
-
-    /**
-     * Represents the animation state of a word, including its scale, offset, and potential letter-level states.
-     */
-    data class WordAnimState(
-        val scale: Float,
-        val yOffset: Float,
-        val glow: Float,
-        val gradientPosition: Float,
-        val state: ElementState,
-        val activeAnimFactor: Float,
-        val isLetterGroup: Boolean = false,
-        val letterStates: List<LetterAnimState> = emptyList(),
-    )
-
-    /**
-     * Represents the overall animation state of a line, including its words.
-     */
-    data class LineAnimState(
-        val opacity: Float,
-        val blur: Float,
-        val scale: Float,
-        val isActive: Boolean,
-        val wordStates: List<WordAnimState>,
-        val isBackground: Boolean,
-        val isSongwriter: Boolean,
-    )
-
-    /**
-     * Possible states for a lyric element (word, line, or dot).
-     */
-    enum class ElementState { NotSung, Active, Sung }
 
     // Internal maps to track the state of ongoing animations.
     private val wordSpringsMap = mutableMapOf<Long, WordSprings>()
@@ -157,13 +110,9 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
     private val lineScaleAnims = mutableMapOf<Int, Animatable<Float, AnimationVector1D>>()
     private val scaleSpringSpec = SpringSpec<Float>(dampingRatio = 0.7f, stiffness = 200f)
 
-    /** Holds spring simulations for interlude dots. */
-    data class DotSprings(
-        val scale:   SpringSimulation = SpringSimulation(0.75f, 0.7f,  0.6f),
-        val yOffset: SpringSimulation = SpringSimulation(0f,    1.25f, 0.4f),
-        val opacity: SpringSimulation = SpringSimulation(0.35f, 1.0f,  0.5f),
-    )
+
     private val dotSpringsMap = mutableMapOf<Long, DotSprings>()
+    private val letterSpringsMap = mutableMapOf<Long, LetterSprings>()
 
     private var lastFrameTimeNanos = 0L
 
@@ -175,6 +124,7 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
         lineOpacityAnims.clear()
         lineScaleAnims.clear()
         dotSpringsMap.clear()
+        letterSpringsMap.clear()
         lastFrameTimeNanos = 0L
     }
 
@@ -386,7 +336,7 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
             word.letters.mapIndexed { li, letter ->
                 val letterState = getElementState(currentTimeMs, letter.startMs, letter.endMs)
                 // Proximity-based falloff: Neighbors of the active letter also move slightly.
-                val distance = if (activeLetterIdx >= 0) kotlin.math.abs(li - activeLetterIdx).toFloat() else Float.MAX_VALUE
+                val distance = if (activeLetterIdx >= 0) abs(li - activeLetterIdx).toFloat() else Float.MAX_VALUE
                 val falloff = if (activeLetterIdx >= 0 && letterState != ElementState.NotSung)
                     (1f / (1f + distance * 0.9f)).coerceIn(0f, 1f)
                 else 0f
@@ -395,46 +345,65 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
                 val restYOff   = yOffsetSpline.at(0f)
                 val restGlow   = glowSpline.at(0f)
 
-                val lScale: Float
-                val lYOff: Float
-                val lGlow: Float
+                var targetScale: Float
+                var targetYOff: Float
+                var targetGlow: Float
 
                 when (letterState) {
                     ElementState.NotSung -> {
-                        lScale = restScale
-                        lYOff  = restYOff
-                        lGlow  = restGlow
+                        targetScale = restScale
+                        targetYOff  = restYOff
+                        targetGlow  = restGlow
                     }
                     ElementState.Sung -> {
                         if (activeLetterIdx == -1) {
-                            lScale = scaleSpline.at(1f)
-                            lYOff  = yOffsetSpline.at(1f)
-                            lGlow  = glowSpline.at(SUNG_LETTER_GLOW)
+                            targetScale = scaleSpline.at(1f)
+                            targetYOff  = yOffsetSpline.at(1f)
+                            targetGlow  = glowSpline.at(SUNG_LETTER_GLOW)
                         } else {
-                            val activeScale = scaleSpline.at(activeLetterProgress)
-                            val activeYOff  = yOffsetSpline.at(activeLetterProgress)
-                            val activeGlow  = glowSpline.at(activeLetterProgress)
-                            lScale = restScale + (activeScale - restScale) * falloff
-                            lYOff  = restYOff  + (activeYOff  - restYOff)  * falloff
-                            lGlow  = restGlow  + (activeGlow  - restGlow)  * falloff
+                            val activeValScale = scaleSpline.at(activeLetterProgress)
+                            val activeValYOff  = yOffsetSpline.at(activeLetterProgress)
+                            val activeValGlow  = glowSpline.at(activeLetterProgress)
+                            targetScale = restScale + (activeValScale - restScale) * falloff
+                            targetYOff  = restYOff  + (activeValYOff  - restYOff)  * falloff
+                            targetGlow  = restGlow  + (activeValGlow  - restGlow)  * falloff
                         }
                     }
                     ElementState.Active -> {
-                        val activeScale = scaleSpline.at(activeLetterProgress)
-                        val activeYOff  = yOffsetSpline.at(activeLetterProgress)
-                        val activeGlow  = glowSpline.at(activeLetterProgress)
-                        lScale = restScale + (activeScale - restScale) * falloff
-                        lYOff  = restYOff  + (activeYOff  - restYOff)  * falloff
-                        lGlow  = restGlow  + (activeGlow  - restGlow)  * falloff
+                        val activeValScale = scaleSpline.at(activeLetterProgress)
+                        val activeValYOff  = yOffsetSpline.at(activeLetterProgress)
+                        val activeValGlow  = glowSpline.at(activeLetterProgress)
+                        targetScale = restScale + (activeValScale - restScale) * falloff
+                        targetYOff  = restYOff  + (activeValYOff  - restYOff)  * falloff
+                        targetGlow  = restGlow  + (activeValGlow  - restGlow)  * falloff
                     }
                 }
+
+                // Smooth it with a spring
+                val letterKey = lineIndex.toLong() * 1000000L + wordIndex.toLong() * 100L + li.toLong()
+                val lSprings = letterSpringsMap.getOrPut(letterKey) {
+                    LetterSprings().also {
+                        it.scale.setGoal(targetScale, immediate = true)
+                        it.yOffset.setGoal(targetYOff, immediate = true)
+                        it.glow.setGoal(targetGlow, immediate = true)
+                    }
+                }
+                lSprings.scale.setGoal(targetScale)
+                lSprings.yOffset.setGoal(targetYOff)
+                lSprings.glow.setGoal(targetGlow)
 
                 val lGradPos = when (letterState) {
                     ElementState.NotSung -> -20f
                     ElementState.Sung    -> 100f
-                    ElementState.Active  -> if (li == activeLetterIdx) -20f + 120f * activeLetterProgress else -20f
+                    ElementState.Active  -> if (li == activeLetterIdx) -20f + 120f * easeSinOut(activeLetterProgress) else -20f
                 }
-                LetterAnimState(gradientPosition = lGradPos, scale = lScale, yOffset = lYOff, glow = lGlow)
+
+                LetterAnimState(
+                    gradientPosition = lGradPos,
+                    scale = lSprings.scale.step(deltaTime),
+                    yOffset = lSprings.yOffset.step(deltaTime),
+                    glow = lSprings.glow.step(deltaTime)
+                )
             }
         } else emptyList()
 
@@ -465,11 +434,11 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
         deltaTime: Float,
         lineIndex: Int,
     ): List<WordAnimState> {
-        val gapDuration = line.duration.toFloat().coerceAtLeast(1f)
-        val dotDuration = gapDuration / 3f
+        val effectiveDuration = maxOf(30L, line.duration - 250L) // 250ms breather matching layout
+        val dotDuration = effectiveDuration.toFloat() / 3f
         return (0 until 3).map { dotIdx ->
             val dotStart = line.startMs + (dotIdx * dotDuration).toLong()
-            val dotEnd   = if (dotIdx == 2) line.endMs else dotStart + dotDuration.toLong()
+            val dotEnd   = dotStart + dotDuration.toLong()
             val progress = getProgress(currentTimeMs, dotStart, dotEnd)
             val state    = getElementState(currentTimeMs, dotStart, dotEnd)
 
@@ -528,5 +497,9 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
         if (currentTimeMs <= startMs) return 0f
         if (currentTimeMs >= endMs) return 1f
         return (currentTimeMs - startMs).toFloat() / (endMs - startMs).toFloat()
+    }
+
+    private fun easeSinOut(t: Float): Float {
+        return sin(t * (PI.toFloat() / 2f))
     }
 }

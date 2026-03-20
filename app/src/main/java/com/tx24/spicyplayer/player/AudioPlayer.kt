@@ -1,4 +1,4 @@
-package com.example.spicyplayer.player
+package com.tx24.spicyplayer.player
 
 import android.content.Context
 import androidx.media3.common.MediaItem

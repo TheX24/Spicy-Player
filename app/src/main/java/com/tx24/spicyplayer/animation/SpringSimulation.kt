@@ -1,4 +1,4 @@
-package com.example.spicyplayer.animation
+package com.tx24.spicyplayer.animation
 
 import kotlin.math.*
 

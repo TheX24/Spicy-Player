@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.spicyplayer"
+    namespace = "com.tx24.spicyplayer"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.spicyplayer"
+        applicationId = "com.tx24.spicyplayer"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

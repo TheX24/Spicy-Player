@@ -1,10 +1,10 @@
-package com.example.spicyplayer.parser
+package com.tx24.spicyplayer.parser
 
 import android.util.Xml
-import com.example.spicyplayer.models.Letter
-import com.example.spicyplayer.models.Line
-import com.example.spicyplayer.models.ParsedLyrics
-import com.example.spicyplayer.models.Word
+import com.tx24.spicyplayer.models.Letter
+import com.tx24.spicyplayer.models.Line
+import com.tx24.spicyplayer.models.ParsedLyrics
+import com.tx24.spicyplayer.models.Word
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -13,7 +13,7 @@ import java.io.InputStreamReader
  * A parser for TTML (Timed Text Markup Language) lyric files.
  * This parser extracts lyrics, timing information, songwriter metadata, and interludes.
  */
-object TtmlParser {
+object TtmlLyricsParser {
     /**
      * Context used during parsing to keep track of nested span timing and metadata.
      */
