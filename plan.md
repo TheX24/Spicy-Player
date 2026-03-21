@@ -38,6 +38,6 @@
   - [ ] Audio player settings
   - [ ] General settings
 - [ ] Polish and Bug hunting
-  - [ ] App icon
+  - [x] App icon
   - [ ] Verify FLAC gapless playback (Concat adapter)
   - [ ] Final performance optimizations (60fps target)

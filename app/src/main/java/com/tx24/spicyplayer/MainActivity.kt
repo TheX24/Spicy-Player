@@ -28,8 +28,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import com.tx24.spicyplayer.R
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.tx24.spicyplayer.models.Line
 import com.tx24.spicyplayer.parser.TtmlLyricsParser
@@ -141,11 +144,18 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header row with the app title and a scan button.
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
+                    horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Spicy Player", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                    Image(
+                        painter = painterResource(id = R.drawable.logo),
+                        contentDescription = "App Logo",
+                        modifier = Modifier.size(48.dp).padding(end = 12.dp)
+                    )
+                    Text("Spicy Player", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+                    
+                    Spacer(modifier = Modifier.weight(1f))
                     
                     Button(onClick = {
                         coroutineScope.launch {
