@@ -25,7 +25,7 @@
     - [x] Set up ExoPlayer with `androidx.media3:media3-exoplayer` and `androidx.media3:media3-flac`
   - [ ] Folder scanner + auto-pairing
     - [ ] Implement file picker to scan `/Music/` directory
-    - [ ] Auto-pair `.flac` and `.ttml` files based on name
+    - [x] Auto-pair `.flac` and `.ttml` files based on name
   - [ ] UI (similar to Musicolet)
     - [ ] Library
     - [ ] Queue
