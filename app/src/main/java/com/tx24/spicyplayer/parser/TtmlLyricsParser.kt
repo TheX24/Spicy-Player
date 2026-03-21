@@ -230,7 +230,7 @@ object TtmlLyricsParser {
                                 val wordDuration = wordEnd - wordStart
 
                                 // Decide if this word should have granular letter-level animation.
-                                val isLetterGroup = !isBgToken && wordDuration >= 1000L && token.length <= 12 && token.length > 1
+                                val isLetterGroup = wordDuration >= 1000L && token.length <= 12 && token.length > 1
                                 val letters = if (isLetterGroup) {
                                     val letterDuration = wordDuration.toFloat() / token.length
                                     token.mapIndexed { li, ch ->

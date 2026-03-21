@@ -27,7 +27,7 @@ internal class ScrollManager(
     private var lastDragTimeMs by mutableLongStateOf(0L)
 
     fun updateScroll(
-        currentTime: Long,
+        currentTimeMs: Long,
         dt: Float,
         totalContentHeight: Float,
         targetY: Float?
@@ -36,57 +36,68 @@ internal class ScrollManager(
             scrollSpring.setGoal(targetY)
         }
         
+        val springPosBefore = scrollSpring.current
         val actualSpringY = scrollSpring.step(dt)
-        val maxScrollDown = 0f
-        val maxScrollUp = -totalContentHeight
-        val totalScroll = actualSpringY + userScrollOffset
-        
-        val isPlaying = currentTime != lastFrameSongTime
+        val springDelta = actualSpringY - springPosBefore
+
+        val timeSinceInteraction = System.currentTimeMillis() - lastInteractionTimeMs
+        val isInManualMode = isUserScrolling || (timeSinceInteraction < 4000L && lastInteractionTimeMs > 0L)
+
+        if (isInManualMode) {
+            // Cancel out the auto-scroll movement to keep the view static where the user left it.
+            userScrollOffset -= springDelta
+        }
+
+        val isPlaying = currentTimeMs != lastFrameSongTime
         if (isPlaying && !wasPlaying) {
             lastInteractionTimeMs = 0L // Resume auto-scrolling when playback starts.
         }
         wasPlaying = isPlaying
-        lastFrameSongTime = currentTime
+        lastFrameSongTime = currentTimeMs
 
         if (isUserScrolling) {
             lastInteractionTimeMs = System.currentTimeMillis()
         }
-        
-        val timeSinceInteraction = System.currentTimeMillis() - lastInteractionTimeMs
-        
+
         if (!isUserScrolling) {
             // Apply inertia if there is remaining velocity.
             if (abs(scrollVelocity) > 0.1f) {
                 userScrollOffset += scrollVelocity * dt
-                // Friction / Decay
                 scrollVelocity *= 0.95f 
                 if (abs(scrollVelocity) < 10f) scrollVelocity = 0f
-                
-                // While moving with inertia, keep the interaction timer fresh.
                 lastInteractionTimeMs = System.currentTimeMillis()
             }
 
+            val maxScrollDown = 60f
+            val maxScrollUp = -totalContentHeight - 60f
             val totalScroll = actualSpringY + userScrollOffset
-            // Clamp scroll and slowly decay user offset to return to auto-scroll.
+
+            // Boundaries.
             if (totalScroll > maxScrollDown) {
                 userScrollOffset += (maxScrollDown - totalScroll) * 0.15f
                 scrollVelocity = 0f
             } else if (totalScroll < maxScrollUp) {
                 userScrollOffset += (maxScrollUp - totalScroll) * 0.15f
                 scrollVelocity = 0f
-            } else if (isPlaying && timeSinceInteraction > 3000L && userScrollOffset != 0f) {
+            } else if (isPlaying && !isInManualMode && userScrollOffset != 0f) {
+                // Focus recovery logic.
                 userScrollDecayTimer += dt
-                if (userScrollDecayTimer > 0.5f) {
-                    userScrollOffset *= 0.88f
-                    if (abs(userScrollOffset) < 1f) userScrollOffset = 0f
+                if (userScrollDecayTimer > 0.2f) {
+                    userScrollOffset *= (1f - 0.15f * dt * 60f).coerceIn(0.8f, 0.99f)
+                    if (abs(userScrollOffset) < 0.5f) {
+                        userScrollOffset = 0f
+                        userScrollDecayTimer = 0f
+                    }
                 }
-            } else if (!isPlaying) {
+            } else {
                 userScrollDecayTimer = 0f
             }
         } else {
             userScrollDecayTimer = 0f
+            // Resistance when scrolling past boundaries during drag.
+            val maxScrollDown = 60f
+            val maxScrollUp = -totalContentHeight - 60f
             val totalScroll = actualSpringY + userScrollOffset
-            // Resistance when scrolling past boundaries.
             if (totalScroll > maxScrollDown) {
                 userScrollOffset += (maxScrollDown - totalScroll) * 0.5f * dt
             } else if (totalScroll < maxScrollUp) {

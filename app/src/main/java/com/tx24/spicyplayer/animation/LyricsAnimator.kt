@@ -176,11 +176,8 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
             val lineState = getElementState(currentTimeMs, line.startMs, line.endMs)
 
             // A line is considered active if it's currently in the Active state.
-            val isActive = if (line.isBackground) {
-                lineState == ElementState.Active
-            } else {
-                lineState == ElementState.Active
-            }
+            // Songwriter lines are NEVER considered active for the purpose of word animations.
+            val isActive = !line.isSongwriter && lineState == ElementState.Active
 
             // Determine the target opacity based on the line type and state.
             val targetOpacity = when {
