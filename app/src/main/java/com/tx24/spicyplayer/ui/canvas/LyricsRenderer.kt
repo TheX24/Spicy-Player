@@ -139,7 +139,9 @@ private fun DrawScope.drawSyllabicLetterFragment(
 
     val brightAlpha = (baseDim + (baseBright - baseDim) * wordAnim.activeAnimFactor) * lineAnim.opacity
     val dimAlpha = baseDim * lineAnim.opacity
-    val gradientFraction = ((lState.gradientPosition + 20f) / 120f).coerceIn(0f, 1f)
+    
+    // Even sharper fade-in for individual letters/chars (2 units instead of 20)
+    val gradientFraction = ((lState.gradientPosition + 10f) / 60f).coerceIn(0f, 1f)
 
     withTransform({
         scale(lState.scale, lState.scale, Offset(sPivotX, sPivotY))
@@ -201,13 +203,6 @@ private fun DrawScope.drawStandardWord(
         scale(scaleX = wordScale, scaleY = wordScale, pivot = Offset(pivotX, pivotY))
         translate(top = wordYShift)
     }) {
-        val gradientFraction = ((wordAnim.gradientPosition + 20f) / 120f).coerceIn(0f, 1f)
-        
-        // Calculate the highlight edge based on the FULL word width.
-        val fullWordXHighlight = wLayout.fullWordWidth * gradientFraction
-        // Adjust for this fragment's local start position within the full word.
-        val fragmentXHighlight = fullWordXHighlight - wLayout.startXOffset
-
         val brightAlpha = (baseDim + (baseBright - baseDim) * wordAnim.activeAnimFactor) * lineAnim.opacity
         val dimAlpha = baseDim * lineAnim.opacity
 
@@ -219,16 +214,25 @@ private fun DrawScope.drawStandardWord(
         )
 
         if (brightAlpha > dimAlpha + 0.01f && wordAnim.activeAnimFactor > 0.001f) {
-            val edgeSoftnessInPixels = textHeight * 0.5f // Use pixels for softness
+            val edgeSoftnessInPixels = textHeight * 0.25f 
+            
+            // Map the 0..1 gradientFraction to an expanded range [-margin, textWidth + margin]
+            // so the softness feathering clears the edges at 0% and 100%.
+            val margin = edgeSoftnessInPixels 
+            val wipeProgress = ((wordAnim.gradientPosition + 20f) / 120f).coerceIn(0f, 1f)
+            
+            val fullWordXWithMargins = (wLayout.fullWordWidth + 2 * margin) * wipeProgress - margin
+            val fragmentXHighlight = fullWordXWithMargins - wLayout.startXOffset
+            
             val startFade = fragmentXHighlight - edgeSoftnessInPixels / 2f
             val endFade = fragmentXHighlight + edgeSoftnessInPixels / 2f
             
             val highlightColor = Color.White
             val gradientBrush = Brush.horizontalGradient(
                 0f to highlightColor,
-                maxOf(0f, startFade) to highlightColor,
-                minOf(textWidth, endFade) to Color.Transparent,
-                textWidth to Color.Transparent,
+                (maxOf(0f, startFade) / textWidth).coerceIn(0f, 1f) to highlightColor,
+                (minOf(textWidth, endFade) / textWidth).coerceIn(0f, 1f) to Color.Transparent,
+                1f to Color.Transparent,
                 startX = 0f,
                 endX = textWidth
             )

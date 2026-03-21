@@ -326,11 +326,14 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
         }
 
         // Logic for LetterGroup words (syllabic highlight).
-        val letterStates = if (activeLine && word.isLetterGroup && word.letters.isNotEmpty()) {
+        val letterStates = if (word.isLetterGroup && word.letters.isNotEmpty()) {
             // Identify the currently active letter/syllable.
-            val activeLetterIdx = word.letters.indexOfFirst { letter ->
-                getElementState(currentTimeMs, letter.startMs, letter.endMs) == ElementState.Active
-            }
+            val activeLetterIdx = if (activeLine) {
+                word.letters.indexOfFirst { letter ->
+                    getElementState(currentTimeMs, letter.startMs, letter.endMs) == ElementState.Active
+                }
+            } else -1
+
             val activeLetterProgress = if (activeLetterIdx >= 0) {
                 getProgress(currentTimeMs, word.letters[activeLetterIdx].startMs, word.letters[activeLetterIdx].endMs)
             } else 0f
@@ -351,33 +354,46 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
                 var targetYOff: Float
                 var targetGlow: Float
 
-                when (letterState) {
-                    ElementState.NotSung -> {
-                        targetScale = restScale
-                        targetYOff  = restYOff
-                        targetGlow  = restGlow
-                    }
-                    ElementState.Sung -> {
-                        if (activeLetterIdx == -1) {
-                            targetScale = scaleSpline.at(1f)
-                            targetYOff  = yOffsetSpline.at(1f)
-                            targetGlow  = SUNG_LETTER_GLOW
-                        } else {
+                if (activeLine) {
+                    when (letterState) {
+                        ElementState.NotSung -> {
+                            targetScale = restScale
+                            targetYOff = restYOff
+                            targetGlow = restGlow
+                        }
+                        ElementState.Sung -> {
+                            if (activeLetterIdx == -1) {
+                                targetScale = scaleSpline.at(1f)
+                                targetYOff = yOffsetSpline.at(1f)
+                                targetGlow = SUNG_LETTER_GLOW
+                            } else {
+                                val activeValScale = scaleSpline.at(activeLetterProgress)
+                                val activeValYOff = yOffsetSpline.at(activeLetterProgress)
+                                val activeValGlow = glowSpline.at(activeLetterProgress)
+                                targetScale = restScale + (activeValScale - restScale) * falloff
+                                targetYOff = restYOff + (activeValYOff - restYOff) * falloff
+                                targetGlow = restGlow + (activeValGlow - restGlow) * falloff
+                            }
+                        }
+                        ElementState.Active -> {
                             val activeValScale = scaleSpline.at(activeLetterProgress)
-                            val activeValYOff  = yOffsetSpline.at(activeLetterProgress)
-                            val activeValGlow  = glowSpline.at(activeLetterProgress)
+                            val activeValYOff = yOffsetSpline.at(activeLetterProgress)
+                            val activeValGlow = glowSpline.at(activeLetterProgress)
                             targetScale = restScale + (activeValScale - restScale) * falloff
-                            targetYOff  = restYOff  + (activeValYOff  - restYOff)  * falloff
-                            targetGlow  = restGlow  + (activeValGlow  - restGlow)  * falloff
+                            targetYOff = restYOff + (activeValYOff - restYOff) * falloff
+                            targetGlow = restGlow + (activeValGlow - restGlow) * falloff
                         }
                     }
-                    ElementState.Active -> {
-                        val activeValScale = scaleSpline.at(activeLetterProgress)
-                        val activeValYOff  = yOffsetSpline.at(activeLetterProgress)
-                        val activeValGlow  = glowSpline.at(activeLetterProgress)
-                        targetScale = restScale + (activeValScale - restScale) * falloff
-                        targetYOff  = restYOff  + (activeValYOff  - restYOff)  * falloff
-                        targetGlow  = restGlow  + (activeValGlow  - restGlow)  * falloff
+                } else {
+                    // Not an active line: just show as Sung or NotSung
+                    if (letterState == ElementState.Sung) {
+                        targetScale = scaleSpline.at(1f)
+                        targetYOff = yOffsetSpline.at(1f)
+                        targetGlow = 0f
+                    } else {
+                        targetScale = restScale
+                        targetYOff = restYOff
+                        targetGlow = 0f
                     }
                 }
 
@@ -394,10 +410,12 @@ class LyricsAnimator(private val coroutineScope: CoroutineScope) {
                 lSprings.yOffset.setGoal(targetYOff)
                 lSprings.glow.setGoal(targetGlow)
 
-                val lGradPos = when (letterState) {
-                    ElementState.NotSung -> -20f
-                    ElementState.Sung    -> 100f
-                    ElementState.Active  -> if (li == activeLetterIdx) -20f + 120f * easeSinOut(activeLetterProgress) else -20f
+                val lGradPos = when {
+                    !activeLine -> if (letterState == ElementState.Sung) 100f else -20f
+                    letterState == ElementState.NotSung -> -20f
+                    letterState == ElementState.Sung    -> 100f
+                    letterState == ElementState.Active  -> if (li == activeLetterIdx) -20f + 120f * easeSinOut(activeLetterProgress) else -20f
+                    else -> -20f
                 }
 
                 LetterAnimState(
