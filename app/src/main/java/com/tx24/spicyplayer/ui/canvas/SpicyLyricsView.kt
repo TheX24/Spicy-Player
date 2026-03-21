@@ -134,7 +134,8 @@ fun SpicyLyricsView(
                         }
 
                         // 3. Step the scroll spring and handle user overrides.
-                        val totalContentHeight = (currentLayouts.lastOrNull()?.yOffset ?: 0f) + accumulatedY
+                        val lastLayout = currentLayouts.lastOrNull()
+                        val totalContentHeight = (lastLayout?.yOffset ?: 0f) + (lastLayout?.height ?: 0f) + accumulatedY
                         
                         scrollManager.updateScroll(currentTime, deltaTime, totalContentHeight, targetY)
                     }

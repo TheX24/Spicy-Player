@@ -33,7 +33,10 @@ internal class ScrollManager(
         targetY: Float?
     ) {
         if (targetY != null) {
-            scrollSpring.setGoal(targetY)
+            // Clamp the target goal to valid scroll boundaries to prevent 'fighting' 
+            // with the boundary constraints at the very top or bottom of the lyrics.
+            val clampedGoal = targetY.coerceIn(-totalContentHeight, 0f)
+            scrollSpring.setGoal(clampedGoal)
         }
         
         val springPosBefore = scrollSpring.current
@@ -59,6 +62,10 @@ internal class ScrollManager(
             lastInteractionTimeMs = System.currentTimeMillis()
         }
 
+        val maxScrollDown = 60f
+        val maxScrollUp = -totalContentHeight - 60f
+        val totalScroll = actualSpringY + userScrollOffset
+
         if (!isUserScrolling) {
             // Apply inertia if there is remaining velocity.
             if (abs(scrollVelocity) > 0.1f) {
@@ -68,11 +75,7 @@ internal class ScrollManager(
                 lastInteractionTimeMs = System.currentTimeMillis()
             }
 
-            val maxScrollDown = 60f
-            val maxScrollUp = -totalContentHeight - 60f
-            val totalScroll = actualSpringY + userScrollOffset
-
-            // Boundaries.
+            // Boundaries & Focus Recovery.
             if (totalScroll > maxScrollDown) {
                 userScrollOffset += (maxScrollDown - totalScroll) * 0.15f
                 scrollVelocity = 0f
@@ -80,7 +83,6 @@ internal class ScrollManager(
                 userScrollOffset += (maxScrollUp - totalScroll) * 0.15f
                 scrollVelocity = 0f
             } else if (isPlaying && !isInManualMode && userScrollOffset != 0f) {
-                // Focus recovery logic.
                 userScrollDecayTimer += dt
                 if (userScrollDecayTimer > 0.2f) {
                     userScrollOffset *= (1f - 0.15f * dt * 60f).coerceIn(0.8f, 0.99f)
@@ -94,10 +96,7 @@ internal class ScrollManager(
             }
         } else {
             userScrollDecayTimer = 0f
-            // Resistance when scrolling past boundaries during drag.
-            val maxScrollDown = 60f
-            val maxScrollUp = -totalContentHeight - 60f
-            val totalScroll = actualSpringY + userScrollOffset
+            // Resistance when scrolling past boundaries during active drag.
             if (totalScroll > maxScrollDown) {
                 userScrollOffset += (maxScrollDown - totalScroll) * 0.5f * dt
             } else if (totalScroll < maxScrollUp) {
@@ -132,6 +131,9 @@ internal class ScrollManager(
     }
 
     fun onSeek() {
+        // Re-base the auto-scroll spring so it starts its new journey from 
+        // the EXACT visual position the user is currently seeing.
+        scrollSpring.resetTo(animScrollY)
         userScrollOffset = 0f
         userScrollDecayTimer = 0f
         lastInteractionTimeMs = 0L

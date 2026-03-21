@@ -38,6 +38,11 @@ class SpringSimulation(
         }
     }
 
+    fun resetTo(currentValue: Float) {
+        x = currentValue
+        v = 0f
+    }
+
     fun step(deltaTime: Float): Float {
         val dt = deltaTime.coerceIn(0f, 0.064f)
 
