@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.tx24.spicyplayer"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.tx24.spicyplayer"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "0.1-alpha"
     }
@@ -55,7 +55,8 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
+    // Use alpha for Expressive APIs
+    implementation("androidx.compose.material3:material3:1.4.0-alpha06")
     
     // ExoPlayer
     implementation("androidx.media3:media3-exoplayer:1.3.1")

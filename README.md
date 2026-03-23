@@ -52,23 +52,7 @@ A stateful XML parser that:
 
 ## Roadmap
 
-### Lyrics Visuals
-- [x] **TTML Parsing & Agent Mapping**: Correctly separating singer roles.
-- [x] **Lyrics Canvas**: Single-pass high-performance rendering.
-- [x] **Dynamic Glow & Spline Highlights**: Smooth karaoke-style color wipes.
-- [x] **Motion Cancellation**: Freezes auto-scroll when the user interacts, returning after 4s of idle time.
-- [ ] **Lyrics Theming**: Customizable font faces, size multipliers, and blur intensities.
-
-### Audio Engine
-- [x] **Media3 ExoPlayer Wrapper**: Handle FLAC, MP3, and WAV.
-- [x] **Lyric Auto-Pairing**: Match `.flac` and `.ttml` based on file name prefix.
-- [ ] **Gapless Playback**: Implement a customized `ConcatenatingMediaSource` for seamless transitions.
-- [ ] **Equalizer & Reverb**: Native Android audio effects integration.
-
-### User Experience (UI/UX)
-- [x] **Adaptive Launch Icons**: 15dp inset foreground with a 108dp safety margin. 
-- [ ] **Music Library**: A folder-based scanner that caches metadata and covers locally. 
-- [ ] **Player Controls**: Drag-to-dismiss "Now Playing" sheet with Musicolet-style layouts.
+Find the full feature and bug roadmap [here](plan.md).
 
 ---
 

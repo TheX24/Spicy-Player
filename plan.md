@@ -1,30 +1,64 @@
-# Spicy Player Work Breakdown
-
-- Lyrics aspect
-  - [x] TTML parser
-  - [x] Compose lyrics list
-  - [x] Word renderer
-  - [x] Smooth scroll with inertia
-  - [x] Tap to seek
-  - [x] 3 Dots Interlude indicator
-  - [x] Dynamic Background
-  - [ ] Landscape view
-  - [ ] Fix held word animation
-- Audio player aspect
-  - [x] ExoPlayer
-  - [ ] Folder scanner + auto-pairing
-    - [ ] Implement file picker to scan `/Music/` directory
-    - [x] Auto-pair `.flac` and `.ttml` files based on name
-  - [ ] UI (similar to Musicolet)
-    - [ ] Library
-    - [ ] Queue
-    - [ ] Now Playing
-    - [ ] Spectrum viz + controls
-- Settings
-  - [ ] Lyrics settings
-  - [ ] Audio player settings
-  - [ ] General settings
-- [ ] Polish and Bug hunting
-  - [x] App icon
-  - [ ] Verify FLAC gapless playback (Concat adapter)
-  - [ ] Final performance optimizations (60fps target)
+- Features
+  - Lyrics aspect
+    - [x] TTML parser
+    - [x] Compose lyrics list
+    - [x] Word renderer
+    - [x] Smooth scroll with inertia
+    - [x] Tap to seek
+    - [x] 3 Dots Interlude indicator
+    - [x] Dynamic Background
+    - [ ] Landscape view
+      - [ ] Split screen layout with cover art/controls on the left and scrolling lyrics on the right
+    - [ ] Fixes
+      - [ ] Resolve overlapping text issues during fast sections or duets
+      - [ ] Improve parser resilience for malformed `.ttml` files to prevent crashes
+  - Audio player aspect
+    - [x] ExoPlayer
+    - [ ] Folder scanner + auto-pairing
+      - [ ] Implement file picker to scan `/Music/` directory
+        - [ ] Use Android Storage Access Framework (SAF) for scoped storage compliance
+        - [ ] Background service for scanning with a progress notification
+      - [x] Auto-pair `.flac` and `.ttml` files based on name
+    - [ ] Implement MediaSession for song info broadcasting
+    - [ ] UI
+      - [ ] Library
+        - [ ] Categorized tabs: Albums, Artists, Songs, Folders, and Playlists
+        - [ ] Grid view for Albums/Artists with fast-scroll alphabet indexer on the right edge
+      - [ ] Queue
+        - [ ] Drag-and-drop to reorder tracks
+        - [ ] Swipe left/right to remove a track from the queue
+        - [ ] Sleep timer
+      - [ ] Now Playing
+        - [ ] Swipe horizontally on the album cover to skip to previous/next track
+        - [ ] Tap album cover to show/hide lyrics overlay or toggle full-screen cover
+        - [x] Controls
+        - [x] Progress bar
+        - [x] Cover art and track info
+          - [ ] Auto expand cover art and track info to middle if no TTML is found
+            - [ ] Use `animateContentSize` or `updateTransition` in Compose for a smooth centering animation
+          - [ ] Scrolling track info if too long
+      - [ ] Spectrum viz
+        - [ ] Fetch audio session ID from ExoPlayer to drive visualizer data
+        - [ ] Multiple visualizer styles (e.g., bar graph, waveform, circular aura around cover art)
+  - Settings
+    - [ ] Lyrics settings
+      - [ ] Global offset/delay adjustment (e.g., ±500ms) for out-of-sync lyrics
+      - [ ] Custom font size and highlight color picker (using Material 3 dynamic colors by default)
+    - [ ] Audio player settings
+      - [ ] Equalizer (EQ) preset selection and Bass Boost toggle
+      - [ ] Crossfade duration slider (0-10 seconds) and gapless playback toggle
+    - [ ] General settings
+      - [ ] App theme selector (Light, Dark, System Default, Material You)
+      - [ ] Cache management (clear cached images/lyrics to free up space)
+      - [ ] Keep screen on
+- Bugs
+  - [ ] RTL Languages
+    - [ ] Ensure the Word renderer calculates layout widths properly from right to left
+    - [ ] Mirror the scroll direction metrics for RTL text in the lyrics list
+  - [ ] Held word animation
+    - [ ] Use `Animatable` progress driven by the fractional time difference between word start and end
+    - [ ] Prevent sudden layout jumps or visual "snapping" when the held word transitions to the next
+  - [ ] Audio focus handling
+    - [ ] Properly pause playback on incoming calls and duck volume on transient notifications
+  - [ ] Bluetooth/general audio delay fix
+  - [ ] 3 Dots interlude line spacings

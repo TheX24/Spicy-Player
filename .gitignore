@@ -6,3 +6,4 @@ spicy-lyrics/
 build_output.log
 build/
 .kotlin/
+.agents/

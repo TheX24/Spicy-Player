@@ -36,6 +36,10 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -97,6 +101,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     val coroutineScope = rememberCoroutineScope()
@@ -554,8 +559,55 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                     loopMode = loopMode,
                     onToggleLoop = { loopMode = (loopMode + 1) % 3 },
                     colorScheme = colorScheme,
-                    formatTime = { formatTime(it) }
+                    formatTime = { formatTime(it) },
+                    isExpressive = true // Future proof: classic design is kept accessible
                 )
+
+                if (showMenu) {
+                    ModalBottomSheet(
+                        onDismissRequest = { showMenu = false },
+                        containerColor = colorScheme.surfaceVariant
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                "More Options",
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(bottom = 16.dp, start = 8.dp),
+                                color = colorScheme.onSurfaceVariant
+                            )
+                            
+                            ListItem(
+                                headlineContent = { Text("Add to Playlist") },
+                                leadingContent = { Icon(Icons.Rounded.FavoriteBorder, contentDescription = null) },
+                                modifier = Modifier.clickable { showMenu = false },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                            ListItem(
+                                headlineContent = { Text("Sleep Timer") },
+                                leadingContent = { Icon(Icons.Rounded.Timer, contentDescription = null) },
+                                modifier = Modifier.clickable { showMenu = false },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                            ListItem(
+                                headlineContent = { Text("Equalizer") },
+                                leadingContent = { Icon(Icons.Rounded.GraphicEq, contentDescription = null) },
+                                modifier = Modifier.clickable { showMenu = false },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                            ListItem(
+                                headlineContent = { Text("Settings") },
+                                leadingContent = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+                                modifier = Modifier.clickable { showMenu = false },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                            Spacer(Modifier.height(48.dp))
+                        }
+                    }
+                }
             }
         }
     }
