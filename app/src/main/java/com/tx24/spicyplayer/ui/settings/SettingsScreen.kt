@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +24,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 import com.tx24.spicyplayer.ui.settings.components.*
 import com.tx24.spicyplayer.viewmodel.SettingsViewModel
+
+import com.tx24.spicyplayer.BuildConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +48,7 @@ fun SettingsScreen(
     val bassBoostStrength  by vm.bassBoostStrength.collectAsStateWithLifecycle()
     val crossfade          by vm.crossfadeDuration.collectAsStateWithLifecycle()
     val gapless            by vm.gaplessPlayback.collectAsStateWithLifecycle()
+    val backSkipThreshold  by vm.backSkipThreshold.collectAsStateWithLifecycle()
 
     val appTheme           by vm.appTheme.collectAsStateWithLifecycle()
     val materialYou        by vm.materialYou.collectAsStateWithLifecycle()
@@ -58,18 +62,13 @@ fun SettingsScreen(
     val scanDir            by vm.scanDirectory.collectAsStateWithLifecycle()
 
     // ── Local UI state ────────────────────────────────────────────────────────
-    var showEqualizer      by remember { mutableStateOf(false) }
+    var showResetSettings  by remember { mutableStateOf(false) }
 
     // ── Sub-screens ───────────────────────────────────────────────────────────
-    if (showEqualizer) {
-        EqualizerScreen(
-            currentPreset = eqPreset,
-            onPresetChange = { vm.setEqPreset(it) },
-            bassBoostEnabled = bassBoost,
-            onBassBoostEnabledChange = { vm.setBassBoost(it) },
-            bassBoostStrength = bassBoostStrength,
-            onBassBoostStrengthChange = { vm.setBassBoostStrength(it) },
-            onBack = { showEqualizer = false }
+    if (showResetSettings) {
+        ResetSettingsScreen(
+            onBack = { showResetSettings = false },
+            vm = vm
         )
         return
     }
@@ -127,14 +126,14 @@ fun SettingsScreen(
             item { SettingsSectionHeader("Lyrics") }
             item {
                 SettingsSection {
-                    SliderSettingItem(
+                    NumberSettingItem(
                         icon = Icons.Rounded.Tune,
                         title = "Global Sync Offset",
-                        valueLabel = "${if (lyricsOffsetMs >= 0) "+" else ""}$lyricsOffsetMs ms",
-                        value = lyricsOffsetMs.toFloat(),
-                        onValueChange = { vm.setLyricsOffsetMs(it.toInt()) },
-                        valueRange = -500f..500f,
-                        steps = 99
+                        value = lyricsOffsetMs,
+                        onValueChange = { vm.setLyricsOffsetMs(it) },
+                        valueRange = -5000..5000,
+                        step = 50,
+                        suffix = "ms"
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     SegmentedSettingItem(
@@ -156,9 +155,9 @@ fun SettingsScreen(
                 }
             }
 
-            // ━━ Audio ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            // ━━ Audio & Playback ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-            item { SettingsSectionHeader("Audio") }
+            item { SettingsSectionHeader("Audio & Playback") }
             item {
                 SettingsSection {
                     NavigationSettingItem(
@@ -166,17 +165,6 @@ fun SettingsScreen(
                         title = "Equalizer",
                         subtitle = eqPreset.lowercase().replaceFirstChar { it.uppercase() },
                         onClick = onNavigateToEqualizer
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                    SliderSettingItem(
-                        icon = Icons.Rounded.BlurOn,
-                        title = "Crossfade Duration",
-                        valueLabel = if (crossfade == 0) "Off" else "${crossfade}s",
-                        value = crossfade.toFloat(),
-                        onValueChange = { vm.setCrossfadeDuration(it.toInt()) },
-                        onValueChangeFinished = {},
-                        valueRange = 0f..10f,
-                        steps = 9
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     SwitchSettingItem(
@@ -194,12 +182,41 @@ fun SettingsScreen(
                         onCheckedChange = {},
                         enabled = false
                     )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                    SliderSettingItem(
+                        icon = Icons.Rounded.BlurOn,
+                        title = "Crossfade Duration",
+                        valueLabel = if (crossfade == 0) "Off" else "${crossfade}s",
+                        value = crossfade.toFloat(),
+                        onValueChange = { vm.setCrossfadeDuration(it.toInt()) },
+                        onValueChangeFinished = {},
+                        valueRange = 0f..10f,
+                        steps = 9
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                    SliderSettingItem(
+                        icon = Icons.Rounded.Replay,
+                        title = "Previous Skip Threshold",
+                        valueLabel = "${backSkipThreshold}s",
+                        value = backSkipThreshold.toFloat(),
+                        onValueChange = { vm.setBackSkipThreshold(it.toInt()) },
+                        valueRange = 0f..10f,
+                        steps = 9
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                    SegmentedSettingItem(
+                        icon = Icons.AutoMirrored.Rounded.VolumeDown,
+                        title = "Audio Focus Behavior",
+                        options = listOf("Pause", "Continue"),
+                        selectedIndex = if (audioFocus == "PAUSE") 0 else 1,
+                        onSelect = { vm.setAudioFocus(if (it == 0) "PAUSE" else "DUCK") }
+                    )
                 }
             }
 
-            // ━━ Appearance ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            // ━━ Appearance & Display ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-            item { SettingsSectionHeader("Appearance") }
+            item { SettingsSectionHeader("Appearance & Display") }
             item {
                 SettingsSection {
                     SegmentedSettingItem(
@@ -212,28 +229,10 @@ fun SettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     SwitchSettingItem(
                         icon = Icons.Rounded.AutoAwesome,
-                        title = "Material You (Dynamic Color)",
-                        subtitle = "Use wallpaper colors",
+                        title = "Material You",
+                        subtitle = "Dynamic colors based on your wallpaper",
                         checked = materialYou,
                         onCheckedChange = { vm.setMaterialYou(it) }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                    SegmentedSettingItem(
-                        icon = Icons.Rounded.Style,
-                        title = "Controls Style",
-                        options = listOf("Classic", "Expressive"),
-                        selectedIndex = if (controlsStyle == "EXPRESSIVE") 1 else 0,
-                        onSelect = { vm.setControlsStyle(if (it == 1) "EXPRESSIVE" else "CLASSIC") }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                    SliderSettingItem(
-                        icon = Icons.Rounded.BlurCircular,
-                        title = "Background Blur Intensity",
-                        valueLabel = "$blur%",
-                        value = blur.toFloat(),
-                        onValueChange = { vm.setBackgroundBlur(it.toInt()) },
-                        valueRange = 0f..100f,
-                        steps = 99
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     SwitchSettingItem(
@@ -255,29 +254,46 @@ fun SettingsScreen(
                         },
                         onSelect = { vm.setContrastLevel(when (it) { 1 -> 0.5f; 2 -> 1.0f; else -> 0.0f }) }
                     )
-                }
-            }
-
-            // ━━ General ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-            item { SettingsSectionHeader("General") }
-            item {
-                SettingsSection {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                    SegmentedSettingItem(
+                        icon = Icons.Rounded.Style,
+                        title = "Player Controls Style",
+                        options = listOf("Classic", "Expressive"),
+                        selectedIndex = if (controlsStyle == "EXPRESSIVE") 1 else 0,
+                        onSelect = { vm.setControlsStyle(if (it == 1) "EXPRESSIVE" else "CLASSIC") }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                    NumberSettingItem(
+                        icon = Icons.Rounded.BlurCircular,
+                        title = "Background Blur Intensity",
+                        value = blur,
+                        onValueChange = { vm.setBackgroundBlur(it) },
+                        valueRange = 0..100,
+                        step = 5,
+                        suffix = "%"
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                    NavigationSettingItem(
+                        icon = Icons.Rounded.Equalizer,
+                        title = "Visualizer",
+                        subtitle = "Coming soon",
+                        onClick = {}
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     SwitchSettingItem(
                         icon = Icons.Rounded.ScreenLockPortrait,
                         title = "Keep Screen On",
                         checked = keepScreenOn,
                         onCheckedChange = { vm.setKeepScreenOn(it) }
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                    SegmentedSettingItem(
-                        icon = Icons.Rounded.VolumeDown,
-                        title = "Audio Focus Behavior",
-                        options = listOf("Pause", "Continue"),
-                        selectedIndex = if (audioFocus == "PAUSE") 0 else 1,
-                        onSelect = { vm.setAudioFocus(if (it == 0) "PAUSE" else "DUCK") }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                }
+            }
+
+            // ━━ Library & Storage ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            item { SettingsSectionHeader("Library & Storage") }
+            item {
+                SettingsSection {
                     NavigationSettingItem(
                         icon = Icons.Rounded.Folder,
                         title = "Scan Directory",
@@ -298,17 +314,6 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     ButtonSettingItem(
-                        icon = Icons.Rounded.Lyrics,
-                        title = "Clear Lyrics Cache",
-                        subtitle = "Cached TTML parse results",
-                        buttonLabel = "Clear",
-                        onClick = {
-                            context.cacheDir.listFiles()?.filter { it.name.endsWith(".ttml") }?.forEach { it.delete() }
-                            android.widget.Toast.makeText(context, "Lyrics cache cleared", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                    ButtonSettingItem(
                         icon = Icons.Rounded.Photo,
                         title = "Clear Image Cache",
                         subtitle = "Album art bitmaps",
@@ -318,6 +323,17 @@ fun SettingsScreen(
                                 it.name.endsWith(".png") || it.name.endsWith(".jpg") || it.name.endsWith(".webp")
                             }?.forEach { it.delete() }
                             android.widget.Toast.makeText(context, "Image cache cleared", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                    ButtonSettingItem(
+                        icon = Icons.Rounded.Lyrics,
+                        title = "Clear Lyrics Cache",
+                        subtitle = "Cached TTML parse results",
+                        buttonLabel = "Clear",
+                        onClick = {
+                            context.cacheDir.listFiles()?.filter { it.name.endsWith(".ttml") }?.forEach { it.delete() }
+                            android.widget.Toast.makeText(context, "Lyrics cache cleared", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     )
                 }
@@ -331,7 +347,7 @@ fun SettingsScreen(
                     NavigationSettingItem(
                         icon = Icons.Rounded.Info,
                         title = "Version",
-                        subtitle = "0.1-alpha (1)",
+                        subtitle = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                         onClick = {}
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
@@ -348,6 +364,13 @@ fun SettingsScreen(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/tx24/spicy-player"))
                             context.startActivity(intent)
                         }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                    NavigationSettingItem(
+                        icon = Icons.Rounded.Restore,
+                        title = "Reset to Defaults",
+                        subtitle = "Reset specific settings or all",
+                        onClick = { showResetSettings = true }
                     )
                 }
             }

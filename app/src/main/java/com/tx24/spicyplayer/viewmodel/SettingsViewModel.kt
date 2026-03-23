@@ -20,8 +20,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val eqPreset         = repo.eqPreset.stateIn(viewModelScope, SharingStarted.Eagerly, "FLAT")
     val bassBoostEnabled = repo.bassBoostEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val bassBoostStrength = repo.bassBoostStrength.stateIn(viewModelScope, SharingStarted.Eagerly, 800)
+    val loudnessEnabled  = repo.loudnessEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val loudnessStrength = repo.loudnessStrength.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
     val crossfadeDuration = repo.crossfadeDuration.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
     val gaplessPlayback  = repo.gaplessPlayback.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val backSkipThreshold = repo.backSkipThreshold.stateIn(viewModelScope, SharingStarted.Eagerly, 5)
+    val customEqBands    = repo.customEqBands.stateIn(viewModelScope, SharingStarted.Eagerly, listOf(0f, 0f, 0f, 0f, 0f))
 
     // ── Appearance ────────────────────────────────────────────────────────
     val appTheme         = repo.appTheme.stateIn(viewModelScope, SharingStarted.Eagerly, "SYSTEM")
@@ -43,8 +47,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setEqPreset(v: String)           = viewModelScope.launch { repo.setEqPreset(v) }
     fun setBassBoost(v: Boolean)         = viewModelScope.launch { repo.setBassBoost(v) }
     fun setBassBoostStrength(v: Int)     = viewModelScope.launch { repo.setBassBoostStrength(v) }
+    fun setLoudnessEnabled(v: Boolean)   = viewModelScope.launch { repo.setLoudnessEnabled(v) }
+    fun setLoudnessStrength(v: Int)      = viewModelScope.launch { repo.setLoudnessStrength(v) }
     fun setCrossfadeDuration(v: Int)     = viewModelScope.launch { repo.setCrossfadeDuration(v) }
     fun setGaplessPlayback(v: Boolean)   = viewModelScope.launch { repo.setGaplessPlayback(v) }
+    fun setBackSkipThreshold(v: Int)     = viewModelScope.launch { repo.setBackSkipThreshold(v) }
+    fun setCustomEqBands(v: List<Float>) = viewModelScope.launch { repo.setCustomEqBands(v) }
 
     fun setAppTheme(v: String)           = viewModelScope.launch { repo.setAppTheme(v) }
     fun setMaterialYou(v: Boolean)       = viewModelScope.launch { repo.setMaterialYou(v) }
@@ -56,4 +64,44 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setKeepScreenOn(v: Boolean)      = viewModelScope.launch { repo.setKeepScreenOn(v) }
     fun setAudioFocus(v: String)         = viewModelScope.launch { repo.setAudioFocus(v) }
     fun setScanDirectory(v: String)      = viewModelScope.launch { repo.setScanDirectory(v) }
+
+    // ── Resets ────────────────────────────────────────────────────────────
+    fun resetLyrics() = viewModelScope.launch {
+        repo.setLyricsOffsetMs(0)
+        repo.setLyricsFontSize("MEDIUM")
+    }
+
+    fun resetAudio() = viewModelScope.launch {
+        repo.setEqPreset("FLAT")
+        repo.setBassBoost(false)
+        repo.setBassBoostStrength(800)
+        repo.setLoudnessEnabled(false)
+        repo.setLoudnessStrength(0)
+        repo.setCrossfadeDuration(0)
+        repo.setGaplessPlayback(true)
+        repo.setBackSkipThreshold(5)
+        repo.setCustomEqBands(listOf(0f, 0f, 0f, 0f, 0f))
+        repo.setAudioFocus("PAUSE")
+    }
+
+    fun resetAppearance() = viewModelScope.launch {
+        repo.setAppTheme("SYSTEM")
+        repo.setMaterialYou(false)
+        repo.setControlsStyle("EXPRESSIVE")
+        repo.setBackgroundBlur(60)
+        repo.setPureBlack(false)
+        repo.setContrastLevel(0f)
+    }
+
+    fun resetLibrary() = viewModelScope.launch {
+        repo.setKeepScreenOn(false)
+        repo.setScanDirectory("/sdcard/Music/")
+    }
+
+    fun resetAll() {
+        resetLyrics()
+        resetAudio()
+        resetAppearance()
+        resetLibrary()
+    }
 }

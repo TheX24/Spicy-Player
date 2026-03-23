@@ -8,6 +8,7 @@
     - [x] 3 Dots Interlude indicator
     - [x] Dynamic Background
     - [ ] Romanization
+    - [ ] Translation (?)
     - [ ] Landscape view
       - [ ] Split screen layout with cover art/controls on the left and scrolling lyrics on the right
     - [ ] Fixes
@@ -15,10 +16,10 @@
       - [ ] Improve parser resilience for malformed `.ttml` files to prevent crashes
   - Audio player aspect
     - [x] ExoPlayer
-    - [ ] Folder scanner + auto-pairing
+    - [x] Folder scanner + auto-pairing
       - [x] Implement file picker to scan `/Music/` directory
-        - [ ] Use Android Storage Access Framework (SAF) for scoped storage compliance
-        - [ ] Background service for scanning with a progress notification
+        - [x] Use Android Storage Access Framework (SAF) for scoped storage compliance
+        - [x] Background service for scanning with a progress notification
       - [x] Auto-pair `.flac` and `.ttml` files based on name
     - [ ] Implement MediaSession for song info broadcasting
     - [ ] UI
@@ -26,7 +27,7 @@
         - [ ] Greeting
         - [ ] Tutorial
         - [ ] Select folder to scan
-        - [ ] Show progress of scanning
+        - [x] Show progress of scanning
       - [ ] Library
         - [ ] Categorized tabs: Albums, Artists, Songs, Folders, and Playlists
         - [ ] Grid view for Albums/Artists with fast-scroll alphabet indexer on the right edge
@@ -34,50 +35,52 @@
         - [ ] Drag-and-drop to reorder tracks
         - [ ] Swipe left/right to remove a track from the queue
         - [ ] Sleep timer
-      - [ ] Now Playing
-        - [ ] Swipe horizontally on the album cover to skip to previous/next track
+      - [x] Now Playing
+        - [ ] Swipe horizontally to skip to previous/next track
         - [ ] Tap album cover to show/hide lyrics overlay or toggle full-screen cover
         - [x] Controls
+          - [ ] Advanced controls
         - [x] Progress bar
         - [x] Cover art and track info
           - [ ] Auto expand cover art and track info to middle if no TTML is found
             - [ ] Use `animateContentSize` or `updateTransition` in Compose for a smooth centering animation
-          - [ ] Scrolling track info if too long
-      - [ ] Spectrum viz
+          - [x] Scrolling track info if too long
+      - [ ] Spectrum visualization
         - [ ] Fetch audio session ID from ExoPlayer to drive visualizer data
         - [ ] Multiple visualizer styles (e.g., bar graph, waveform, circular aura around cover art)
   - Settings
     - [x] Lyrics settings
       - [x] Global offset/delay adjustment (e.g., ±500ms) for out-of-sync lyrics
       - [x] Custom font size
-      - [ ] Translation
     - [x] Audio player settings
       - [x] Equalizer (EQ) preset selection and Bass Boost toggle
-      - [ ] Crossfade duration slider (0-10 seconds) and gapless playback toggle
+        - [ ] *TODO* Musicolet-like EQ
+      - [x] Crossfade duration slider (0-10 seconds) and gapless playback toggle
     - [x] General settings
       - [x] App theme selector (Light, Dark, System Default, Material You)
-      - [ ] Cache management (clear cached images/lyrics to free up space)
+      - [x] Cache management (clear cached images/lyrics to free up space)
       - [x] Keep screen on
       - [x] Scan directory
       - [x] Audio focus mode
       - [x] Rescan library
         - [ ] Cache scanned and matched
-    - [ ] Reset to defaults button on everything
+    - [x] Reset to defaults
 - Bugs
   - [ ] RTL Languages
     - [ ] Ensure the Word renderer calculates layout widths properly from right to left
     - [ ] Mirror the scroll direction metrics for RTL text in the lyrics list
+    - [ ] Flip gradient scan direction
+    - [ ] Turn off held word animation
   - [ ] Held word animation
-    - [ ] Use `Animatable` progress driven by the fractional time difference between word start and end
-    - [ ] Prevent sudden layout jumps or visual "snapping" when the held word transitions to the next
-  - [ ] Audio focus handling
-    - [ ] Properly pause playback on incoming calls and duck volume on transient notifications
+    - [ ] Slower anims look fine but faster anims look weird
+  - [x] Audio focus handling
   - [ ] Bluetooth/general audio delay fix
   - [ ] 3 Dots interlude BG line spacings
-  - [ ] Previous song
-  - [ ] Seeking doesn't move lyrics view
-  - [ ] BG Blur and timing offset have too many steps/circles in slider
-  - [ ] Fix scan directory setting
-  - [ ] Custom EQ doesn't work
+  - [x] Previous song
+  - [x] Seeking doesn't move lyrics view
+  - [x] BG Blur and timing offset have too many steps/circles in slider
+  - [x] Fix scan directory setting
+  - [x] Custom EQ doesn't work
   - [x] Transition/animation between settings pages
   - [ ] Performance improvements
+  - [ ] Fix logo sizing in some places like toasts

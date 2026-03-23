@@ -8,9 +8,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -164,6 +168,95 @@ fun SliderSettingItem(
             modifier = Modifier.padding(start = 0.dp)
         )
     }
+}
+
+// ── Number item ───────────────────────────────────────────────────────────────
+
+@Composable
+fun NumberSettingItem(
+    icon: ImageVector? = null,
+    title: String,
+    subtitle: String? = null,
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    valueRange: IntRange,
+    step: Int = 1,
+    suffix: String = "",
+    enabled: Boolean = true
+) {
+    var textValue by remember(value) { mutableStateOf(value.toString()) }
+
+    SettingRow(
+        icon = icon,
+        title = title,
+        subtitle = subtitle,
+        trailing = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledIconButton(
+                    onClick = {
+                        val newVal = (value - step).coerceAtLeast(valueRange.first)
+                        onValueChange(newVal)
+                    },
+                    modifier = Modifier.size(32.dp),
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                    enabled = enabled && value > valueRange.first
+                ) {
+                    Icon(Icons.Rounded.Remove, contentDescription = "Decrease", modifier = Modifier.size(16.dp))
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BasicTextField(
+                        value = textValue,
+                        onValueChange = { newText ->
+                            if (newText.isEmpty() || newText == "-") {
+                                textValue = newText
+                            } else {
+                                val parsed = newText.toIntOrNull()
+                                if (parsed != null) {
+                                    val coerced = parsed.coerceIn(valueRange)
+                                    textValue = coerced.toString()
+                                    onValueChange(coerced)
+                                }
+                            }
+                        },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.widthIn(min = 44.dp).width(IntrinsicSize.Min)
+                    )
+                    
+                    if (suffix.isNotEmpty()) {
+                        Text(
+                            text = suffix,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 2.dp)
+                        )
+                    }
+                }
+
+                FilledIconButton(
+                    onClick = {
+                        val newVal = (value + step).coerceAtMost(valueRange.last)
+                        onValueChange(newVal)
+                    },
+                    modifier = Modifier.size(32.dp),
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                    enabled = enabled && value < valueRange.last
+                ) {
+                    Icon(Icons.Rounded.Add, contentDescription = "Increase", modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+    )
 }
 
 // ── Segmented button item ─────────────────────────────────────────────────────

@@ -25,22 +25,35 @@ private val EQ_BANDS = listOf("60 Hz", "230 Hz", "910 Hz", "3.6 kHz", "14 kHz")
 fun EqualizerScreen(
     currentPreset: String,
     onPresetChange: (String) -> Unit,
+    customBands: List<Float>,
+    onCustomBandsChange: (List<Float>) -> Unit,
+    onCustomBandsPreview: (List<Float>) -> Unit,
     bassBoostEnabled: Boolean,
     onBassBoostEnabledChange: (Boolean) -> Unit,
     bassBoostStrength: Int,
     onBassBoostStrengthChange: (Int) -> Unit,
+    loudnessEnabled: Boolean,
+    onLoudnessEnabledChange: (Boolean) -> Unit,
+    loudnessStrength: Int,
+    onLoudnessStrengthChange: (Int) -> Unit,
     onBack: () -> Unit,
 ) {
     // Band gains in dB (–12 to +12), keyed by preset
-    val defaultGains = remember(currentPreset) {
+    val defaultGains = remember(currentPreset, customBands) {
         when (currentPreset) {
             "BASS"        -> listOf(6f,  4f,  0f, -2f, -2f)
             "TREBLE"      -> listOf(-2f, -2f, 0f,  4f,  6f)
             "VOCAL"       -> listOf(-1f,  0f,  3f,  3f,  0f)
+            "CUSTOM"      -> customBands.ifEmpty { listOf(0f, 0f, 0f, 0f, 0f) }
             else          -> listOf(0f,  0f,  0f,  0f,  0f)
         }
     }
-    val gains = remember(currentPreset) { defaultGains.map { mutableStateOf(it) } }
+    val gains = remember { mutableStateListOf(*defaultGains.toTypedArray()) }
+
+    LaunchedEffect(currentPreset, customBands) {
+        // Sync local gains with default/custom bands if not midway through an edit
+        defaultGains.forEachIndexed { i, v -> gains[i] = v }
+    }
 
     Scaffold(
         topBar = {
@@ -101,6 +114,7 @@ fun EqualizerScreen(
                                         onPresetChange(label.replace(" ", "_").uppercase())
                                     },
                                     shape = SegmentedButtonDefaults.itemShape(index = index, count = EQ_PRESETS.size),
+                                    icon = {},
                                     label = {
                                         Text(
                                             label,
@@ -136,18 +150,27 @@ fun EqualizerScreen(
                                     modifier = Modifier.width(56.dp)
                                 )
                                 Slider(
-                                    value = gains[i].value,
+                                    value = gains[i],
                                     onValueChange = {
-                                        gains[i].value = it
-                                        onPresetChange("CUSTOM")
+                                        gains[i] = it
+                                        if (currentPreset != "CUSTOM") {
+                                            onPresetChange("CUSTOM")
+                                        }
+                                        onCustomBandsPreview(gains.toList())
+                                    },
+                                    onValueChangeFinished = {
+                                        if (currentPreset == "CUSTOM") {
+                                            onCustomBandsChange(gains.toList())
+                                        }
                                     },
                                     valueRange = -12f..12f,
+                                    steps = 23,
                                     modifier = Modifier.weight(1f)
                                 )
                                 SuggestionChip(
                                     onClick = {},
                                     label = {
-                                        val g = gains[i].value
+                                        val g = gains[i]
                                         Text(
                                             "${if (g >= 0) "+" else ""}${"%.0f".format(g)} dB",
                                             style = MaterialTheme.typography.labelSmall
@@ -158,7 +181,7 @@ fun EqualizerScreen(
                                         labelColor = MaterialTheme.colorScheme.onSecondaryContainer
                                     ),
                                     border = null,
-                                    modifier = Modifier.width(64.dp)
+                                    modifier = Modifier.width(72.dp)
                                 )
                             }
                             if (i < EQ_BANDS.lastIndex) {
@@ -168,33 +191,6 @@ fun EqualizerScreen(
                     }
                 }
             }
-
-            // EQ Visualization placeholder
-            item {
-                SettingsSectionHeader("Visualization")
-                SettingsSection {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp)
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.GraphicEq,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        Text(
-                            "Live visualization coming soon",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
             // Bass Boost section
             item { SettingsSectionHeader("Extra Effects") }
             item {
@@ -237,6 +233,54 @@ fun EqualizerScreen(
                                 )
                                 Text(
                                     "${(bassBoostStrength / 10)}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.width(32.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 0.dp))
+                        Spacer(Modifier.height(16.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Loudness Enhancer",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Switch(
+                                checked = loudnessEnabled,
+                                onCheckedChange = onLoudnessEnabledChange
+                            )
+                        }
+                        
+                        if (loudnessEnabled) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    "Gain",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.width(56.dp)
+                                )
+                                Slider(
+                                    value = loudnessStrength.toFloat(),
+                                    onValueChange = { onLoudnessStrengthChange(it.toInt()) },
+                                    valueRange = 0f..100f,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    "${loudnessStrength / 10} dB",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.width(32.dp)

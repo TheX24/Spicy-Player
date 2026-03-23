@@ -106,7 +106,7 @@ object TtmlLyricsParser {
         }
 
         // Inject instrumental interlude placeholders for significant gaps (>= 3s) between main lines.
-        val mainLines = lines.filter { !it.isBackground && !it.isSongwriter }
+        val mainLines = lines.filter { !it.isSongwriter }
             .sortedBy { it.startMs }
         val interludes = mutableListOf<Line>()
         for (i in 0 until mainLines.size - 1) {

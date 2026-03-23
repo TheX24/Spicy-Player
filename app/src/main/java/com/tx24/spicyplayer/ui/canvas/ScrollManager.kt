@@ -32,11 +32,26 @@ internal class ScrollManager(
         totalContentHeight: Float,
         targetY: Float?
     ) {
+        val timeJump = abs(currentTimeMs - lastFrameSongTime)
+        val isFirstFrame = lastFrameSongTime == 0L
+        val isSeek = timeJump > 800L
+
         if (targetY != null) {
             // Clamp the target goal to valid scroll boundaries to prevent 'fighting' 
             // with the boundary constraints at the very top or bottom of the lyrics.
             val clampedGoal = targetY.coerceIn(-totalContentHeight, 0f)
-            scrollSpring.setGoal(clampedGoal)
+            
+            if (isFirstFrame) {
+                scrollSpring.resetTo(clampedGoal)
+                userScrollOffset = 0f
+                lastInteractionTimeMs = 0L
+            } else if (isSeek) {
+                userScrollOffset = 0f
+                lastInteractionTimeMs = 0L
+                scrollSpring.setGoal(clampedGoal)
+            } else {
+                scrollSpring.setGoal(clampedGoal)
+            }
         }
         
         val springPosBefore = scrollSpring.current

@@ -22,8 +22,12 @@ class SettingsRepository(private val context: Context) {
         val EQ_PRESET           = stringPreferencesKey("eq_preset")           // FLAT, BASS_BOOST, TREBLE, VOCAL, CUSTOM
         val BASS_BOOST_ENABLED  = booleanPreferencesKey("bass_boost_enabled")
         val BASS_BOOST_STRENGTH = intPreferencesKey("bass_boost_strength")    // 0–1000
+        val LOUDNESS_ENABLED    = booleanPreferencesKey("loudness_enabled")
+        val LOUDNESS_STRENGTH   = intPreferencesKey("loudness_strength")      // 0–1000
         val CROSSFADE_DURATION  = intPreferencesKey("crossfade_duration_s")   // 0–10
         val GAPLESS_PLAYBACK    = booleanPreferencesKey("gapless_playback")
+        val BACK_SKIP_THRESHOLD = intPreferencesKey("back_skip_threshold")
+        val CUSTOM_EQ_BANDS     = stringPreferencesKey("custom_eq_bands")
 
         // Appearance
         val APP_THEME           = stringPreferencesKey("app_theme")            // LIGHT, DARK, SYSTEM
@@ -52,8 +56,14 @@ class SettingsRepository(private val context: Context) {
     val eqPreset: Flow<String>         = dataFlow.map { it[EQ_PRESET] ?: "FLAT" }
     val bassBoostEnabled: Flow<Boolean> = dataFlow.map { it[BASS_BOOST_ENABLED] ?: false }
     val bassBoostStrength: Flow<Int>   = dataFlow.map { it[BASS_BOOST_STRENGTH] ?: 800 }
+    val loudnessEnabled: Flow<Boolean> = dataFlow.map { it[LOUDNESS_ENABLED] ?: false }
+    val loudnessStrength: Flow<Int>    = dataFlow.map { it[LOUDNESS_STRENGTH] ?: 0 }
     val crossfadeDuration: Flow<Int>   = dataFlow.map { it[CROSSFADE_DURATION] ?: 0 }
     val gaplessPlayback: Flow<Boolean> = dataFlow.map { it[GAPLESS_PLAYBACK] ?: true }
+    val backSkipThreshold: Flow<Int>   = dataFlow.map { it[BACK_SKIP_THRESHOLD] ?: 5 }
+    val customEqBands: Flow<List<Float>> = dataFlow.map { prefs ->
+        prefs[CUSTOM_EQ_BANDS]?.split(",")?.mapNotNull { it.toFloatOrNull() }?.takeIf { it.size == 5 } ?: listOf(0f, 0f, 0f, 0f, 0f)
+    }
 
     // ── Appearance ────────────────────────────────────────────────────────
     val appTheme: Flow<String>       = dataFlow.map { it[APP_THEME] ?: "SYSTEM" }
@@ -74,9 +84,13 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setEqPreset(value: String)          = context.dataStore.edit { it[EQ_PRESET] = value }
     suspend fun setBassBoost(value: Boolean)        = context.dataStore.edit { it[BASS_BOOST_ENABLED] = value }
-    suspend fun setBassBoostStrength(value: Int)   = context.dataStore.edit { it[BASS_BOOST_STRENGTH] = value }
+    suspend fun setBassBoostStrength(value: Int)    = context.dataStore.edit { it[BASS_BOOST_STRENGTH] = value }
+    suspend fun setLoudnessEnabled(value: Boolean)  = context.dataStore.edit { it[LOUDNESS_ENABLED] = value }
+    suspend fun setLoudnessStrength(value: Int)     = context.dataStore.edit { it[LOUDNESS_STRENGTH] = value }
     suspend fun setCrossfadeDuration(value: Int)    = context.dataStore.edit { it[CROSSFADE_DURATION] = value }
     suspend fun setGaplessPlayback(value: Boolean)  = context.dataStore.edit { it[GAPLESS_PLAYBACK] = value }
+    suspend fun setBackSkipThreshold(value: Int)    = context.dataStore.edit { it[BACK_SKIP_THRESHOLD] = value }
+    suspend fun setCustomEqBands(value: List<Float>) = context.dataStore.edit { it[CUSTOM_EQ_BANDS] = value.joinToString(",") }
 
     suspend fun setAppTheme(value: String)          = context.dataStore.edit { it[APP_THEME] = value }
     suspend fun setMaterialYou(value: Boolean)      = context.dataStore.edit { it[MATERIAL_YOU] = value }
