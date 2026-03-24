@@ -984,6 +984,21 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
             },
             onNavigateToSettings = {
                 currentScreen = AppScreen.SETTINGS
+            },
+            onClearQueue = {
+                audioPlayer.pause()
+                playQueue = emptyList()
+                playQueueIndex = 0
+                currentSongIndex = -1
+                trackName = ""
+                artistName = ""
+                coverArtBitmap = null
+                isPlaying = false
+                currentTimeMs = 0L
+                lines = emptyList()
+                currentBitrate = ""
+                currentFormat = ""
+                currentDurationMs = 1L
             }
         )
 
