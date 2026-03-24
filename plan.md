@@ -63,7 +63,7 @@
       - [x] Scan directory
       - [x] Audio focus mode
       - [x] Rescan library
-        - [ ] Cache scanned and matched
+        - [x] Cache scanned and matched
     - [x] Reset to defaults
 - Bugs
   - [ ] RTL Languages
@@ -84,3 +84,4 @@
   - [x] Transition/animation between settings pages
   - [ ] Performance improvements
   - [ ] Fix logo sizing in some places like toasts
+  - [ ] Shuffle not shuffling?

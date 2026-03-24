@@ -383,13 +383,13 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                 }
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                     when (audioFocusSetting) {
-                        "DUCK"  -> audioPlayer.player.volume = 0.3f
+                        "DUCK"  -> audioPlayer.player?.volume = 0.3f
                         "PAUSE" -> { audioPlayer.pause(); isPlaying = false }
                         // IGNORE -> do nothing
                     }
                 }
                 AudioManager.AUDIOFOCUS_GAIN -> {
-                    audioPlayer.player.volume = 1.0f
+                    audioPlayer.player?.volume = 1.0f
                     if (audioFocusSetting != "IGNORE" && !isPlaying) {
                         audioPlayer.play()
                         isPlaying = true
@@ -609,7 +609,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
         Log.d("SpicyPlayer", "loadNext: current=$currentSongIndex, loopMode=$loopMode")
         when {
             loopMode == 2 -> {
-                audioPlayer.player.seekTo(0)
+                audioPlayer.player?.seekTo(0)
                 audioPlayer.play()
                 isPlaying = true
             }
@@ -642,7 +642,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     val loadPrevious = {
         Log.d("SpicyPlayer", "loadPrevious: current=$currentSongIndex")
         if (currentTimeMs > backSkipThreshold * 1000L) {
-            audioPlayer.player.seekTo(0)
+            audioPlayer.player?.seekTo(0)
             currentTimeMs = 0L
         } else {
             when {
@@ -694,20 +694,26 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
         onDispose { audioPlayer.removeListener(listener) }
     }
 
+    // ── Skip Callbacks ──────────────────────────────────────────────────
+    LaunchedEffect(audioPlayer) {
+        audioPlayer.onSkipNext = { loadNext(true) }
+        audioPlayer.onSkipPrevious = { loadPrevious() }
+    }
+
     // ── Playback time loop ────────────────────────────────────────────────
     LaunchedEffect(isPlaying, isDraggingSlider) {
         if (isPlaying && !isDraggingSlider) {
-            currentTimeMs = audioPlayer.player.currentPosition
+            currentTimeMs = audioPlayer.player?.currentPosition ?: 0L
             var lastTime = System.currentTimeMillis()
             while (isPlaying && !isDraggingSlider) {
                 val now = System.currentTimeMillis()
                 val dt = now - lastTime
                 lastTime = now
 
-                val dur = audioPlayer.player.duration
+                val dur = audioPlayer.player?.duration ?: 0L
                 if (dur > 0) currentDurationMs = dur
 
-                val actualPos = audioPlayer.player.currentPosition
+                val actualPos = audioPlayer.player?.currentPosition ?: 0L
                 val diff = actualPos - currentTimeMs
                 if (kotlin.math.abs(diff) > 500) {
                     currentTimeMs = actualPos
@@ -859,7 +865,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                                         lines = lines,
                                         currentTimeMs = currentTimeMs + lyricsOffsetMs,
                                         onSeekWord = { timeMs ->
-                                            audioPlayer.player.seekTo(timeMs)
+                                            audioPlayer.player?.seekTo(timeMs)
                                             currentTimeMs = timeMs
                                         },
                                         modifier = Modifier.fillMaxSize(),
@@ -875,7 +881,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                                 currentTimeMs = currentTimeMs,
                                 currentDurationMs = currentDurationMs,
                                 onSeek = { currentTimeMs = it },
-                                onSeekFinished = { audioPlayer.player.seekTo(currentTimeMs) },
+                                onSeekFinished = { audioPlayer.player?.seekTo(currentTimeMs) },
                                 isDraggingSlider = isDraggingSlider,
                                 onDraggingChanged = { isDraggingSlider = it },
                                 currentBitrate = currentBitrate,
@@ -888,7 +894,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                                 onNext = { loadNext(false) },
                                 isPlaying = isPlaying,
                                 onTogglePlay = {
-                                    if (audioPlayer.player.isPlaying) {
+                                    if (audioPlayer.player?.isPlaying == true) {
                                         audioPlayer.pause()
                                         isPlaying = false
                                     } else {
