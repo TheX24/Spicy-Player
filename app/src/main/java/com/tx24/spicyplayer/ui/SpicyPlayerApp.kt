@@ -335,6 +335,18 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
         animationSpec = tween(800, easing = LinearOutSlowInEasing)
     )
 
+    // ── Lyrics visibility & expansion state ───────────────────────────────
+    val hasLyrics = remember(lines) { lines.isNotEmpty() }
+    val lyricsWeight by animateFloatAsState(
+        targetValue = if (hasLyrics) 1f else 0.001f,
+        animationSpec = tween(800, easing = LinearOutSlowInEasing)
+    )
+
+    val headerVerticalBias by animateFloatAsState(
+        targetValue = if (hasLyrics) -1f else -0.2f,
+        animationSpec = tween(800, easing = LinearOutSlowInEasing)
+    )
+
     val currentImageSize = 48.dp + (72.dp * headerProgress)
     val currentSpacerWidth = (16.dp * headerProgress)
     val currentHeaderBias = -1f + headerProgress
@@ -846,20 +858,28 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .safeDrawingPadding()
+                                .safeDrawingPadding(),
+                            verticalArrangement = Arrangement.Top
                         ) {
-                            // ── Header ──────────────────────────────────────────────
-                            NowPlayingHeader(
-                                nowPlayingData = nowPlayingData,
-                                headerProgress = headerProgress,
-                                currentImageSize = currentImageSize,
-                                currentSpacerWidth = currentSpacerWidth,
-                                currentHeaderBias = currentHeaderBias,
-                                metadataAlpha = metadataAlpha
-                            )
+                            // ── Header (Compact when lyrics exist, Centered otherwise) ──────
+                            val headerBoxModifier = if (!hasLyrics) Modifier.weight(1f) else Modifier.wrapContentHeight()
+                            Box(
+                                modifier = Modifier.then(headerBoxModifier),
+                                contentAlignment = BiasAlignment(0f, headerVerticalBias)
+                            ) {
+                                NowPlayingHeader(
+                                    nowPlayingData = nowPlayingData,
+                                    hasLyrics = hasLyrics,
+                                    headerProgress = headerProgress,
+                                    currentImageSize = currentImageSize,
+                                    currentSpacerWidth = currentSpacerWidth,
+                                    currentHeaderBias = currentHeaderBias,
+                                    metadataAlpha = metadataAlpha
+                                )
+                            }
 
                             // ── Lyrics ──────────────────────────────────────────────
-                            Box(modifier = Modifier.weight(1f)) {
+                            Box(modifier = Modifier.weight(lyricsWeight)) {
                                 if (currentSongIndex != -1) {
                                     SpicyLyricsView(
                                         lines = lines,

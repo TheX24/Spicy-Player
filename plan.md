@@ -7,8 +7,12 @@
     - [x] Tap to seek
     - [x] 3 Dots Interlude indicator
     - [x] Dynamic Background
+    - [ ] Update word-wrapping to match Spicy Lyrics
     - [ ] Romanization
     - [ ] Translation (?)
+    - [ ] Line synced lyrics
+    - [ ] Static lyrics
+    - [ ] Spicy Lyrics-like settings
     - [ ] Landscape view
       - [ ] Split screen layout with cover art/controls on the left and scrolling lyrics on the right
     - [ ] Fixes
