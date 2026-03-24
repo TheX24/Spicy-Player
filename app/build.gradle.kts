@@ -63,6 +63,15 @@ android {
         compose = true
         buildConfig = true
     }
+
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            val fileName = "SpicyPlayer-${variant.versionName}.apk"
+            output.outputFileName = fileName
+        }
+    }
 }
 
 dependencies {
