@@ -18,7 +18,8 @@ struct ContentView: View {
             AnimatedArtworkBackground(artwork: viewModel.artwork)
 
             VStack(spacing: 16) {
-                header
+                topBar
+                heroPanel
 
                 if !viewModel.libraryTracks.isEmpty {
                     libraryPanel
@@ -27,8 +28,8 @@ struct ContentView: View {
                 lyricsPanel
                 controls
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 28)
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
             .padding(.bottom, 20)
         }
         .fileImporter(
@@ -63,26 +64,21 @@ struct ContentView: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
+    private var topBar: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Spicy Player")
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .font(.system(size: 36, weight: .semibold))
                     .foregroundStyle(.white)
 
-                Text(viewModel.nowPlayingTitle)
-                    .font(.headline)
-                    .foregroundStyle(.white.opacity(0.90))
-                    .lineLimit(1)
-
                 Text(viewModel.lyricsStatus)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.68))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.62))
                     .lineLimit(2)
 
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
-                        .font(.footnote)
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.67))
                         .lineLimit(3)
                 }
@@ -90,38 +86,129 @@ struct ContentView: View {
 
             Spacer(minLength: 0)
 
-            VStack(alignment: .trailing, spacing: 8) {
-                actionButton("Import Song", style: .prominent) {
-                    activeImportTarget = .audio
-                    isImporterPresented = true
-                }
+            importMenu
+        }
+    }
 
-                actionButton("Import Folder", style: .prominent) {
-                    activeImportTarget = .folder
-                    isImporterPresented = true
-                }
+    private var importMenu: some View {
+        Menu {
+            Button {
+                activeImportTarget = .audio
+                isImporterPresented = true
+            } label: {
+                Label("Import Song", systemImage: "music.note")
+            }
 
-                actionButton("Attach Lyrics", style: .secondary) {
-                    activeImportTarget = .lyrics
-                    isImporterPresented = true
+            Button {
+                activeImportTarget = .folder
+                isImporterPresented = true
+            } label: {
+                Label("Import Folder", systemImage: "folder.badge.plus")
+            }
+
+            Button {
+                activeImportTarget = .lyrics
+                isImporterPresented = true
+            } label: {
+                Label("Attach Lyrics", systemImage: "quote.bubble")
+            }
+            .disabled(!viewModel.canAttachLyrics())
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.26), Color.white.opacity(0.06)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Circle()
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+
+                Image(systemName: "plus")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 54, height: 54)
+            .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+        }
+    }
+
+    private var heroPanel: some View {
+        HStack(spacing: 16) {
+            artworkView
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(viewModel.nowPlayingTitle)
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+
+                Text(viewModel.libraryTracks.first(where: { $0.id == viewModel.selectedTrackID })?.hasLyrics == true ? "Synced TTML loaded" : "No paired lyrics yet")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.64))
+
+                Text(timecode(viewModel.currentTimeMs))
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.72))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.white.opacity(0.10), in: Capsule())
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(.white.opacity(0.10), lineWidth: 1)
+        )
+    }
+
+    private var artworkView: some View {
+        Group {
+            if let artwork = viewModel.artwork {
+                Image(uiImage: artwork)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.18), Color.white.opacity(0.06)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    Image(systemName: "music.note")
+                        .font(.system(size: 30, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.78))
                 }
-                .disabled(!viewModel.canAttachLyrics())
             }
         }
+        .frame(width: 108, height: 108)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(.white.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.22), radius: 22, y: 10)
     }
 
     private var libraryPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Library")
-                    .font(.headline)
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.92))
 
                 Spacer()
 
-                Text("\(viewModel.libraryTracks.count) track\(viewModel.libraryTracks.count == 1 ? "" : "s")")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.55))
+                Text("\(viewModel.libraryTracks.count) tracks")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.52))
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -144,9 +231,9 @@ struct ContentView: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(.white.opacity(0.08), lineWidth: 1)
         )
     }
@@ -154,7 +241,7 @@ struct ContentView: View {
     private var lyricsPanel: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 14) {
+                LazyVStack(spacing: 18) {
                     if viewModel.lines.isEmpty {
                         placeholderView
                     } else {
@@ -173,13 +260,13 @@ struct ContentView: View {
                         }
                     }
                 }
-                .padding(.vertical, 24)
+                .padding(.vertical, 26)
             }
-            .padding(20)
+            .padding(.horizontal, 20)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
                     .stroke(.white.opacity(0.08), lineWidth: 1)
             )
             .onChange(of: viewModel.currentTimeMs, initial: false) { _, _ in
@@ -187,7 +274,7 @@ struct ContentView: View {
                     return
                 }
 
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.88)) {
+                withAnimation(.spring(response: 0.52, dampingFraction: 0.88)) {
                     proxy.scrollTo(activeID, anchor: .center)
                 }
             }
@@ -197,46 +284,66 @@ struct ContentView: View {
     private var placeholderView: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Offline lyric playback")
-                .font(.title2.weight(.semibold))
+                .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.white)
 
-            Text("Songs and `.ttml` files are copied into the app's local library on iOS. Import a whole folder to bulk-load tracks, or attach lyrics manually to the current track.")
-                .font(.body)
-                .foregroundStyle(.white.opacity(0.78))
+            Text("Import songs or a full folder into the local library. TTML files are paired by basename, and you can still attach lyrics manually from the plus menu.")
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(.white.opacity(0.76))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var controls: some View {
-        HStack(spacing: 14) {
-            Button(action: viewModel.togglePlayback) {
-                Text(viewModel.isPlaying ? "Pause" : "Play")
-                    .frame(maxWidth: .infinity)
+        HStack(spacing: 18) {
+            controlButton(systemName: "backward.fill") {
+                Task {
+                    await viewModel.playPreviousTrack()
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color(red: 0.96, green: 0.28, blue: 0.20))
+
+            Button(action: viewModel.togglePlayback) {
+                ZStack {
+                    Circle()
+                        .fill(.white)
+                    Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.black)
+                        .offset(x: viewModel.isPlaying ? 0 : 1)
+                }
+                .frame(width: 66, height: 66)
+            }
+            .buttonStyle(.plain)
+
+            controlButton(systemName: "forward.fill") {
+                Task {
+                    await viewModel.playNextTrack()
+                }
+            }
+
+            Spacer()
 
             Text(timecode(viewModel.currentTimeMs))
-                .font(.system(.headline, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.92))
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .background(.white.opacity(0.10), in: Capsule())
+                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.82))
         }
+        .padding(.horizontal, 8)
     }
 
-    @ViewBuilder
-    private func actionButton(_ title: String, style: ActionButtonStyle, action: @escaping () -> Void) -> some View {
-        switch style {
-        case .prominent:
-            Button(title, action: action)
-                .buttonStyle(.borderedProminent)
-                .tint(Color(red: 0.98, green: 0.36, blue: 0.23))
-        case .secondary:
-            Button(title, action: action)
-                .buttonStyle(.bordered)
-                .tint(.white)
+    private func controlButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(.white.opacity(0.12))
+                Circle()
+                    .stroke(.white.opacity(0.10), lineWidth: 1)
+                Image(systemName: systemName)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 52, height: 52)
         }
+        .buttonStyle(.plain)
     }
 
     private func allowedContentTypes() -> [UTType] {
@@ -260,11 +367,6 @@ struct ContentView: View {
     }
 }
 
-private enum ActionButtonStyle {
-    case prominent
-    case secondary
-}
-
 private struct LibraryTrackChip: View {
     let track: ImportedTrack
     let isSelected: Bool
@@ -272,36 +374,30 @@ private struct LibraryTrackChip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(track.title)
-                .font(.subheadline.weight(.semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
 
             Text(track.hasLyrics ? "Lyrics paired" : "No lyrics yet")
-                .font(.caption)
-                .foregroundStyle(track.hasLyrics ? Color(red: 1.0, green: 0.80, blue: 0.47) : .white.opacity(0.58))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(track.hasLyrics ? Color(red: 1.0, green: 0.84, blue: 0.71) : .white.opacity(0.56))
                 .lineLimit(1)
         }
         .frame(width: 170, alignment: .leading)
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(isSelected ? Color.white.opacity(0.42) : Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(isSelected ? .white.opacity(0.22) : .white.opacity(0.08), lineWidth: 1)
         )
     }
 
-    private var background: LinearGradient {
-        if isSelected {
-            return LinearGradient(
-                colors: [Color(red: 0.98, green: 0.36, blue: 0.23).opacity(0.55), Color.white.opacity(0.12)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-
-        return LinearGradient(
-            colors: [Color.white.opacity(0.10), Color.white.opacity(0.05)],
+    private var background: some ShapeStyle {
+        LinearGradient(
+            colors: isSelected
+                ? [Color.white.opacity(0.22), Color.white.opacity(0.10)]
+                : [Color.white.opacity(0.10), Color.white.opacity(0.04)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -321,30 +417,32 @@ private struct LyricLineView: View {
     }
 
     var body: some View {
-        composedText()
-            .font(baseFont)
-            .frame(maxWidth: .infinity, alignment: line.oppositeAligned ? .trailing : .leading)
-            .multilineTextAlignment(line.oppositeAligned ? .trailing : .leading)
-            .opacity(lineOpacity)
-            .scaleEffect(isLineActive ? 1.02 : 1.0, anchor: line.oppositeAligned ? .trailing : .leading)
-            .padding(.vertical, line.isInterlude ? 10 : 2)
-            .animation(.easeOut(duration: 0.18), value: isLineActive)
+        Group {
+            if line.isInterlude {
+                InterludeView(line: line, currentTimeMs: currentTimeMs)
+            } else {
+                composedText()
+                    .font(baseFont)
+                    .frame(maxWidth: .infinity, alignment: line.oppositeAligned ? .trailing : .leading)
+                    .multilineTextAlignment(line.oppositeAligned ? .trailing : .leading)
+                    .opacity(lineOpacity)
+                    .scaleEffect(isLineActive ? 1.02 : 1.0, anchor: line.oppositeAligned ? .trailing : .leading)
+            }
+        }
+        .padding(.vertical, line.isInterlude ? 6 : 2)
+        .animation(.easeOut(duration: 0.18), value: isLineActive)
     }
 
     private var baseFont: Font {
         if line.isSongwriter {
-            return .system(size: 17, weight: .medium, design: .rounded)
-        }
-
-        if line.isInterlude {
-            return .system(size: 20, weight: .bold, design: .rounded)
+            return .system(size: 18, weight: .medium)
         }
 
         if line.isBackground {
-            return .system(size: 24, weight: isLineActive ? .semibold : .regular, design: .rounded)
+            return .system(size: 25, weight: isLineActive ? .semibold : .regular)
         }
 
-        return .system(size: 30, weight: isLineActive ? .bold : .semibold, design: .rounded)
+        return .system(size: 32, weight: isLineActive ? .semibold : .medium)
     }
 
     private var lineOpacity: Double {
@@ -352,13 +450,13 @@ private struct LyricLineView: View {
             return 1.0
         }
         if isLinePast {
-            return 0.72
+            return 0.80
         }
-        return line.isSongwriter ? 0.78 : 0.94
+        return line.isSongwriter ? 0.70 : 0.96
     }
 
     private func composedText() -> Text {
-        if line.isInterlude || line.isSongwriter || line.words.isEmpty {
+        if line.isSongwriter || line.words.isEmpty {
             return Text(line.displayText.isEmpty ? " " : line.displayText)
                 .foregroundColor(staticLineColor())
         }
@@ -388,11 +486,8 @@ private struct LyricLineView: View {
     }
 
     private func staticLineColor() -> Color {
-        if line.isInterlude {
-            return Color(red: 1.0, green: 0.78, blue: 0.48)
-        }
         if line.isSongwriter {
-            return .white.opacity(0.86)
+            return .white.opacity(0.72)
         }
         return .white
     }
@@ -403,7 +498,7 @@ private struct LyricLineView: View {
         }
 
         if word.startMs <= currentTimeMs && currentTimeMs <= word.endMs {
-            return Color(red: 1.0, green: 0.82, blue: 0.55)
+            return Color(red: 1.0, green: 0.94, blue: 0.90)
         }
 
         return upcomingWordColor()
@@ -415,7 +510,7 @@ private struct LyricLineView: View {
         }
 
         if letter.startMs <= currentTimeMs && currentTimeMs <= letter.endMs {
-            return Color(red: 1.0, green: 0.82, blue: 0.55)
+            return Color(red: 1.0, green: 0.94, blue: 0.90)
         }
 
         return upcomingWordColor()
@@ -423,29 +518,59 @@ private struct LyricLineView: View {
 
     private func wordWeight(_ word: LyricWord) -> Font.Weight {
         if word.startMs <= currentTimeMs && currentTimeMs <= word.endMs {
-            return .bold
+            return .semibold
         }
         if currentTimeMs > word.endMs {
-            return .semibold
+            return .medium
         }
         return .regular
     }
 
     private func letterWeight(_ letter: LyricLetter) -> Font.Weight {
         if letter.startMs <= currentTimeMs && currentTimeMs <= letter.endMs {
-            return .bold
+            return .semibold
         }
         if currentTimeMs > letter.endMs {
-            return .semibold
+            return .medium
         }
         return .regular
     }
 
     private func upcomingWordColor() -> Color {
         if line.isBackground {
-            return .white.opacity(0.42)
+            return .white.opacity(0.34)
         }
-        return .white.opacity(0.50)
+        return .white.opacity(0.42)
+    }
+}
+
+private struct InterludeView: View {
+    let line: LyricLine
+    let currentTimeMs: Int
+
+    var body: some View {
+        let progress = interludeProgress()
+
+        HStack(spacing: 12) {
+            ForEach(0..<3, id: \.self) { index in
+                let phase = progress + (Double(index) * 0.18)
+                Circle()
+                    .fill(Color.white.opacity(0.72))
+                    .frame(width: 10, height: 10)
+                    .scaleEffect(0.72 + 0.55 * pulse(phase))
+                    .opacity(0.35 + 0.65 * pulse(phase))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func interludeProgress() -> Double {
+        let duration = max(Double(line.duration), 1)
+        return max(0, min(Double(currentTimeMs - line.startMs) / duration, 1))
+    }
+
+    private func pulse(_ value: Double) -> Double {
+        (sin(value * .pi * 4) + 1) / 2
     }
 }
 
@@ -460,45 +585,45 @@ private struct AnimatedArtworkBackground: View {
 
                 ZStack {
                     LinearGradient(
-                        colors: [Color(red: 0.04, green: 0.05, blue: 0.08), Color(red: 0.14, green: 0.08, blue: 0.10)],
+                        colors: [Color(red: 0.08, green: 0.09, blue: 0.12), Color(red: 0.16, green: 0.12, blue: 0.14)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
 
-                    animatedOrb(
-                        color: Color(red: 0.96, green: 0.31, blue: 0.21),
+                    orb(
+                        color: Color(red: 1.0, green: 0.54, blue: 0.45),
                         size: min(size.width, size.height) * 0.72,
-                        x: size.width * (0.18 + 0.08 * sin(time * 0.43)),
-                        y: size.height * (0.22 + 0.10 * cos(time * 0.31))
+                        x: size.width * (0.14 + 0.08 * sin(time * 0.35)),
+                        y: size.height * (0.20 + 0.10 * cos(time * 0.28))
                     )
 
-                    animatedOrb(
-                        color: Color(red: 1.0, green: 0.77, blue: 0.42),
-                        size: min(size.width, size.height) * 0.54,
-                        x: size.width * (0.82 + 0.09 * cos(time * 0.28)),
-                        y: size.height * (0.34 + 0.10 * sin(time * 0.37))
+                    orb(
+                        color: Color(red: 0.98, green: 0.82, blue: 0.63),
+                        size: min(size.width, size.height) * 0.52,
+                        x: size.width * (0.82 + 0.08 * cos(time * 0.26)),
+                        y: size.height * (0.28 + 0.12 * sin(time * 0.31))
                     )
 
-                    animatedOrb(
-                        color: Color(red: 0.84, green: 0.19, blue: 0.14),
-                        size: min(size.width, size.height) * 0.62,
-                        x: size.width * (0.56 + 0.07 * sin(time * 0.22)),
-                        y: size.height * (0.82 + 0.06 * cos(time * 0.29))
+                    orb(
+                        color: Color(red: 0.88, green: 0.36, blue: 0.28),
+                        size: min(size.width, size.height) * 0.66,
+                        x: size.width * (0.58 + 0.07 * sin(time * 0.20)),
+                        y: size.height * (0.84 + 0.05 * cos(time * 0.23))
                     )
 
                     if let artwork {
                         Image(uiImage: artwork)
                             .resizable()
                             .scaledToFill()
-                            .blur(radius: 82)
-                            .opacity(0.28)
+                            .blur(radius: 90)
+                            .opacity(0.34)
                             .ignoresSafeArea()
                     }
 
                     Rectangle()
                         .fill(
                             LinearGradient(
-                                colors: [Color.black.opacity(0.08), Color.black.opacity(0.76)],
+                                colors: [Color.white.opacity(0.02), Color.black.opacity(0.76)],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -509,13 +634,13 @@ private struct AnimatedArtworkBackground: View {
         }
     }
 
-    private func animatedOrb(color: Color, size: CGFloat, x: CGFloat, y: CGFloat) -> some View {
+    private func orb(color: Color, size: CGFloat, x: CGFloat, y: CGFloat) -> some View {
         Circle()
             .fill(color)
             .frame(width: size, height: size)
             .position(x: x, y: y)
             .blur(radius: size * 0.22)
-            .opacity(0.55)
+            .opacity(0.52)
             .blendMode(.screen)
     }
 }

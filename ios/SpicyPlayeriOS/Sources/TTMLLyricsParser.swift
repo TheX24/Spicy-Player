@@ -385,25 +385,7 @@ private struct ParagraphState {
     }
 
     private func splitKeepingTrailingHyphen(_ token: String) -> [String] {
-        guard token.contains("-") else {
-            return [token]
-        }
-
-        var result: [String] = []
-        var current = ""
-        for character in token {
-            current.append(character)
-            if character == "-" {
-                result.append(current)
-                current = ""
-            }
-        }
-
-        if !current.isEmpty {
-            result.append(current)
-        }
-
-        return result.filter { !$0.isEmpty }
+        [token]
     }
 }
 

@@ -130,6 +130,26 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
+    func playPreviousTrack() async {
+        guard !libraryTracks.isEmpty else {
+            return
+        }
+
+        let currentIndex = libraryTracks.firstIndex { $0.id == selectedTrackID } ?? 0
+        let previousIndex = currentIndex == 0 ? libraryTracks.index(before: libraryTracks.endIndex) : libraryTracks.index(before: currentIndex)
+        await loadTrack(libraryTracks[previousIndex], autoplay: true)
+    }
+
+    func playNextTrack() async {
+        guard !libraryTracks.isEmpty else {
+            return
+        }
+
+        let currentIndex = libraryTracks.firstIndex { $0.id == selectedTrackID } ?? 0
+        let nextIndex = libraryTracks.index(after: currentIndex) == libraryTracks.endIndex ? libraryTracks.startIndex : libraryTracks.index(after: currentIndex)
+        await loadTrack(libraryTracks[nextIndex], autoplay: true)
+    }
+
     func seek(to timeMs: Int) {
         let time = CMTime(seconds: Double(timeMs) / 1000.0, preferredTimescale: 600)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
