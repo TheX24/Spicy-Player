@@ -156,20 +156,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
         }
     }
 
-    // Permission Launcher for Notifications (Android 13+)
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (!isGranted) {
-            Toast.makeText(context, "Notification permission denied. Sync progress hidden.", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    LaunchedEffect(isScanning) {
-        if (isScanning && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
+    // (Removed separate notification permission request as it's now handled at startup)
 
     // ── Queue & controls state ─────────────────────────────────────────────
     // playQueue: empty = no explicit queue (sequential through songPairs)
@@ -362,16 +349,44 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     val metadataAlpha = headerProgress
 
     // ── Permissions ───────────────────────────────────────────────────────
-    val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        arrayOf(Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_MEDIA_VIDEO)
-    } else {
-        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    val permissions = remember {
+        val list = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            list.add(Manifest.permission.READ_MEDIA_AUDIO)
+            list.add(Manifest.permission.READ_MEDIA_VIDEO)
+            list.add(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            list.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+        list.toTypedArray()
     }
+
+    var permissionsGranted by remember { 
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else {
+                androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+        )
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
-        onResult = { _ -> }
+        onResult = { results ->
+            permissionsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                results[Manifest.permission.READ_MEDIA_AUDIO] == true
+            } else {
+                results[Manifest.permission.READ_EXTERNAL_STORAGE] == true
+            }
+        }
     )
-    LaunchedEffect(Unit) { permissionLauncher.launch(permissions) }
+
+    LaunchedEffect(Unit) {
+        if (!permissionsGranted) {
+            permissionLauncher.launch(permissions)
+        }
+    }
 
     // ── Keep screen on ────────────────────────────────────────────────────
     val view = LocalView.current
@@ -496,8 +511,8 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     )
 
     // ── Initial scan ──────────────────────────────────────────────────────
-    LaunchedEffect(Unit) {
-        if (songPairs.isEmpty() && !isScanning) {
+    LaunchedEffect(permissionsGranted) {
+        if (permissionsGranted && songPairs.isEmpty() && !isScanning) {
             isScanning = true
             coroutineScope.launch(Dispatchers.IO) {
                 try {
@@ -513,7 +528,6 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                         }
                     } else {
                         scanHistory = emptyList()
-                        val scanPath = settingsVm.scanDirectory.value.ifBlank { "/sdcard/Music/" }
                         val intent = Intent(context, ScanService::class.java).apply {
                             putExtra("scan_path", scanPath)
                         }

@@ -69,11 +69,15 @@ fun NowPlayingHeader(
         // 1. Track Info Column (Orbiting) - Drawn FIRST (Under)
         val offsetX = androidx.compose.ui.unit.lerp(currentImageSize + 16.dp, 0.dp, expansionProgress)
         val offsetY = androidx.compose.ui.unit.lerp(0.dp, imageSize + 12.dp, expansionProgress)
+        
+        // availableWidth is maxWidth minus the offset and a small margin (16dp)
+        val availableWidth = maxWidth - offsetX - 16.dp
 
         Column(
             modifier = Modifier
                 .align(BiasAlignment(horizontalBias, verticalBias))
                 .offset(x = offsetX, y = offsetY)
+                .widthIn(max = availableWidth)
                 .graphicsLayer {
                     // Alpha still follows metadata visibility
                     alpha = if (headerProgress > 0.01f) metadataAlpha else 1f

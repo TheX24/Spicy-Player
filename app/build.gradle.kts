@@ -21,8 +21,8 @@ android {
         applicationId = "com.tx24.spicyplayer"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "v0.3-alpha"
+        versionCode = 4
+        versionName = "v0.3.1-alpha"
     }
 
     signingConfigs {

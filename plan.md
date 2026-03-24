@@ -63,7 +63,7 @@
       - [x] Crossfade duration slider (0-10 seconds) and gapless playback toggle
     - [x] General settings
       - [x] App theme selector (Light, Dark, System Default, Material You)
-      - [x] Cache management (clear cached images/lyrics to free up space)
+      - [ ] Cache management (clear cached images/lyrics to free up space)
       - [x] Keep screen on
       - [x] Scan directory
       - [x] Audio focus mode
