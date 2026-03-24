@@ -82,7 +82,7 @@
     - [ ] Slower anims look fine but faster anims look weird
   - [x] Audio focus handling
   - [ ] Bluetooth/general audio delay fix
-  - [ ] 3 Dots interlude BG line spacings
+  - [x] 3 Dots interlude BG line spacings
   - [x] Previous song
   - [x] Seeking doesn't move lyrics view
   - [x] BG Blur and timing offset have too many steps/circles in slider
