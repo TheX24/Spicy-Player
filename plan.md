@@ -90,5 +90,5 @@
   - [x] Custom EQ doesn't work
   - [x] Transition/animation between settings pages
   - [ ] Performance improvements
-  - [ ] Fix logo sizing
+  - [x] Fix logo sizing
   - [x] Shuffle not shuffling?
