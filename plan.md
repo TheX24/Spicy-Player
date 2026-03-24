@@ -21,7 +21,7 @@
         - [x] Use Android Storage Access Framework (SAF) for scoped storage compliance
         - [x] Background service for scanning with a progress notification
       - [x] Auto-pair `.flac` and `.ttml` files based on name
-    - [ ] Implement MediaSession for song info broadcasting
+    - [x] Implement MediaSession for song info broadcasting
     - [ ] UI
       - [ ] Introduction screen
         - [ ] Greeting
