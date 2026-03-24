@@ -83,6 +83,8 @@ import com.tx24.spicyplayer.ui.settings.SettingsScreen
 import com.tx24.spicyplayer.util.formatTime
 import com.tx24.spicyplayer.util.performScan
 import com.tx24.spicyplayer.viewmodel.SettingsViewModel
+import com.tx24.spicyplayer.viewmodel.UpdateStatus
+import com.tx24.spicyplayer.ui.components.UpdateDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -212,7 +214,13 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     val contrastLevel      by settingsVm.contrastLevel.collectAsStateWithLifecycle()
     val loudnessEnabled    by settingsVm.loudnessEnabled.collectAsStateWithLifecycle()
     val loudnessStrength   by settingsVm.loudnessStrength.collectAsStateWithLifecycle()
+    val updateStatus       by settingsVm.updateStatus.collectAsStateWithLifecycle()
     
+    // ── Startup ───────────────────────────────────────────────────────────
+    LaunchedEffect(Unit) {
+        settingsVm.checkForUpdates(isManual = false)
+    }
+
     // ── Apply dynamic audio settings ──────────────────────────────────────
     LaunchedEffect(audioFocusSetting) {
         audioPlayer.updateAudioFocus(audioFocusSetting)
@@ -781,6 +789,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
 
     // ── UI ────────────────────────────────────────────────────────────────
     MaterialTheme(colorScheme = colorScheme) {
+        UpdateDialog(updateStatus, settingsVm, context)
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {

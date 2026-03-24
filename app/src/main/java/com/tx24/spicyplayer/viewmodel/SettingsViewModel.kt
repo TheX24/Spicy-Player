@@ -6,11 +6,27 @@ import androidx.lifecycle.viewModelScope
 import com.tx24.spicyplayer.data.SettingsRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import com.tx24.spicyplayer.BuildConfig
+import com.tx24.spicyplayer.util.GitHubUpdateChecker
+import com.tx24.spicyplayer.util.GitHubRelease
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+sealed class UpdateStatus {
+    object Idle : UpdateStatus()
+    object Checking : UpdateStatus()
+    data class UpToDate(val isManual: Boolean) : UpdateStatus()
+    data class NewVersion(val release: GitHubRelease) : UpdateStatus()
+    data class Error(val message: String, val isManual: Boolean) : UpdateStatus()
+}
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = SettingsRepository(app)
+
+    private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
+    val updateStatus = _updateStatus.asStateFlow()
 
     // ── Lyrics ────────────────────────────────────────────────────────────
     val lyricsOffsetMs   = repo.lyricsOffsetMs.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
@@ -103,5 +119,27 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         resetAudio()
         resetAppearance()
         resetLibrary()
+    }
+
+    // ── Updates ───────────────────────────────────────────────────────────
+    fun checkForUpdates(isManual: Boolean) {
+        viewModelScope.launch {
+            _updateStatus.value = UpdateStatus.Checking
+            val release = GitHubUpdateChecker.getLatestRelease()
+            if (release != null) {
+                val currentVersion = BuildConfig.VERSION_NAME.trim()
+                if (release.tagName.trim() != currentVersion) {
+                    _updateStatus.value = UpdateStatus.NewVersion(release)
+                } else {
+                    _updateStatus.value = UpdateStatus.UpToDate(isManual)
+                }
+            } else {
+                _updateStatus.value = UpdateStatus.Error("Failed to fetch update info", isManual)
+            }
+        }
+    }
+
+    fun clearUpdateStatus() {
+        _updateStatus.value = UpdateStatus.Idle
     }
 }

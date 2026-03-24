@@ -40,6 +40,7 @@
         - [ ] Swipe left/right to remove a track from the queue
         - [ ] Sleep timer
       - [x] Now Playing
+        - [ ] Fully hide controls
         - [ ] Swipe horizontally to skip to previous/next track
         - [ ] Tap album cover to show/hide lyrics overlay or toggle full-screen cover
         - [x] Controls
@@ -69,6 +70,8 @@
       - [x] Rescan library
         - [x] Cache scanned and matched
     - [x] Reset to defaults
+  - General
+    - [x] Update checking
 - Bugs
   - [ ] RTL Languages
     - [ ] Ensure the Word renderer calculates layout widths properly from right to left
