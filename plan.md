@@ -46,8 +46,8 @@
           - [ ] Advanced controls
         - [x] Progress bar
         - [x] Cover art and track info
-          - [ ] Auto expand cover art and track info to middle if no TTML is found
-            - [ ] Use `animateContentSize` or `updateTransition` in Compose for a smooth centering animation
+          - [x] Auto expand cover art and track info to middle if no TTML is found
+            - [x] Use `animateContentSize` or `updateTransition` in Compose for a smooth centering animation
           - [x] Scrolling track info if too long
       - [ ] Spectrum visualization
         - [ ] Fetch audio session ID from ExoPlayer to drive visualizer data
@@ -87,5 +87,5 @@
   - [x] Custom EQ doesn't work
   - [x] Transition/animation between settings pages
   - [ ] Performance improvements
-  - [ ] Fix logo sizing in some places like toasts
-  - [ ] Shuffle not shuffling?
+  - [ ] Fix logo sizing
+  - [x] Shuffle not shuffling?

@@ -173,6 +173,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     // playQueue: empty = no explicit queue (sequential through songPairs)
     var playQueue by remember { mutableStateOf<List<Pair<File, File?>>>(emptyList()) }
     var playQueueIndex by remember { mutableIntStateOf(0) }
+    var isShuffleMode by remember { mutableStateOf(false) }
     var loopMode by remember { mutableIntStateOf(0) }   // 0=off 1=all 2=one
     var showMenu by remember { mutableStateOf(false) }
     var currentScreen by remember { mutableStateOf(AppScreen.NOW_PLAYING) }
@@ -672,11 +673,37 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     }
 
     val handleShuffle = {
-        val shuffled = if (playQueue.isEmpty()) songPairs.shuffled() else playQueue.shuffled()
-        if (shuffled.isNotEmpty()) {
-            playQueue = shuffled
-            playQueueIndex = 0
-            loadSongFromPair(shuffled[0], songPairs.indexOf(shuffled[0]), true, false)
+        if (currentSongIndex == -1) {
+            // Stopped state: Shuffle all and start playing, but don't toggle isShuffleMode highlight
+            if (songPairs.isNotEmpty()) {
+                val shuffled = songPairs.shuffled()
+                playQueue = shuffled
+                playQueueIndex = 0
+                isShuffleMode = false
+                loadSongFromPair(shuffled[0], songPairs.indexOf(shuffled[0]), true, false)
+            }
+        } else {
+            // Playing state: Toggle isShuffleMode and update the remaining queue
+            isShuffleMode = !isShuffleMode
+            if (isShuffleMode) {
+                // Shuffle remaining songs
+                if (playQueue.isNotEmpty() && playQueueIndex < playQueue.size - 1) {
+                    val currentTrack = playQueue[playQueueIndex]
+                    val played = playQueue.subList(0, playQueueIndex + 1)
+                    val remaining = playQueue.subList(playQueueIndex + 1, playQueue.size).shuffled()
+                    playQueue = played + remaining
+                }
+            } else {
+                // Revert to original order while keeping the current song
+                val currentTrack = if (playQueue.isNotEmpty()) playQueue[playQueueIndex] else songPairs.getOrNull(currentSongIndex)
+                if (currentTrack != null) {
+                    val originalIndex = songPairs.indexOf(currentTrack)
+                    if (originalIndex != -1) {
+                        playQueue = songPairs
+                        playQueueIndex = originalIndex
+                    }
+                }
+            }
         }
     }
 
@@ -734,9 +761,9 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                     currentTimeMs += dt + correction.toLong()
                 }
 
-                if (currentDurationMs > 0 && crossfadeDuration > 0) {
+                if (currentDurationMs > crossfadeDuration * 1000L && crossfadeDuration > 0) {
                     val remainingMs = currentDurationMs - actualPos
-                    if (remainingMs > 0 && remainingMs <= crossfadeDuration * 1000L && !isCrossfadingTriggered && loadingJob?.isActive != true) {
+                    if (actualPos > 1000L && remainingMs > 0 && remainingMs <= crossfadeDuration * 1000L && !isCrossfadingTriggered && loadingJob?.isActive != true) {
                         isCrossfadingTriggered = true
                         currentLoadNext(true)
                     }
@@ -909,17 +936,28 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                                 primaryTint = primaryTint,
                                 onShowMenu = { showMenu = true },
                                 onShuffle = { handleShuffle() },
-                                isShuffleActive = playQueue.isNotEmpty(),
+                                isShuffleActive = isShuffleMode,
                                 onPrevious = { loadPrevious() },
                                 onNext = { loadNext(false) },
                                 isPlaying = isPlaying,
-                                onTogglePlay = {
-                                    if (audioPlayer.player?.isPlaying == true) {
-                                        audioPlayer.pause()
-                                        isPlaying = false
+                                 onTogglePlay = {
+                                    if (currentSongIndex == -1) {
+                                        // Stopped state: Start sequential playback
+                                        if (songPairs.isNotEmpty()) {
+                                            playQueue = songPairs
+                                            playQueueIndex = 0
+                                            isShuffleMode = false
+                                            loadSong(0, true, false)
+                                            isPlaying = true
+                                        }
                                     } else {
-                                        audioPlayer.play()
-                                        isPlaying = true
+                                        if (audioPlayer.player?.isPlaying == true) {
+                                            audioPlayer.pause()
+                                            isPlaying = false
+                                        } else {
+                                            audioPlayer.play()
+                                            isPlaying = true
+                                        }
                                     }
                                 },
                                 loopMode = loopMode,
