@@ -14,12 +14,16 @@ final class PlayerViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var libraryTracks: [ImportedTrack] = []
     @Published var selectedTrackID: ImportedTrack.ID?
+    @Published var lyricOffsetMs = UserDefaults.standard.integer(forKey: "SpicyPlayeriOS.lyricOffsetMs")
+    @Published var isShuffleEnabled = UserDefaults.standard.bool(forKey: "SpicyPlayeriOS.shuffleEnabled")
 
     private let player = AVPlayer()
     private var timeObserver: Any?
     private var currentTrackBaseName: String?
     private let supportedAudioExtensions: Set<String> = ["flac", "mp3", "wav", "m4a", "aac", "alac", "caf", "aif", "aiff"]
     private let lastSelectedTrackDefaultsKey = "SpicyPlayeriOS.lastSelectedTrackBaseName"
+    private let lyricOffsetDefaultsKey = "SpicyPlayeriOS.lyricOffsetMs"
+    private let shuffleDefaultsKey = "SpicyPlayeriOS.shuffleEnabled"
 
     init() {
         configureAudioSession()
@@ -135,6 +139,11 @@ final class PlayerViewModel: ObservableObject {
             return
         }
 
+        if isShuffleEnabled, libraryTracks.count > 1 {
+            await shufflePlay()
+            return
+        }
+
         let currentIndex = libraryTracks.firstIndex { $0.id == selectedTrackID } ?? 0
         let previousIndex = currentIndex == 0 ? libraryTracks.index(before: libraryTracks.endIndex) : libraryTracks.index(before: currentIndex)
         await loadTrack(libraryTracks[previousIndex], autoplay: true)
@@ -145,9 +154,43 @@ final class PlayerViewModel: ObservableObject {
             return
         }
 
+        if isShuffleEnabled, libraryTracks.count > 1 {
+            await shufflePlay()
+            return
+        }
+
         let currentIndex = libraryTracks.firstIndex { $0.id == selectedTrackID } ?? 0
         let nextIndex = libraryTracks.index(after: currentIndex) == libraryTracks.endIndex ? libraryTracks.startIndex : libraryTracks.index(after: currentIndex)
         await loadTrack(libraryTracks[nextIndex], autoplay: true)
+    }
+
+    func shufflePlay() async {
+        guard !libraryTracks.isEmpty else {
+            return
+        }
+
+        let currentID = selectedTrackID
+        let candidates = libraryTracks.filter { $0.id != currentID }
+        let selectedTrack = candidates.randomElement() ?? libraryTracks.randomElement()
+
+        if let selectedTrack {
+            await loadTrack(selectedTrack, autoplay: true)
+        }
+    }
+
+    func toggleShuffle() {
+        isShuffleEnabled.toggle()
+        UserDefaults.standard.set(isShuffleEnabled, forKey: shuffleDefaultsKey)
+    }
+
+    func adjustLyricOffset(by deltaMs: Int) {
+        lyricOffsetMs = min(max(lyricOffsetMs + deltaMs, -2000), 2000)
+        UserDefaults.standard.set(lyricOffsetMs, forKey: lyricOffsetDefaultsKey)
+    }
+
+    func resetLyricOffset() {
+        lyricOffsetMs = 0
+        UserDefaults.standard.set(lyricOffsetMs, forKey: lyricOffsetDefaultsKey)
     }
 
     func seek(to timeMs: Int) {
@@ -157,12 +200,16 @@ final class PlayerViewModel: ObservableObject {
     }
 
     func activeLineID() -> UUID? {
-        if let current = lines.first(where: { !$0.isBackground && !$0.isSongwriter && $0.startMs <= currentTimeMs && currentTimeMs <= $0.endMs }) {
+        activeLineID(for: currentTimeMs)
+    }
+
+    func activeLineID(for timeMs: Int) -> UUID? {
+        if let current = lines.first(where: { !$0.isBackground && !$0.isSongwriter && $0.startMs <= timeMs && timeMs <= $0.endMs }) {
             return current.id
         }
 
         return lines
-            .filter { !$0.isBackground && !$0.isSongwriter && $0.startMs <= currentTimeMs }
+            .filter { !$0.isBackground && !$0.isSongwriter && $0.startMs <= timeMs }
             .last?
             .id
     }
@@ -272,17 +319,45 @@ final class PlayerViewModel: ObservableObject {
         let asset = AVURLAsset(url: url)
 
         do {
-            let metadata = try await asset.load(.commonMetadata)
-            if let item = metadata.first(where: { $0.commonKey?.rawValue == "artwork" }),
-               let data = try await item.load(.dataValue),
-               let image = UIImage(data: data) {
-                artwork = image
-            } else {
-                artwork = nil
-            }
+            artwork = try await extractArtwork(from: asset)
         } catch {
             artwork = nil
         }
+    }
+
+    private func extractArtwork(from asset: AVURLAsset) async throws -> UIImage? {
+        let commonMetadata = try await asset.load(.commonMetadata)
+        if let image = try await image(from: commonMetadata) {
+            return image
+        }
+
+        let metadataFormats = try await asset.load(.availableMetadataFormats)
+        for format in metadataFormats {
+            let items = asset.metadata(forFormat: format)
+            if let image = try await image(from: items) {
+                return image
+            }
+        }
+
+        return nil
+    }
+
+    private func image(from items: [AVMetadataItem]) async throws -> UIImage? {
+        for item in items {
+            let commonKey = item.commonKey?.rawValue.lowercased()
+            let identifier = item.identifier?.rawValue.lowercased()
+            let looksLikeArtwork = commonKey == "artwork" || identifier?.contains("artwork") == true
+
+            guard looksLikeArtwork else {
+                continue
+            }
+
+            if let data = try? await item.load(.dataValue), let image = UIImage(data: data) {
+                return image
+            }
+        }
+
+        return nil
     }
 
     private func refreshLibrary() {
