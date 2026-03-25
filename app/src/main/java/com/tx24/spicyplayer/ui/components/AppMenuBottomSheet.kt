@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Settings
@@ -25,7 +26,8 @@ fun AppMenuBottomSheet(
     onDismiss: () -> Unit,
     colorScheme: ColorScheme,
     onNavigateToEqualizer: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onClearQueue: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         AnimatedVisibility(
@@ -91,6 +93,18 @@ fun AppMenuBottomSheet(
                         modifier = Modifier.clickable {
                             onDismiss()
                             onNavigateToSettings()
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                    
+                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = colorScheme.onSurfaceVariant.copy(alpha = 0.1f))
+
+                    ListItem(
+                        headlineContent = { Text("Clear Queue", color = colorScheme.error) },
+                        leadingContent = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null, tint = colorScheme.error) },
+                        modifier = Modifier.clickable {
+                            onDismiss()
+                            onClearQueue()
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )

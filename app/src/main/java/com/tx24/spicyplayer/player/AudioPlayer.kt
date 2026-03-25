@@ -9,7 +9,9 @@ import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import android.net.Uri
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ConcatenatingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -24,13 +26,17 @@ import kotlinx.coroutines.*
  */
 class AudioPlayer(private val context: Context) {
 
-    private val player1 = createPlayer()
-    private val player2 = createPlayer()
+    private var player1: ExoPlayer? = null
+    private var player2: ExoPlayer? = null
+    private var crossfadeWrapper: CrossfadePlayerWrapper? = null
 
-    var activePlayer: ExoPlayer = player1
+    var onSkipNext: (() -> Unit)? = null
+    var onSkipPrevious: (() -> Unit)? = null
+
+    var activePlayer: ExoPlayer? = null
         private set
 
-    val player: ExoPlayer
+    val player: ExoPlayer?
         get() = activePlayer
 
     private var equalizer: Equalizer? = null
@@ -42,16 +48,43 @@ class AudioPlayer(private val context: Context) {
 
     private val playerListeners = mutableListOf<Player.Listener>()
 
-    private fun createPlayer(): ExoPlayer {
-        val p = ExoPlayer.Builder(context).build()
-        p.setAudioAttributes(
-            AudioAttributes.Builder()
-                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                .setUsage(C.USAGE_MEDIA)
-                .build(),
-            /* handleAudioFocus = */ true
-        )
-        return p
+    /**
+     * Injects the players and wrapper from the MediaPlaybackService.
+     */
+    fun injectPlayers(p1: ExoPlayer, p2: ExoPlayer, wrapper: CrossfadePlayerWrapper) {
+        player1 = p1
+        player2 = p2
+        crossfadeWrapper = wrapper
+        
+        crossfadeWrapper?.onSkipNext = { onSkipNext?.invoke() }
+        crossfadeWrapper?.onSkipPrevious = { onSkipPrevious?.invoke() }
+        
+        activePlayer = p1
+        
+        // Re-add any listeners that were registered before injection
+        playerListeners.forEach { activePlayer?.addListener(it) }
+    }
+
+    /**
+     * Helper to create a MediaItem with metadata for the notification/carousel.
+     * Uses URIs for artwork to avoid TransactionTooLargeException.
+     */
+    fun createMediaItem(
+        uri: String,
+        title: String,
+        artist: String,
+        artworkUri: String
+    ): MediaItem {
+        val metadata = MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .setArtworkUri(Uri.parse(artworkUri))
+            .build()
+
+        return MediaItem.Builder()
+            .setUri(Uri.parse(uri))
+            .setMediaMetadata(metadata)
+            .build()
     }
 
     // ── Audio session setup ───────────────────────────────────────────────────
@@ -61,7 +94,8 @@ class AudioPlayer(private val context: Context) {
      * Must be called whenever a new media item starts playing so the session ID is valid.
      */
     fun attachEffects() {
-        val sessionId = activePlayer.audioSessionId
+        val currentActive = activePlayer ?: return
+        val sessionId = currentActive.audioSessionId
         if (sessionId == C.AUDIO_SESSION_ID_UNSET) return
 
         try {
@@ -165,15 +199,18 @@ class AudioPlayer(private val context: Context) {
     // ── Playlist & Crossfade ──────────────────────────────────────────────────
 
     fun preparePlaylist(uris: List<String>, playWhenReady: Boolean = true) {
+        val currentActive = activePlayer ?: return
+        val p1 = player1
+        val p2 = player2
+        val idle = if (currentActive === p1) p2 else p1
+        
         crossfadeJob?.cancel()
         
-        // Reset the idle player just in case
-        val idlePlayer = if (activePlayer === player1) player2 else player1
-        idlePlayer.stop()
-        idlePlayer.clearMediaItems()
-        idlePlayer.volume = 1.0f
+        idle?.stop()
+        idle?.clearMediaItems()
+        idle?.volume = 1.0f
 
-        activePlayer.volume = 1.0f
+        currentActive.volume = 1.0f
 
         val dataSourceFactory = DefaultDataSource.Factory(context)
         val mediaSourceFactory = ProgressiveMediaSource.Factory(dataSourceFactory)
@@ -185,23 +222,27 @@ class AudioPlayer(private val context: Context) {
             concatenatingMediaSource.addMediaSource(mediaSource)
         }
 
-        activePlayer.setMediaSource(concatenatingMediaSource)
-        activePlayer.prepare()
-        activePlayer.playWhenReady = playWhenReady
+        currentActive.setMediaSource(concatenatingMediaSource)
+        currentActive.prepare()
+        currentActive.playWhenReady = playWhenReady
 
-        activePlayer.postDelayed({ attachEffects() }, 200)
+        currentActive.postDelayed({ attachEffects() }, 200)
     }
 
     fun playNextWithCrossfade(uris: List<String>, crossfadeDurationMs: Long, playWhenReady: Boolean = true) {
-        if (crossfadeDurationMs <= 0 || !activePlayer.isPlaying) {
+        val currentActive = activePlayer ?: return
+        val p1 = player1
+        val p2 = player2
+        val newPlayer = if (currentActive === p1) p2 else p1
+        
+        if (newPlayer == null || crossfadeDurationMs <= 0 || !currentActive.isPlaying) {
             preparePlaylist(uris, playWhenReady)
             return
         }
 
         crossfadeJob?.cancel()
 
-        val oldPlayer = activePlayer
-        val newPlayer = if (activePlayer === player1) player2 else player1
+        val oldPlayer = currentActive
 
         // Temporarily disable auto audio focus on oldPlayer so it doesn't get paused when newPlayer starts
         val attributes = AudioAttributes.Builder()
@@ -226,8 +267,9 @@ class AudioPlayer(private val context: Context) {
         newPlayer.volume = 0f
         newPlayer.playWhenReady = playWhenReady
 
-        // Switch active player
+        // Switch active player and notify wrapper
         activePlayer = newPlayer
+        crossfadeWrapper?.switchActivePlayer(newPlayer)
         
         // Migrate listeners
         playerListeners.forEach { listener ->
@@ -273,31 +315,31 @@ class AudioPlayer(private val context: Context) {
         
         // We only want to set this if the player is not currently fading out
         // For simplicity, just set it on both and playNextWithCrossfade will override it if needed
-        player1.setAudioAttributes(attributes, handleFocus)
-        player2.setAudioAttributes(attributes, handleFocus)
+        player1?.setAudioAttributes(attributes, handleFocus)
+        player2?.setAudioAttributes(attributes, handleFocus)
     }
 
     fun addListener(listener: Player.Listener) {
         if (!playerListeners.contains(listener)) {
             playerListeners.add(listener)
-            activePlayer.addListener(listener)
+            activePlayer?.addListener(listener)
         }
     }
 
     fun removeListener(listener: Player.Listener) {
         playerListeners.remove(listener)
-        player1.removeListener(listener)
-        player2.removeListener(listener)
+        player1?.removeListener(listener)
+        player2?.removeListener(listener)
     }
 
     fun pause() {
         crossfadeJob?.cancel()
-        player1.pause()
-        player2.pause()
+        player1?.pause()
+        player2?.pause()
     }
 
     fun play() {
-        activePlayer.play()
+        activePlayer?.play()
     }
 
     fun release() {
@@ -309,8 +351,7 @@ class AudioPlayer(private val context: Context) {
         bassBoost = null
         loudnessEnhancer?.release()
         loudnessEnhancer = null
-        player1.release()
-        player2.release()
+        // We don't release players here anymore as they are owned by the service
     }
 }
 

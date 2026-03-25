@@ -2,7 +2,9 @@ package com.tx24.spicyplayer.service
 
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import com.tx24.spicyplayer.util.NotificationHelper
@@ -40,10 +42,18 @@ class ScanService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val scanPath = intent?.getStringExtra("scan_path") ?: "/sdcard/Music/"
         
-        startForeground(
-            NotificationHelper.NOTIFICATION_ID,
-            NotificationHelper.buildScanNotification(this, "Preparing to scan...")
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NotificationHelper.NOTIFICATION_ID,
+                NotificationHelper.buildScanNotification(this, "Preparing to scan..."),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(
+                NotificationHelper.NOTIFICATION_ID,
+                NotificationHelper.buildScanNotification(this, "Preparing to scan...")
+            )
+        }
 
         startScan(scanPath)
         

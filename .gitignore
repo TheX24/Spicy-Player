@@ -7,3 +7,5 @@ build_output.log
 build/
 .kotlin/
 .agents/
+*.jks
+keystore.properties

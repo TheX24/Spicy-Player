@@ -26,6 +26,11 @@ fun fuzzyNormalize(s: String): String =
         .replace(Regex("[^\\p{L}\\p{N}]"), "")
         .trim()
 
+fun isInstrumental(s: String): Boolean {
+    val lower = s.lowercase()
+    return lower.contains("instrumental") || lower.contains("karaoke")
+}
+
 private const val CACHE_FILE_NAME = "library_cache.txt"
 
 suspend fun loadCachedScan(context: Context, scanPath: String): List<Pair<File, File?>>? = withContext(Dispatchers.IO) {
@@ -122,56 +127,122 @@ suspend fun performScan(
 
         val baseName = robustNormalize(audioFile.nameWithoutExtension)
         val fuzzyBase = fuzzyNormalize(audioFile.nameWithoutExtension)
+        val audioIsInstrumental = isInstrumental(audioFile.nameWithoutExtension)
+        val audioDir = audioFile.parentFile
 
-        var ttmlFile = allFiles.find {
-            it.name.endsWith(".ttml", ignoreCase = true) &&
-                robustNormalize(it.nameWithoutExtension) == baseName
-        } ?: allFiles.find {
-            it.name.endsWith(".ttml", ignoreCase = true) &&
-                fuzzyNormalize(it.nameWithoutExtension) == fuzzyBase
+        // Candidates filtering by instrumental status
+        val filteredTtmls = ttmlFiles.filter { 
+            isInstrumental(it.nameWithoutExtension) == audioIsInstrumental 
         }
 
-        if (ttmlFile == null && fuzzyBase.length >= 3) {
-            ttmlFile = ttmlFiles.find {
-                fuzzyNormalize(it.nameWithoutExtension).contains(fuzzyBase) ||
-                    fuzzyBase.contains(fuzzyNormalize(it.nameWithoutExtension))
+        var ttmlFile: File? = null
+
+        // 1. Exact or fuzzy match in the same directory
+        ttmlFile = filteredTtmls.find { 
+            it.parentFile == audioDir && (robustNormalize(it.nameWithoutExtension) == baseName || fuzzyNormalize(it.nameWithoutExtension) == fuzzyBase)
+        }
+
+        // 2. Exact or fuzzy match anywhere
+        if (ttmlFile == null) {
+            ttmlFile = filteredTtmls.find { 
+                robustNormalize(it.nameWithoutExtension) == baseName || fuzzyNormalize(it.nameWithoutExtension) == fuzzyBase
             }
         }
 
+        // 3. Metadata match (if available)
         if (ttmlFile == null) {
             try {
                 val retriever = MediaMetadataRetriever()
                 audioFile.inputStream().use { retriever.setDataSource(it.fd) }
                 val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: 
+                             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
                 retriever.release()
+                
                 if (!title.isNullOrBlank()) {
                     val fuzzyTitle = fuzzyNormalize(title)
+                    val fuzzyArtist = artist?.let { fuzzyNormalize(it) } ?: ""
+                    
                     if (fuzzyTitle.length >= 3) {
-                        ttmlFile = ttmlFiles.find {
-                            val ft = fuzzyNormalize(it.nameWithoutExtension)
-                            ft == fuzzyTitle || ft.contains(fuzzyTitle) || fuzzyTitle.contains(ft)
+                        ttmlFile = filteredTtmls.find {
+                            val ttmlName = it.nameWithoutExtension
+                            val ft = fuzzyNormalize(ttmlName)
+                            
+                            // High confidence: Title matches exactly or (Title matches part and Artist matches part)
+                            val exactTitle = ft == fuzzyTitle
+                            val titlePartMatches = ft.contains(fuzzyTitle)
+                            val artistMatches = fuzzyArtist.isNotEmpty() && ft.contains(fuzzyArtist)
+                            
+                            if (exactTitle) return@find true
+                            if (titlePartMatches && artistMatches) return@find true
+                            
+                            // If in same directory, allow Title match alone but only if it matches a full segment
+                            // and the title is a significant part of the filename (to avoid "Enough" matching long sentences)
+                            if (it.parentFile == audioDir && titlePartMatches) {
+                                val ttmlSegments = it.nameWithoutExtension.split(Regex("[-_\\s\\.\\(\\)\\[\\]]")).map { fuzzyNormalize(it) }
+                                if (ttmlSegments.contains(fuzzyTitle)) {
+                                    if (ft.length <= fuzzyTitle.length * 3) return@find true
+                                }
+                            }
+                            false
                         }
                     }
                 }
             } catch (_: Exception) {}
         }
 
+        // 4. Loose match but only in the same directory or with high similarity
+        if (ttmlFile == null && fuzzyBase.length >= 4) {
+            ttmlFile = filteredTtmls.find { ttml ->
+                val ft = fuzzyNormalize(ttml.nameWithoutExtension)
+                val sameDir = ttml.parentFile == audioDir
+                
+                // Same directory: allow "contains" if it matches a logical segment
+                if (sameDir) {
+                    val ttmlSegments = ttml.nameWithoutExtension.split(Regex("[-_\\s\\.]")).map { fuzzyNormalize(it) }
+                    val audioSegments = audioFile.nameWithoutExtension.split(Regex("[-_\\s\\.]")).map { fuzzyNormalize(it) }
+                    if (ttmlSegments.any { it == fuzzyBase } || audioSegments.any { it == ft }) return@find true
+                }
+                
+                // Global matches: must be very similar or structured as Artist - Title
+                val verySimilar = (ft.length >= 8 && (ft.startsWith(fuzzyBase) || ft.endsWith(fuzzyBase))) ||
+                                  (fuzzyBase.length >= 8 && (fuzzyBase.startsWith(ft) || fuzzyBase.endsWith(ft)))
+                
+                if (verySimilar) {
+                    val originalFt = robustNormalize(ttml.nameWithoutExtension)
+                    val originalBase = robustNormalize(audioFile.nameWithoutExtension)
+                    
+                    // High confidence structure match
+                    if (originalFt.contains(" - $originalBase") || originalFt.contains("$originalBase - ")) return@find true
+                    if (originalBase.contains(" - $originalFt") || originalBase.contains("$originalFt - ")) return@find true
+                    
+                    // High similarity fallback for Global: Title is a major part and match is stable
+                    val diff = Math.abs(ft.length - fuzzyBase.length)
+                    if (diff <= 6 && (ft.length <= fuzzyBase.length * 2 || fuzzyBase.length <= ft.length * 2)) {
+                        if (ft.startsWith(fuzzyBase) || ft.endsWith(fuzzyBase)) return@find true
+                    }
+                }
+                false
+            }
+        }
+
+        // 5. Hardcore latin-only match as last resort (must be in same dir or very similar)
         if (ttmlFile == null) {
             val latinOnly = fuzzyBase.replace(Regex("[^a-zA-Z0-9]"), "")
             if (latinOnly.length >= 5) {
-                ttmlFile = ttmlFiles.find {
+                ttmlFile = filteredTtmls.find {
                     val tl = fuzzyNormalize(it.nameWithoutExtension).replace(Regex("[^a-zA-Z0-9]"), "")
-                    tl == latinOnly && tl.isNotEmpty()
+                    tl == latinOnly && tl.isNotEmpty() && (it.parentFile == audioDir || tl.length > 8)
                 }
             }
         }
 
         if (ttmlFile != null) {
             matchedCount++
-            Log.d("SpicyPlayer", "Paired: ${audioFile.name} -> ${ttmlFile.name}")
+            Log.d("SpicyPlayer", "Matched: ${audioFile.name} -> ${ttmlFile.name} (${if (ttmlFile.parentFile == audioDir) "Local" else "Global"})")
             audioFile to ttmlFile
         } else {
-            Log.d("SpicyPlayer", "No lyrics for: ${audioFile.name}")
+            if (audioFiles.size < 50) Log.d("SpicyPlayer", "No match found for: ${audioFile.name}")
             audioFile to null
         }
     }.sortedBy { it.first.name.lowercase() }

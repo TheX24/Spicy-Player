@@ -83,6 +83,8 @@ import com.tx24.spicyplayer.ui.settings.SettingsScreen
 import com.tx24.spicyplayer.util.formatTime
 import com.tx24.spicyplayer.util.performScan
 import com.tx24.spicyplayer.viewmodel.SettingsViewModel
+import com.tx24.spicyplayer.viewmodel.UpdateStatus
+import com.tx24.spicyplayer.ui.components.UpdateDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -154,25 +156,13 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
         }
     }
 
-    // Permission Launcher for Notifications (Android 13+)
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (!isGranted) {
-            Toast.makeText(context, "Notification permission denied. Sync progress hidden.", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    LaunchedEffect(isScanning) {
-        if (isScanning && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
+    // (Removed separate notification permission request as it's now handled at startup)
 
     // ── Queue & controls state ─────────────────────────────────────────────
     // playQueue: empty = no explicit queue (sequential through songPairs)
     var playQueue by remember { mutableStateOf<List<Pair<File, File?>>>(emptyList()) }
     var playQueueIndex by remember { mutableIntStateOf(0) }
+    var isShuffleMode by remember { mutableStateOf(false) }
     var loopMode by remember { mutableIntStateOf(0) }   // 0=off 1=all 2=one
     var showMenu by remember { mutableStateOf(false) }
     var currentScreen by remember { mutableStateOf(AppScreen.NOW_PLAYING) }
@@ -211,7 +201,13 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     val contrastLevel      by settingsVm.contrastLevel.collectAsStateWithLifecycle()
     val loudnessEnabled    by settingsVm.loudnessEnabled.collectAsStateWithLifecycle()
     val loudnessStrength   by settingsVm.loudnessStrength.collectAsStateWithLifecycle()
+    val updateStatus       by settingsVm.updateStatus.collectAsStateWithLifecycle()
     
+    // ── Startup ───────────────────────────────────────────────────────────
+    LaunchedEffect(Unit) {
+        settingsVm.checkForUpdates(isManual = false)
+    }
+
     // ── Apply dynamic audio settings ──────────────────────────────────────
     LaunchedEffect(audioFocusSetting) {
         audioPlayer.updateAudioFocus(audioFocusSetting)
@@ -335,22 +331,62 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
         animationSpec = tween(800, easing = LinearOutSlowInEasing)
     )
 
+    // ── Lyrics visibility & expansion state ───────────────────────────────
+    val hasLyrics = remember(lines) { lines.isNotEmpty() }
+    val lyricsWeight by animateFloatAsState(
+        targetValue = if (hasLyrics) 1f else 0.001f,
+        animationSpec = tween(800, easing = LinearOutSlowInEasing)
+    )
+
+    val headerVerticalBias by animateFloatAsState(
+        targetValue = if (hasLyrics) -1f else -0.2f,
+        animationSpec = tween(800, easing = LinearOutSlowInEasing)
+    )
+
     val currentImageSize = 48.dp + (72.dp * headerProgress)
     val currentSpacerWidth = (16.dp * headerProgress)
     val currentHeaderBias = -1f + headerProgress
     val metadataAlpha = headerProgress
 
     // ── Permissions ───────────────────────────────────────────────────────
-    val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        arrayOf(Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_MEDIA_VIDEO)
-    } else {
-        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    val permissions = remember {
+        val list = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            list.add(Manifest.permission.READ_MEDIA_AUDIO)
+            list.add(Manifest.permission.READ_MEDIA_VIDEO)
+            list.add(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            list.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+        list.toTypedArray()
     }
+
+    var permissionsGranted by remember { 
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else {
+                androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+        )
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
-        onResult = { _ -> }
+        onResult = { results ->
+            permissionsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                results[Manifest.permission.READ_MEDIA_AUDIO] == true
+            } else {
+                results[Manifest.permission.READ_EXTERNAL_STORAGE] == true
+            }
+        }
     )
-    LaunchedEffect(Unit) { permissionLauncher.launch(permissions) }
+
+    LaunchedEffect(Unit) {
+        if (!permissionsGranted) {
+            permissionLauncher.launch(permissions)
+        }
+    }
 
     // ── Keep screen on ────────────────────────────────────────────────────
     val view = LocalView.current
@@ -383,13 +419,13 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                 }
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                     when (audioFocusSetting) {
-                        "DUCK"  -> audioPlayer.player.volume = 0.3f
+                        "DUCK"  -> audioPlayer.player?.volume = 0.3f
                         "PAUSE" -> { audioPlayer.pause(); isPlaying = false }
                         // IGNORE -> do nothing
                     }
                 }
                 AudioManager.AUDIOFOCUS_GAIN -> {
-                    audioPlayer.player.volume = 1.0f
+                    audioPlayer.player?.volume = 1.0f
                     if (audioFocusSetting != "IGNORE" && !isPlaying) {
                         audioPlayer.play()
                         isPlaying = true
@@ -475,8 +511,8 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     )
 
     // ── Initial scan ──────────────────────────────────────────────────────
-    LaunchedEffect(Unit) {
-        if (songPairs.isEmpty() && !isScanning) {
+    LaunchedEffect(permissionsGranted) {
+        if (permissionsGranted && songPairs.isEmpty() && !isScanning) {
             isScanning = true
             coroutineScope.launch(Dispatchers.IO) {
                 try {
@@ -492,7 +528,6 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                         }
                     } else {
                         scanHistory = emptyList()
-                        val scanPath = settingsVm.scanDirectory.value.ifBlank { "/sdcard/Music/" }
                         val intent = Intent(context, ScanService::class.java).apply {
                             putExtra("scan_path", scanPath)
                         }
@@ -609,7 +644,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
         Log.d("SpicyPlayer", "loadNext: current=$currentSongIndex, loopMode=$loopMode")
         when {
             loopMode == 2 -> {
-                audioPlayer.player.seekTo(0)
+                audioPlayer.player?.seekTo(0)
                 audioPlayer.play()
                 isPlaying = true
             }
@@ -642,7 +677,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     val loadPrevious = {
         Log.d("SpicyPlayer", "loadPrevious: current=$currentSongIndex")
         if (currentTimeMs > backSkipThreshold * 1000L) {
-            audioPlayer.player.seekTo(0)
+            audioPlayer.player?.seekTo(0)
             currentTimeMs = 0L
         } else {
             when {
@@ -660,11 +695,37 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     }
 
     val handleShuffle = {
-        val shuffled = if (playQueue.isEmpty()) songPairs.shuffled() else playQueue.shuffled()
-        if (shuffled.isNotEmpty()) {
-            playQueue = shuffled
-            playQueueIndex = 0
-            loadSongFromPair(shuffled[0], songPairs.indexOf(shuffled[0]), true, false)
+        if (currentSongIndex == -1) {
+            // Stopped state: Shuffle all and start playing, but don't toggle isShuffleMode highlight
+            if (songPairs.isNotEmpty()) {
+                val shuffled = songPairs.shuffled()
+                playQueue = shuffled
+                playQueueIndex = 0
+                isShuffleMode = false
+                loadSongFromPair(shuffled[0], songPairs.indexOf(shuffled[0]), true, false)
+            }
+        } else {
+            // Playing state: Toggle isShuffleMode and update the remaining queue
+            isShuffleMode = !isShuffleMode
+            if (isShuffleMode) {
+                // Shuffle remaining songs
+                if (playQueue.isNotEmpty() && playQueueIndex < playQueue.size - 1) {
+                    val currentTrack = playQueue[playQueueIndex]
+                    val played = playQueue.subList(0, playQueueIndex + 1)
+                    val remaining = playQueue.subList(playQueueIndex + 1, playQueue.size).shuffled()
+                    playQueue = played + remaining
+                }
+            } else {
+                // Revert to original order while keeping the current song
+                val currentTrack = if (playQueue.isNotEmpty()) playQueue[playQueueIndex] else songPairs.getOrNull(currentSongIndex)
+                if (currentTrack != null) {
+                    val originalIndex = songPairs.indexOf(currentTrack)
+                    if (originalIndex != -1) {
+                        playQueue = songPairs
+                        playQueueIndex = originalIndex
+                    }
+                }
+            }
         }
     }
 
@@ -694,20 +755,26 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
         onDispose { audioPlayer.removeListener(listener) }
     }
 
+    // ── Skip Callbacks ──────────────────────────────────────────────────
+    LaunchedEffect(audioPlayer) {
+        audioPlayer.onSkipNext = { loadNext(true) }
+        audioPlayer.onSkipPrevious = { loadPrevious() }
+    }
+
     // ── Playback time loop ────────────────────────────────────────────────
     LaunchedEffect(isPlaying, isDraggingSlider) {
         if (isPlaying && !isDraggingSlider) {
-            currentTimeMs = audioPlayer.player.currentPosition
+            currentTimeMs = audioPlayer.player?.currentPosition ?: 0L
             var lastTime = System.currentTimeMillis()
             while (isPlaying && !isDraggingSlider) {
                 val now = System.currentTimeMillis()
                 val dt = now - lastTime
                 lastTime = now
 
-                val dur = audioPlayer.player.duration
+                val dur = audioPlayer.player?.duration ?: 0L
                 if (dur > 0) currentDurationMs = dur
 
-                val actualPos = audioPlayer.player.currentPosition
+                val actualPos = audioPlayer.player?.currentPosition ?: 0L
                 val diff = actualPos - currentTimeMs
                 if (kotlin.math.abs(diff) > 500) {
                     currentTimeMs = actualPos
@@ -716,9 +783,9 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                     currentTimeMs += dt + correction.toLong()
                 }
 
-                if (currentDurationMs > 0 && crossfadeDuration > 0) {
+                if (currentDurationMs > crossfadeDuration * 1000L && crossfadeDuration > 0) {
                     val remainingMs = currentDurationMs - actualPos
-                    if (remainingMs > 0 && remainingMs <= crossfadeDuration * 1000L && !isCrossfadingTriggered && loadingJob?.isActive != true) {
+                    if (actualPos > 1000L && remainingMs > 0 && remainingMs <= crossfadeDuration * 1000L && !isCrossfadingTriggered && loadingJob?.isActive != true) {
                         isCrossfadingTriggered = true
                         currentLoadNext(true)
                     }
@@ -736,6 +803,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
 
     // ── UI ────────────────────────────────────────────────────────────────
     MaterialTheme(colorScheme = colorScheme) {
+        UpdateDialog(updateStatus, settingsVm, context)
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {
@@ -840,26 +908,34 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .safeDrawingPadding()
+                                .safeDrawingPadding(),
+                            verticalArrangement = Arrangement.Top
                         ) {
-                            // ── Header ──────────────────────────────────────────────
-                            NowPlayingHeader(
-                                nowPlayingData = nowPlayingData,
-                                headerProgress = headerProgress,
-                                currentImageSize = currentImageSize,
-                                currentSpacerWidth = currentSpacerWidth,
-                                currentHeaderBias = currentHeaderBias,
-                                metadataAlpha = metadataAlpha
-                            )
+                            // ── Header (Compact when lyrics exist, Centered otherwise) ──────
+                            val headerBoxModifier = if (!hasLyrics) Modifier.weight(1f) else Modifier.wrapContentHeight()
+                            Box(
+                                modifier = Modifier.then(headerBoxModifier),
+                                contentAlignment = BiasAlignment(0f, headerVerticalBias)
+                            ) {
+                                NowPlayingHeader(
+                                    nowPlayingData = nowPlayingData,
+                                    hasLyrics = hasLyrics,
+                                    headerProgress = headerProgress,
+                                    currentImageSize = currentImageSize,
+                                    currentSpacerWidth = currentSpacerWidth,
+                                    currentHeaderBias = currentHeaderBias,
+                                    metadataAlpha = metadataAlpha
+                                )
+                            }
 
                             // ── Lyrics ──────────────────────────────────────────────
-                            Box(modifier = Modifier.weight(1f)) {
+                            Box(modifier = Modifier.weight(lyricsWeight)) {
                                 if (currentSongIndex != -1) {
                                     SpicyLyricsView(
                                         lines = lines,
                                         currentTimeMs = currentTimeMs + lyricsOffsetMs,
                                         onSeekWord = { timeMs ->
-                                            audioPlayer.player.seekTo(timeMs)
+                                            audioPlayer.player?.seekTo(timeMs)
                                             currentTimeMs = timeMs
                                         },
                                         modifier = Modifier.fillMaxSize(),
@@ -875,7 +951,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                                 currentTimeMs = currentTimeMs,
                                 currentDurationMs = currentDurationMs,
                                 onSeek = { currentTimeMs = it },
-                                onSeekFinished = { audioPlayer.player.seekTo(currentTimeMs) },
+                                onSeekFinished = { audioPlayer.player?.seekTo(currentTimeMs) },
                                 isDraggingSlider = isDraggingSlider,
                                 onDraggingChanged = { isDraggingSlider = it },
                                 currentBitrate = currentBitrate,
@@ -883,17 +959,28 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                                 primaryTint = primaryTint,
                                 onShowMenu = { showMenu = true },
                                 onShuffle = { handleShuffle() },
-                                isShuffleActive = playQueue.isNotEmpty(),
+                                isShuffleActive = isShuffleMode,
                                 onPrevious = { loadPrevious() },
                                 onNext = { loadNext(false) },
                                 isPlaying = isPlaying,
-                                onTogglePlay = {
-                                    if (audioPlayer.player.isPlaying) {
-                                        audioPlayer.pause()
-                                        isPlaying = false
+                                 onTogglePlay = {
+                                    if (currentSongIndex == -1) {
+                                        // Stopped state: Start sequential playback
+                                        if (songPairs.isNotEmpty()) {
+                                            playQueue = songPairs
+                                            playQueueIndex = 0
+                                            isShuffleMode = false
+                                            loadSong(0, true, false)
+                                            isPlaying = true
+                                        }
                                     } else {
-                                        audioPlayer.play()
-                                        isPlaying = true
+                                        if (audioPlayer.player?.isPlaying == true) {
+                                            audioPlayer.pause()
+                                            isPlaying = false
+                                        } else {
+                                            audioPlayer.play()
+                                            isPlaying = true
+                                        }
                                     }
                                 },
                                 loopMode = loopMode,
@@ -920,6 +1007,21 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
             },
             onNavigateToSettings = {
                 currentScreen = AppScreen.SETTINGS
+            },
+            onClearQueue = {
+                audioPlayer.pause()
+                playQueue = emptyList()
+                playQueueIndex = 0
+                currentSongIndex = -1
+                trackName = ""
+                artistName = ""
+                coverArtBitmap = null
+                isPlaying = false
+                currentTimeMs = 0L
+                lines = emptyList()
+                currentBitrate = ""
+                currentFormat = ""
+                currentDurationMs = 1L
             }
         )
 

@@ -357,7 +357,8 @@ internal object LyricsLayoutCalculator {
                 }
             }
             
-            val drawY = if (isBg) currentY - 32f else if (line.isSongwriter) currentY + lineSpacing * 0.5f else currentY
+            val prevIsInterlude = layouts.lastOrNull()?.isInterlude ?: false
+            val drawY = if (isBg && !prevIsInterlude) currentY - 32f else if (line.isSongwriter) currentY + lineSpacing * 0.5f else currentY
 
             layouts.add(LineLayout(line, wordLayouts, drawY, totalHeight, totalWidth, maxRowWidth, false, isBg, line.oppositeAligned, line.isSongwriter))
             

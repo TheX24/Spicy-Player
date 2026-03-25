@@ -19,11 +19,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.withStyle
+import com.tx24.spicyplayer.ui.components.UpdateDialog
 
 import com.tx24.spicyplayer.ui.settings.components.*
 import com.tx24.spicyplayer.viewmodel.SettingsViewModel
+import com.tx24.spicyplayer.viewmodel.UpdateStatus
 
 import com.tx24.spicyplayer.BuildConfig
 
@@ -60,9 +70,11 @@ fun SettingsScreen(
     val keepScreenOn       by vm.keepScreenOn.collectAsStateWithLifecycle()
     val audioFocus         by vm.audioFocus.collectAsStateWithLifecycle()
     val scanDir            by vm.scanDirectory.collectAsStateWithLifecycle()
+    val updateStatus       by vm.updateStatus.collectAsStateWithLifecycle()
 
     // ── Local UI state ────────────────────────────────────────────────────────
     var showResetSettings  by remember { mutableStateOf(false) }
+    var showLicensesDialog by remember { mutableStateOf(false) }
 
     // ── Sub-screens ───────────────────────────────────────────────────────────
     if (showResetSettings) {
@@ -72,6 +84,42 @@ fun SettingsScreen(
         )
         return
     }
+
+    if (showLicensesDialog) {
+        AlertDialog(
+            onDismissRequest = { showLicensesDialog = false },
+            title = { Text("Open Source Licenses") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .fillMaxWidth()
+                ) {
+                    val libraries = listOf(
+                        "AndroidX (Core, Lifecycle, Activity, Compose, Palette, DataStore)" to "Apache License 2.0",
+                        "Kotlin & Coroutines" to "Apache License 2.0",
+                        "Media3 / ExoPlayer" to "Apache License 2.0",
+                        "Material Design 3" to "Apache License 2.0",
+                        "Google Fonts (Inter, Roboto, Outfit)" to "Open Font License (OFL)",
+                        "Hilt / Dagger (if used)" to "Apache License 2.0"
+                    )
+                    libraries.forEach { (name, license) ->
+                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                            Text(name, style = MaterialTheme.typography.titleSmall)
+                            Text(license, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLicensesDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    UpdateDialog(updateStatus, vm, context)
 
 
     // ── Content ───────────────────────────────────────────────────────────────
@@ -348,13 +396,15 @@ fun SettingsScreen(
                         icon = Icons.Rounded.Info,
                         title = "Version",
                         subtitle = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                        onClick = {}
+                        onClick = {
+                            vm.checkForUpdates(isManual = true)
+                        }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     NavigationSettingItem(
                         icon = Icons.Rounded.Policy,
                         title = "Open Source Licenses",
-                        onClick = { /* LicensesActivity */ }
+                        onClick = { showLicensesDialog = true }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     NavigationSettingItem(
@@ -379,3 +429,4 @@ fun SettingsScreen(
         }
     }
 }
+

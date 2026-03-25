@@ -7,8 +7,12 @@
     - [x] Tap to seek
     - [x] 3 Dots Interlude indicator
     - [x] Dynamic Background
+    - [ ] Update word-wrapping to match Spicy Lyrics
     - [ ] Romanization
     - [ ] Translation (?)
+    - [ ] Line synced lyrics
+    - [ ] Static lyrics
+    - [ ] Spicy Lyrics-like settings
     - [ ] Landscape view
       - [ ] Split screen layout with cover art/controls on the left and scrolling lyrics on the right
     - [ ] Fixes
@@ -21,7 +25,7 @@
         - [x] Use Android Storage Access Framework (SAF) for scoped storage compliance
         - [x] Background service for scanning with a progress notification
       - [x] Auto-pair `.flac` and `.ttml` files based on name
-    - [ ] Implement MediaSession for song info broadcasting
+    - [x] Implement MediaSession for song info broadcasting
     - [ ] UI
       - [ ] Introduction screen
         - [ ] Greeting
@@ -36,14 +40,15 @@
         - [ ] Swipe left/right to remove a track from the queue
         - [ ] Sleep timer
       - [x] Now Playing
+        - [ ] Fully hide controls
         - [ ] Swipe horizontally to skip to previous/next track
         - [ ] Tap album cover to show/hide lyrics overlay or toggle full-screen cover
         - [x] Controls
           - [ ] Advanced controls
         - [x] Progress bar
         - [x] Cover art and track info
-          - [ ] Auto expand cover art and track info to middle if no TTML is found
-            - [ ] Use `animateContentSize` or `updateTransition` in Compose for a smooth centering animation
+          - [x] Auto expand cover art and track info to middle if no TTML is found
+            - [x] Use `animateContentSize` or `updateTransition` in Compose for a smooth centering animation
           - [x] Scrolling track info if too long
       - [ ] Spectrum visualization
         - [ ] Fetch audio session ID from ExoPlayer to drive visualizer data
@@ -58,13 +63,15 @@
       - [x] Crossfade duration slider (0-10 seconds) and gapless playback toggle
     - [x] General settings
       - [x] App theme selector (Light, Dark, System Default, Material You)
-      - [x] Cache management (clear cached images/lyrics to free up space)
+      - [ ] Cache management (clear cached images/lyrics to free up space)
       - [x] Keep screen on
       - [x] Scan directory
       - [x] Audio focus mode
       - [x] Rescan library
-        - [ ] Cache scanned and matched
+        - [x] Cache scanned and matched
     - [x] Reset to defaults
+  - General
+    - [x] Update checking
 - Bugs
   - [ ] RTL Languages
     - [ ] Ensure the Word renderer calculates layout widths properly from right to left
@@ -75,7 +82,7 @@
     - [ ] Slower anims look fine but faster anims look weird
   - [x] Audio focus handling
   - [ ] Bluetooth/general audio delay fix
-  - [ ] 3 Dots interlude BG line spacings
+  - [x] 3 Dots interlude BG line spacings
   - [x] Previous song
   - [x] Seeking doesn't move lyrics view
   - [x] BG Blur and timing offset have too many steps/circles in slider
@@ -83,4 +90,5 @@
   - [x] Custom EQ doesn't work
   - [x] Transition/animation between settings pages
   - [ ] Performance improvements
-  - [ ] Fix logo sizing in some places like toasts
+  - [x] Fix logo sizing
+  - [x] Shuffle not shuffling?
