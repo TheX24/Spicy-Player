@@ -93,6 +93,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.tx24.spicyplayer.models.Song
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,7 +111,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     var trackName by remember { mutableStateOf("") }
     var artistName by remember { mutableStateOf("") }
     var currentSongIndex by remember { mutableIntStateOf(-1) }
-    var songPairs by remember { mutableStateOf<List<Pair<File, File?>>>(emptyList()) }
+    var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var isScanning by remember { mutableStateOf(false) }
     var scanProgress by remember { mutableStateOf(ScanProgress()) }
     var scanHistory by remember { mutableStateOf(listOf<String>()) }
@@ -153,7 +154,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     LaunchedEffect(scanService) {
         scanService?.let { service ->
             service.resultFlow.collect { results ->
-                songPairs = results
+                songs = results
                 isScanning = false
                 Toast.makeText(context, "Matched ${results.size} songs", Toast.LENGTH_SHORT).show()
             }
@@ -163,8 +164,8 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     // (Removed separate notification permission request as it's now handled at startup)
 
     // ── Queue & controls state ─────────────────────────────────────────────
-    // playQueue: empty = no explicit queue (sequential through songPairs)
-    var playQueue by remember { mutableStateOf<List<Pair<File, File?>>>(emptyList()) }
+    // playQueue: empty = no explicit queue (sequential through songs)
+    var playQueue by remember { mutableStateOf<List<Song>>(emptyList()) }
     var playQueueIndex by remember { mutableIntStateOf(0) }
     var isShuffleMode by remember { mutableStateOf(false) }
     var loopMode by remember { mutableIntStateOf(0) }   // 0=off 1=all 2=one
@@ -204,6 +205,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     val loudnessEnabled    by settingsVm.loudnessEnabled.collectAsStateWithLifecycle()
     val loudnessStrength   by settingsVm.loudnessStrength.collectAsStateWithLifecycle()
     val updateStatus       by settingsVm.updateStatus.collectAsStateWithLifecycle()
+    val scanDirectory      by settingsVm.scanDirectory.collectAsStateWithLifecycle()
     
     // ── Startup ───────────────────────────────────────────────────────────
     LaunchedEffect(Unit) {
@@ -512,43 +514,36 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
 
     // ── Initial scan ──────────────────────────────────────────────────────
     LaunchedEffect(permissionsGranted) {
-        if (permissionsGranted && songPairs.isEmpty() && !isScanning) {
-            isScanning = true
-            coroutineScope.launch(Dispatchers.IO) {
-                try {
-                    val scanPath = settingsVm.scanDirectory.value.ifBlank { "/sdcard/Music/" }
-                    
-                    // Attempt to load from cache first
-                    val cachedPairs = com.tx24.spicyplayer.util.loadCachedScan(context, scanPath)
-                    
-                    if (cachedPairs != null) {
-                        launch(Dispatchers.Main) {
-                            songPairs = cachedPairs
-                            isScanning = false
-                        }
-                    } else {
-                        scanHistory = emptyList()
-                        val intent = Intent(context, ScanService::class.java).apply {
-                            putExtra("scan_path", scanPath)
-                        }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            context.startForegroundService(intent)
-                        } else {
-                            context.startService(intent)
-                        }
-                        isScanning = true
+        if (permissionsGranted && scanDirectory.isNotEmpty()) {
+            try {
+                val cachedSongs = com.tx24.spicyplayer.util.loadCachedScan(context, scanDirectory)
+                
+                if (cachedSongs != null) {
+                    songs = cachedSongs
+                    isScanning = false
+                } else {
+                    scanHistory = emptyList()
+                    val intent = Intent(context, ScanService::class.java).apply {
+                        putExtra("scan_path", scanDirectory)
                     }
-                } catch (e: Exception) {
-                    Log.e("SpicyPlayer", "Initial scan error", e)
-                    launch(Dispatchers.Main) { isScanning = false }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
+                    }
+                    isScanning = true
                 }
+            } catch (e: Exception) {
+                Log.e("SpicyPlayer", "Initial scan error", e)
+                isScanning = false
             }
         }
     }
 
     // ── Song loading helpers ──────────────────────────────────────────────
-    val loadSongFromPair: (Pair<File, File?>, Int, Boolean, Boolean) -> Unit = { pair, indexInSongPairs, playWait, useCrossfade ->
-        val (selectedAudio, selectedTtml) = pair
+    val loadSongFromModel: (Song, Int, Boolean, Boolean) -> Unit = { song, indexInSongs, playWait, useCrossfade ->
+        val selectedAudio = song.file
+        val selectedTtml = song.ttmlFile
         loadingJob?.cancel()
         
         // Check cache first
@@ -559,7 +554,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
             coverArtBitmap = cachedMetadata.art
             currentBitrate = cachedMetadata.bitrate
             currentFormat = cachedMetadata.ext
-            currentSongIndex = indexInSongPairs
+            currentSongIndex = indexInSongs
             // We still need to load lyrics if any, but we can do it in background
         }
 
@@ -615,11 +610,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                     coverArtBitmap = result.art
                     currentBitrate = result.bitrate
                     currentFormat = result.ext
-                    currentSongIndex = indexInSongPairs
-                    
-                    // Cache the metadata for future use
-                    metadataCache.put(selectedAudio.absolutePath, result)
-                    
+                    currentSongIndex = indexInSongs
                     if (crossfadeDuration > 0 && useCrossfade) {
                         audioPlayer.playNextWithCrossfade(listOf(selectedAudio.absolutePath), crossfadeDuration * 1000L, playWhenReady = playWait)
                     } else {
@@ -634,8 +625,8 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     }
 
     val loadSong: (Int, Boolean, Boolean) -> Unit = { index, playWait, useCrossfade ->
-        if (index in songPairs.indices) {
-            loadSongFromPair(songPairs[index], index, playWait, useCrossfade)
+        if (index in songs.indices) {
+            loadSongFromModel(songs[index], index, playWait, useCrossfade)
         }
     }
 
@@ -656,14 +647,14 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                 
                 if (next < playQueue.size) {
                     playQueueIndex = next
-                    loadSongFromPair(playQueue[next], songPairs.indexOf(playQueue[next]), true, useCrossfade)
+                    loadSongFromModel(playQueue[next], songs.indexOf(playQueue[next]), true, useCrossfade)
                 } else {
                     isPlaying = false
                 }
             }
-            songPairs.isNotEmpty() -> {
+            songs.isNotEmpty() -> {
                 val next = (currentSongIndex + 1)
-                if (next < songPairs.size) {
+                if (next < songs.size) {
                     loadSong(next, true, useCrossfade)
                 } else if (loopMode == 1) {
                     loadSong(0, true, useCrossfade)
@@ -684,10 +675,10 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                 playQueue.isNotEmpty() -> {
                     val prev = (playQueueIndex - 1 + playQueue.size) % playQueue.size
                     playQueueIndex = prev
-                    loadSongFromPair(playQueue[prev], songPairs.indexOf(playQueue[prev]), true, false)
+                    loadSongFromModel(playQueue[prev], songs.indexOf(playQueue[prev]), true, false)
                 }
-                songPairs.isNotEmpty() -> {
-                    val prev = (currentSongIndex - 1 + songPairs.size) % songPairs.size
+                songs.isNotEmpty() -> {
+                    val prev = (currentSongIndex - 1 + songs.size) % songs.size
                     loadSong(prev, true, false)
                 }
             }
@@ -697,12 +688,12 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     val handleShuffle = {
         if (currentSongIndex == -1) {
             // Stopped state: Shuffle all and start playing, but don't toggle isShuffleMode highlight
-            if (songPairs.isNotEmpty()) {
-                val shuffled = songPairs.shuffled()
+            if (songs.isNotEmpty()) {
+                val shuffled = songs.shuffled()
                 playQueue = shuffled
                 playQueueIndex = 0
                 isShuffleMode = false
-                loadSongFromPair(shuffled[0], songPairs.indexOf(shuffled[0]), true, false)
+                loadSongFromModel(shuffled[0], songs.indexOf(shuffled[0]), true, false)
             }
         } else {
             // Playing state: Toggle isShuffleMode and update the remaining queue
@@ -717,11 +708,11 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                 }
             } else {
                 // Revert to original order while keeping the current song
-                val currentTrack = if (playQueue.isNotEmpty()) playQueue[playQueueIndex] else songPairs.getOrNull(currentSongIndex)
+                val currentTrack = if (playQueue.isNotEmpty()) playQueue[playQueueIndex] else songs.getOrNull(currentSongIndex)
                 if (currentTrack != null) {
-                    val originalIndex = songPairs.indexOf(currentTrack)
+                    val originalIndex = songs.indexOf(currentTrack)
                     if (originalIndex != -1) {
-                        playQueue = songPairs
+                        playQueue = songs
                         playQueueIndex = originalIndex
                     }
                 }
@@ -878,7 +869,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                 }
                 AppScreen.LIBRARY -> {
                     LibraryScreen(
-                        songPairs = songPairs,
+                        songs = songs,
                         colorScheme = colorScheme,
                         bottomPadding = bottomPad,
                         onSongSelected = { index ->
@@ -891,14 +882,14 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                 }
                 AppScreen.QUEUE -> {
                     QueueScreen(
-                        playQueue = playQueue.ifEmpty { songPairs },
+                        playQueue = playQueue.ifEmpty { songs },
                         playQueueIndex = if (playQueue.isEmpty()) currentSongIndex else playQueueIndex,
                         colorScheme = colorScheme,
                         bottomPadding = bottomPad,
                         onTrackSelected = { idx ->
                             if (playQueue.isNotEmpty()) {
                                 playQueueIndex = idx
-                                loadSongFromPair(playQueue[idx], songPairs.indexOf(playQueue[idx]), true, false)
+                                loadSongFromModel(playQueue[idx], songs.indexOf(playQueue[idx]), true, false)
                             } else {
                                 loadSong(idx, true, false)
                             }
@@ -1016,8 +1007,8 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                         isPlaying = isPlaying,
                         onTogglePlay = {
                             if (currentSongIndex == -1) {
-                                if (songPairs.isNotEmpty()) {
-                                    playQueue = songPairs
+                                if (songs.isNotEmpty()) {
+                                    playQueue = songs
                                     playQueueIndex = 0
                                     isShuffleMode = false
                                     loadSong(0, true, false)
@@ -1086,7 +1077,8 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
             }
         }
     }
-    // ── Custom 3-Dots Menu Bottom Sheet ─────────────────────────────────
+
+        // ── Custom 3-Dots Menu Bottom Sheet ─────────────────────────────────
         AppMenuBottomSheet(
             showMenu = showMenu,
             onDismiss = { showMenu = false },
@@ -1158,63 +1150,54 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                                     )
                                 }
                                 
-                                // Current active phase
-                                val currentText = buildString {
-                                    append(scanProgress.phase)
-                                    if (scanProgress.totalCount > 0) {
-                                        append(" ${scanProgress.currentCount}/${scanProgress.totalCount}")
-                                    } else if (scanProgress.currentCount > 0) {
-                                        append(" ${scanProgress.currentCount}")
-                                    }
-                                }
+                                LinearProgressIndicator(
+                                    progress = { 
+                                        if (scanProgress.totalCount > 0) 
+                                            scanProgress.currentCount.toFloat() / scanProgress.totalCount.toFloat()
+                                        else 0f
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    color = colorScheme.primary,
+                                    trackColor = colorScheme.surfaceVariant
+                                )
                                 
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = currentText,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
+                                    text = "Scan: ${if (scanProgress.summary.isNotEmpty()) scanProgress.summary else scanProgress.phase}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            }
-                            
-                            Spacer(modifier = Modifier.height(24.dp))
-                            
-                            // Progress bar
-                            if (scanProgress.totalCount > 0) {
-                                LinearProgressIndicator(
-                                    progress = { scanProgress.currentCount.toFloat() / scanProgress.totalCount.toFloat() },
-                                    modifier = Modifier.fillMaxWidth().height(10.dp).clip(CircleShape),
-                                    color = colorScheme.primary,
-                                    trackColor = colorScheme.surfaceVariant
-                                )
-                            } else {
-                                LinearProgressIndicator(
-                                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                                    color = colorScheme.primary,
-                                    trackColor = colorScheme.surfaceVariant
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Text(
-                                text = "You can exit the app, it will continue scanning in the background",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-
-                            // Battery Optimization Prompt (always helpful to check)
-                            val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
-                            val isIgnoringBatteryOptimizations = remember(isScanning) {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                    powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                                } else {
-                                    true
+                                if (scanProgress.isUpdating) {
+                                    Text(
+                                        text = "Syncing with media session...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = colorScheme.primary,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-                            
+                        }
+                        
+                        // Background usage info
+                        val isIgnoringBatteryOptimizations = remember {
+                            val pm = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                pm.isIgnoringBatteryOptimizations(context.packageName)
+                            } else true
+                        }
+                        
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.5f))
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
                             if (!isIgnoringBatteryOptimizations) {
                                 Button(
                                     onClick = {
@@ -1257,5 +1240,5 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                 }
             }
         }
-    }
+}
 }

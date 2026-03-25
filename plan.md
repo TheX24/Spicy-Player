@@ -26,6 +26,7 @@
         - [x] Use Android Storage Access Framework (SAF) for scoped storage compliance
         - [x] Background service for scanning with a progress notification
       - [x] Auto-pair `.flac` and `.ttml` files based on name
+      - [ ] Multiple folder support
     - [x] Implement MediaSession for song info broadcasting
     - [ ] UI
       - [ ] Introduction screen
@@ -34,8 +35,9 @@
         - [ ] Select folder to scan
         - [x] Show progress of scanning
       - [ ] Library
-        - [ ] Categorized tabs: Albums, Artists, Songs, Folders, and Playlists
-        - [ ] Grid view for Albums/Artists with fast-scroll alphabet indexer on the right edge
+        - [x] Categorized tabs: Albums, Artists, Songs, Folders, and Playlists
+        - [x] Grid view for Albums/Artists with fast-scroll alphabet indexer on the right edge
+        - [ ] Playlists
       - [ ] Queue
         - [ ] Drag-and-drop to reorder tracks
         - [ ] Swipe left/right to remove a track from the queue
@@ -60,7 +62,7 @@
       - [x] Custom font size
     - [x] Audio player settings
       - [x] Equalizer (EQ) preset selection and Bass Boost toggle
-        - [ ] *TODO* Musicolet-like EQ
+        - [ ] _TODO_ Musicolet-like EQ
       - [x] Crossfade duration slider (0-10 seconds) and gapless playback toggle
     - [x] General settings
       - [x] App theme selector (Light, Dark, System Default, Material You)
@@ -97,5 +99,5 @@
   - [ ] Fix unrestrict battery usage setting
   - [ ] Skipping at the end of queue
   - [ ] Fast word fade-in
-  - [ ] Fix classic style NPC and NavBar
   - [ ] Cover art vertical padding
+  - [ ] Fix NPC collapsing animation

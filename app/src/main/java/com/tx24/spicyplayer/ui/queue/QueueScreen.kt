@@ -18,11 +18,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tx24.spicyplayer.ui.canvas.DynamicBackgroundView
+import com.tx24.spicyplayer.models.Song
 import java.io.File
 
 @Composable
 fun QueueScreen(
-    playQueue: List<Pair<File, File?>>,
+    playQueue: List<Song>,
     playQueueIndex: Int,
     colorScheme: ColorScheme,
     bottomPadding: androidx.compose.ui.unit.Dp,
@@ -70,12 +71,12 @@ fun QueueScreen(
                         state = listState,
                         contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
-                itemsIndexed(playQueue) { index, pair ->
+                itemsIndexed(playQueue) { index, song ->
                     val isPlaying = index == playQueueIndex
                     ListItem(
                         headlineContent = {
                             Text(
-                                text = pair.first.nameWithoutExtension,
+                                text = song.title,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 color = if (isPlaying) colorScheme.primary else colorScheme.onSurface,
@@ -85,7 +86,7 @@ fun QueueScreen(
                         },
                         supportingContent = {
                             Text(
-                                text = pair.first.parentFile?.name ?: "Unknown Folder",
+                                text = song.artist,
                                 color = colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall
                             )

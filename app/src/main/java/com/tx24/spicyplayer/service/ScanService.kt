@@ -13,6 +13,7 @@ import com.tx24.spicyplayer.util.performScan
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import com.tx24.spicyplayer.models.Song
 import java.io.File
 
 class ScanService : Service() {
@@ -23,7 +24,7 @@ class ScanService : Service() {
     private val _progressFlow = MutableSharedFlow<ScanProgress>(replay = 1)
     val progressFlow = _progressFlow.asSharedFlow()
 
-    private val _resultFlow = MutableSharedFlow<List<Pair<File, File?>>>(replay = 1)
+    private val _resultFlow = MutableSharedFlow<List<Song>>(replay = 1)
     val resultFlow = _resultFlow.asSharedFlow()
 
     inner class ScanBinder : Binder() {
