@@ -7,6 +7,7 @@
     - [x] Tap to seek
     - [x] 3 Dots Interlude indicator
     - [x] Dynamic Background
+      - [ ] Update to Spikerko's new dynamic background
     - [ ] Update word-wrapping to match Spicy Lyrics
     - [ ] Romanization
     - [ ] Translation (?)
@@ -80,6 +81,7 @@
     - [ ] Turn off held word animation
   - [ ] Held word animation
     - [ ] Slower anims look fine but faster anims look weird
+    - [ ] Don't animate punctuation
   - [x] Audio focus handling
   - [ ] Bluetooth/general audio delay fix
   - [x] 3 Dots interlude BG line spacings
@@ -92,3 +94,8 @@
   - [ ] Performance improvements
   - [x] Fix logo sizing
   - [x] Shuffle not shuffling?
+  - [ ] Fix unrestrict battery usage setting
+  - [ ] Skipping at the end of queue
+  - [ ] Fast word fade-in
+  - [ ] Fix classic style NPC and NavBar
+  - [ ] Cover art vertical padding

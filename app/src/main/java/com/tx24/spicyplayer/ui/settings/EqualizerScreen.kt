@@ -91,7 +91,7 @@ fun EqualizerScreen(
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.Transparent
     ) { innerPadding ->
         LazyColumn(
             contentPadding = PaddingValues(

@@ -32,9 +32,7 @@ class SettingsRepository(private val context: Context) {
         // Appearance
         val APP_THEME           = stringPreferencesKey("app_theme")            // LIGHT, DARK, SYSTEM
         val MATERIAL_YOU        = booleanPreferencesKey("material_you")
-        val CONTROLS_STYLE      = stringPreferencesKey("controls_style")       // CLASSIC, EXPRESSIVE
         val BACKGROUND_BLUR     = intPreferencesKey("background_blur_pct")     // 0–100
-        val PURE_BLACK          = booleanPreferencesKey("pure_black")
         val CONTRAST_LEVEL      = floatPreferencesKey("contrast_level")        // 0.0, 0.5, 1.0
 
         // General
@@ -68,9 +66,7 @@ class SettingsRepository(private val context: Context) {
     // ── Appearance ────────────────────────────────────────────────────────
     val appTheme: Flow<String>       = dataFlow.map { it[APP_THEME] ?: "SYSTEM" }
     val materialYou: Flow<Boolean>   = dataFlow.map { it[MATERIAL_YOU] ?: false }
-    val controlsStyle: Flow<String>  = dataFlow.map { it[CONTROLS_STYLE] ?: "EXPRESSIVE" }
     val backgroundBlur: Flow<Int>    = dataFlow.map { it[BACKGROUND_BLUR] ?: 60 }
-    val pureBlack: Flow<Boolean>     = dataFlow.map { it[PURE_BLACK] ?: false }
     val contrastLevel: Flow<Float>   = dataFlow.map { it[CONTRAST_LEVEL] ?: 0f }
 
     // ── General ───────────────────────────────────────────────────────────
@@ -94,9 +90,7 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setAppTheme(value: String)          = context.dataStore.edit { it[APP_THEME] = value }
     suspend fun setMaterialYou(value: Boolean)      = context.dataStore.edit { it[MATERIAL_YOU] = value }
-    suspend fun setControlsStyle(value: String)     = context.dataStore.edit { it[CONTROLS_STYLE] = value }
     suspend fun setBackgroundBlur(value: Int)       = context.dataStore.edit { it[BACKGROUND_BLUR] = value }
-    suspend fun setPureBlack(value: Boolean)        = context.dataStore.edit { it[PURE_BLACK] = value }
     suspend fun setContrastLevel(value: Float)      = context.dataStore.edit { it[CONTRAST_LEVEL] = value }
 
     suspend fun setKeepScreenOn(value: Boolean)     = context.dataStore.edit { it[KEEP_SCREEN_ON] = value }

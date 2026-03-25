@@ -41,7 +41,7 @@ private fun SettingRow(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val cornerRadius by animateFloatAsState(
-        targetValue = if (isPressed) 24f else 16f,
+        targetValue = if (isPressed) 32f else 16f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "corner"
     )
@@ -380,8 +380,8 @@ fun SettingsSectionHeader(title: String) {
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }

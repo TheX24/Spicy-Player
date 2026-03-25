@@ -9,3 +9,4 @@ build/
 .agents/
 *.jks
 keystore.properties
+skills-lock.json

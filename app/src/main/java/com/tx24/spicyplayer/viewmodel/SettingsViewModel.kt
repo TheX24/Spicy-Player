@@ -46,9 +46,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     // ── Appearance ────────────────────────────────────────────────────────
     val appTheme         = repo.appTheme.stateIn(viewModelScope, SharingStarted.Eagerly, "SYSTEM")
     val materialYou      = repo.materialYou.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-    val controlsStyle    = repo.controlsStyle.stateIn(viewModelScope, SharingStarted.Eagerly, "EXPRESSIVE")
     val backgroundBlur   = repo.backgroundBlur.stateIn(viewModelScope, SharingStarted.Eagerly, 60)
-    val pureBlack        = repo.pureBlack.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val contrastLevel    = repo.contrastLevel.stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
 
     // ── General ───────────────────────────────────────────────────────────
@@ -72,9 +70,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAppTheme(v: String)           = viewModelScope.launch { repo.setAppTheme(v) }
     fun setMaterialYou(v: Boolean)       = viewModelScope.launch { repo.setMaterialYou(v) }
-    fun setControlsStyle(v: String)      = viewModelScope.launch { repo.setControlsStyle(v) }
     fun setBackgroundBlur(v: Int)        = viewModelScope.launch { repo.setBackgroundBlur(v) }
-    fun setPureBlack(v: Boolean)         = viewModelScope.launch { repo.setPureBlack(v) }
     fun setContrastLevel(v: Float)       = viewModelScope.launch { repo.setContrastLevel(v) }
 
     fun setKeepScreenOn(v: Boolean)      = viewModelScope.launch { repo.setKeepScreenOn(v) }
@@ -103,9 +99,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun resetAppearance() = viewModelScope.launch {
         repo.setAppTheme("SYSTEM")
         repo.setMaterialYou(false)
-        repo.setControlsStyle("EXPRESSIVE")
         repo.setBackgroundBlur(60)
-        repo.setPureBlack(false)
         repo.setContrastLevel(0f)
     }
 

@@ -78,6 +78,10 @@ import com.tx24.spicyplayer.ui.canvas.SpicyLyricsView
 import com.tx24.spicyplayer.ui.components.NowPlayingHeader
 import com.tx24.spicyplayer.ui.components.NowPlayingControls
 import com.tx24.spicyplayer.ui.components.AppMenuBottomSheet
+import com.tx24.spicyplayer.ui.components.AppNavigationBar
+import com.tx24.spicyplayer.ui.components.MiniPlayer
+import com.tx24.spicyplayer.ui.library.LibraryScreen
+import com.tx24.spicyplayer.ui.queue.QueueScreen
 import com.tx24.spicyplayer.ui.settings.EqualizerScreen
 import com.tx24.spicyplayer.ui.settings.SettingsScreen
 import com.tx24.spicyplayer.util.formatTime
@@ -185,10 +189,9 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     val settingsVm: SettingsViewModel = viewModel()
     val appTheme           by settingsVm.appTheme.collectAsStateWithLifecycle()
     val materialYou        by settingsVm.materialYou.collectAsStateWithLifecycle()
-    val pureBlack          by settingsVm.pureBlack.collectAsStateWithLifecycle()
+    val contrastLevel      by settingsVm.contrastLevel.collectAsStateWithLifecycle()
     val keepScreenOn       by settingsVm.keepScreenOn.collectAsStateWithLifecycle()
     val audioFocusSetting  by settingsVm.audioFocus.collectAsStateWithLifecycle()
-    val controlsStyle      by settingsVm.controlsStyle.collectAsStateWithLifecycle()
     val blurIntensity      by settingsVm.backgroundBlur.collectAsStateWithLifecycle()
     val eqPreset           by settingsVm.eqPreset.collectAsStateWithLifecycle()
     val bassBoostEnabled   by settingsVm.bassBoostEnabled.collectAsStateWithLifecycle()
@@ -198,7 +201,6 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     val crossfadeDuration  by settingsVm.crossfadeDuration.collectAsStateWithLifecycle()
     val backSkipThreshold  by settingsVm.backSkipThreshold.collectAsStateWithLifecycle()
     val customEqBands      by settingsVm.customEqBands.collectAsStateWithLifecycle()
-    val contrastLevel      by settingsVm.contrastLevel.collectAsStateWithLifecycle()
     val loudnessEnabled    by settingsVm.loudnessEnabled.collectAsStateWithLifecycle()
     val loudnessStrength   by settingsVm.loudnessStrength.collectAsStateWithLifecycle()
     val updateStatus       by settingsVm.updateStatus.collectAsStateWithLifecycle()
@@ -261,8 +263,8 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
         }
     }
 
-    // ── Color scheme: Material You override + pure black + theme ─────────
-    val colorScheme = remember(dynamicPrimaryColor, materialYou, isDark, pureBlack, contrastLevel) {
+    // ── Color scheme: Material You override + theme ─────────
+    val colorScheme = remember(dynamicPrimaryColor, materialYou, isDark, contrastLevel) {
         val base = when {
             materialYou && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
                 if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -292,9 +294,7 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
         }
         
         // AMOLED pure black override
-        val withBlack = if (pureBlack && isDark) {
-            base.copy(background = Color.Black, surface = Color.Black)
-        } else base
+        val withBlack = base
 
         // Apply Contrast Level
         if (contrastLevel > 0f) {
@@ -804,36 +804,27 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
     // ── UI ────────────────────────────────────────────────────────────────
     MaterialTheme(colorScheme = colorScheme) {
         UpdateDialog(updateStatus, settingsVm, context)
-        AnimatedContent(
-            targetState = currentScreen,
+        Box(modifier = Modifier.fillMaxSize()) {
+            DynamicBackgroundView(
+                coverArtBitmap = coverArtBitmap ?: appLogo,
+                blurIntensity = blurIntensity
+            )
+            val navBarVisible = !controlsCollapsed
+            
+            val bottomPad by animateDpAsState(
+                targetValue = if (currentScreen == AppScreen.NOW_PLAYING) 320.dp else 160.dp,
+                animationSpec = tween(500, easing = FastOutSlowInEasing),
+                label = "BottomPadAnimation"
+            )
+            AnimatedContent(
+                targetState = currentScreen,
             transitionSpec = {
                 val duration = 400
-                val enterSlide = when {
-                    initialState == AppScreen.NOW_PLAYING && targetState == AppScreen.SETTINGS -> slideInHorizontally { it }
-                    initialState == AppScreen.SETTINGS && targetState == AppScreen.EQUALIZER -> slideInHorizontally { it }
-                    initialState == AppScreen.EQUALIZER && targetState == AppScreen.SETTINGS -> slideInHorizontally { -it / 3 }
-                    initialState == AppScreen.SETTINGS && targetState == AppScreen.NOW_PLAYING -> slideInHorizontally { -it / 3 }
-                    initialState == AppScreen.NOW_PLAYING && targetState == AppScreen.EQUALIZER -> slideInHorizontally { it }
-                    initialState == AppScreen.EQUALIZER && targetState == AppScreen.NOW_PLAYING -> slideInHorizontally { -it / 3 }
-                    else -> fadeIn()
-                }
-                val exitSlide = when {
-                    initialState == AppScreen.NOW_PLAYING && targetState == AppScreen.SETTINGS -> slideOutHorizontally { -it / 3 }
-                    initialState == AppScreen.SETTINGS && targetState == AppScreen.EQUALIZER -> slideOutHorizontally { -it / 3 }
-                    initialState == AppScreen.EQUALIZER && targetState == AppScreen.SETTINGS -> slideOutHorizontally { it }
-                    initialState == AppScreen.SETTINGS && targetState == AppScreen.NOW_PLAYING -> slideOutHorizontally { it }
-                    initialState == AppScreen.NOW_PLAYING && targetState == AppScreen.EQUALIZER -> slideOutHorizontally { -it / 3 }
-                    initialState == AppScreen.EQUALIZER && targetState == AppScreen.NOW_PLAYING -> slideOutHorizontally { it }
-                    else -> fadeOut()
-                }
-
-                (enterSlide + fadeIn(tween(duration))).togetherWith(
-                    exitSlide + fadeOut(tween(duration))
-                ).apply {
-                    targetContentZIndex = if (targetState.ordinal > initialState.ordinal) 1f else -1f
+                fadeIn(tween(duration)).togetherWith(fadeOut(tween(duration))).apply {
+                    targetContentZIndex = if (targetState == AppScreen.NOW_PLAYING) 2f else 1f
                 }
             },
-            modifier = Modifier.background(colorScheme.background),
+            modifier = Modifier,
             contentAlignment = Alignment.Center,
             label = "app_nav"
         ) { screen ->
@@ -843,12 +834,8 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(colorScheme.background)
+                            .background(Color.Transparent)
                     ) {
-                        DynamicBackgroundView(
-                            coverArtBitmap = coverArtBitmap ?: appLogo,
-                            blurIntensity = blurIntensity
-                        )
                         SettingsScreen(
                             onBack = { currentScreen = AppScreen.NOW_PLAYING },
                             onRescan = { triggerRescan() },
@@ -869,12 +856,8 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(colorScheme.background)
+                            .background(Color.Transparent)
                     ) {
-                        DynamicBackgroundView(
-                            coverArtBitmap = coverArtBitmap ?: appLogo,
-                            blurIntensity = blurIntensity
-                        )
                         EqualizerScreen(
                             currentPreset = eqPreset,
                             onPresetChange = { settingsVm.setEqPreset(it) },
@@ -893,18 +876,43 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                         )
                     }
                 }
+                AppScreen.LIBRARY -> {
+                    LibraryScreen(
+                        songPairs = songPairs,
+                        colorScheme = colorScheme,
+                        bottomPadding = bottomPad,
+                        onSongSelected = { index ->
+                            playQueue = emptyList()
+                            playQueueIndex = 0
+                            loadSong(index, true, false)
+                            isPlaying = true
+                        }
+                    )
+                }
+                AppScreen.QUEUE -> {
+                    QueueScreen(
+                        playQueue = playQueue.ifEmpty { songPairs },
+                        playQueueIndex = if (playQueue.isEmpty()) currentSongIndex else playQueueIndex,
+                        colorScheme = colorScheme,
+                        bottomPadding = bottomPad,
+                        onTrackSelected = { idx ->
+                            if (playQueue.isNotEmpty()) {
+                                playQueueIndex = idx
+                                loadSongFromPair(playQueue[idx], songPairs.indexOf(playQueue[idx]), true, false)
+                            } else {
+                                loadSong(idx, true, false)
+                            }
+                            isPlaying = true
+                        }
+                    )
+                }
                 AppScreen.NOW_PLAYING -> {
                     // ── Now Playing ──────────────────────────────────────────────
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(colorScheme.background)
+                            .background(Color.Transparent)
                     ) {
-                        DynamicBackgroundView(
-                            coverArtBitmap = coverArtBitmap ?: appLogo,
-                            blurIntensity = blurIntensity
-                        )
-
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -944,59 +952,141 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
                                 }
                             }
 
-                            // ── Floating Bottom Controls ──────────────────────
-                            NowPlayingControls(
-                                controlsCollapsed = controlsCollapsed,
-                                onToggleCollapse = { controlsCollapsed = !controlsCollapsed },
-                                currentTimeMs = currentTimeMs,
-                                currentDurationMs = currentDurationMs,
-                                onSeek = { currentTimeMs = it },
-                                onSeekFinished = { audioPlayer.player?.seekTo(currentTimeMs) },
-                                isDraggingSlider = isDraggingSlider,
-                                onDraggingChanged = { isDraggingSlider = it },
-                                currentBitrate = currentBitrate,
-                                currentFormat = currentFormat,
-                                primaryTint = primaryTint,
-                                onShowMenu = { showMenu = true },
-                                onShuffle = { handleShuffle() },
-                                isShuffleActive = isShuffleMode,
-                                onPrevious = { loadPrevious() },
-                                onNext = { loadNext(false) },
-                                isPlaying = isPlaying,
-                                 onTogglePlay = {
-                                    if (currentSongIndex == -1) {
-                                        // Stopped state: Start sequential playback
-                                        if (songPairs.isNotEmpty()) {
-                                            playQueue = songPairs
-                                            playQueueIndex = 0
-                                            isShuffleMode = false
-                                            loadSong(0, true, false)
-                                            isPlaying = true
-                                        }
-                                    } else {
-                                        if (audioPlayer.player?.isPlaying == true) {
-                                            audioPlayer.pause()
-                                            isPlaying = false
-                                        } else {
-                                            audioPlayer.play()
-                                            isPlaying = true
-                                        }
-                                    }
-                                },
-                                loopMode = loopMode,
-                                onToggleLoop = { loopMode = (loopMode + 1) % 3 },
-                                colorScheme = colorScheme,
-                                formatTime = { formatTime(it) },
-                                isExpressive = controlsStyle == "EXPRESSIVE"
+                            // Dynamic space for bottom block to prevent clipping
+                            val npvBottomPad by animateDpAsState(
+                                targetValue = if (controlsCollapsed) 50.dp else 300.dp,
+                                label = "NPVBottomPad"
                             )
-
+                            Spacer(Modifier.height(npvBottomPad))
                         }
                     } 
                 } 
             } 
-        } 
+        }
 
-        // ── Custom 3-Dots Menu Bottom Sheet ─────────────────────────────────
+        // ── Unified Bottom Controls & Navigation ──────────────────────────────
+        val showMiniPlayer = (currentScreen != AppScreen.NOW_PLAYING && currentSongIndex != -1)
+        val playerVisible = (currentScreen == AppScreen.NOW_PLAYING) || showMiniPlayer
+        
+        // Dynamic Corner Radii
+        val touchingRadius = 8.dp
+        val outerRadius = 32.dp
+        
+        val playerBottomRadius by animateDpAsState(
+            targetValue = if (navBarVisible) touchingRadius else outerRadius,
+            label = "PlayerBottomRadius"
+        )
+        val navTopRadius by animateDpAsState(
+            targetValue = if (playerVisible) touchingRadius else outerRadius,
+            label = "NavTopRadius"
+        )
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .then(
+                    if (playerVisible || navBarVisible) 
+                        Modifier.padding(bottom = 12.dp, start = 12.dp, end = 12.dp).navigationBarsPadding()
+                    else Modifier.navigationBarsPadding()
+                ),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val bottomPlayerState = if (currentScreen == AppScreen.NOW_PLAYING) 2 else if (showMiniPlayer) 1 else 0
+            
+            when (bottomPlayerState) {
+                2 -> {
+                    NowPlayingControls(
+                        controlsCollapsed = controlsCollapsed,
+                        onToggleCollapse = { controlsCollapsed = !controlsCollapsed },
+                        currentTimeMs = currentTimeMs,
+                        currentDurationMs = currentDurationMs,
+                        onSeek = { currentTimeMs = it },
+                        onSeekFinished = { audioPlayer.player?.seekTo(currentTimeMs) },
+                        isDraggingSlider = isDraggingSlider,
+                        onDraggingChanged = { isDraggingSlider = it },
+                        currentBitrate = currentBitrate,
+                        currentFormat = currentFormat,
+                        primaryTint = primaryTint,
+                        onShowMenu = { showMenu = true },
+                        onShuffle = { handleShuffle() },
+                        isShuffleActive = isShuffleMode,
+                        onPrevious = { loadPrevious() },
+                        onNext = { loadNext(false) },
+                        isPlaying = isPlaying,
+                        onTogglePlay = {
+                            if (currentSongIndex == -1) {
+                                if (songPairs.isNotEmpty()) {
+                                    playQueue = songPairs
+                                    playQueueIndex = 0
+                                    isShuffleMode = false
+                                    loadSong(0, true, false)
+                                    isPlaying = true
+                                }
+                            } else {
+                                if (audioPlayer.player?.isPlaying == true) {
+                                    audioPlayer.pause()
+                                    isPlaying = false
+                                } else {
+                                    audioPlayer.play()
+                                    isPlaying = true
+                                }
+                            }
+                        },
+                        loopMode = loopMode,
+                        onToggleLoop = { loopMode = (loopMode + 1) % 3 },
+                        colorScheme = colorScheme,
+                        formatTime = { formatTime(it) },
+                        topRadius = outerRadius,
+                        bottomRadius = playerBottomRadius
+                    )
+                }
+                1 -> {
+                    MiniPlayer(
+                        visible = true,
+                        trackName = trackName,
+                        artistName = artistName,
+                        coverArtBitmap = coverArtBitmap,
+                        isPlaying = isPlaying,
+                        onPrevious = { loadPrevious() },
+                        onTogglePlay = {
+                            if (audioPlayer.player?.isPlaying == true) {
+                                audioPlayer.pause()
+                                isPlaying = false
+                            } else {
+                                audioPlayer.play()
+                                isPlaying = true
+                            }
+                        },
+                        onNext = { loadNext(false) },
+                        onClick = { currentScreen = AppScreen.NOW_PLAYING },
+                        colorScheme = colorScheme,
+                        topRadius = outerRadius,
+                        bottomRadius = playerBottomRadius
+                    )
+                }
+                else -> Spacer(modifier = Modifier.height(0.dp))
+            }
+            
+            AnimatedVisibility(
+                visible = navBarVisible,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                AppNavigationBar(
+                    currentScreen = currentScreen,
+                    onNavigate = { screen ->
+                        currentScreen = screen
+                    },
+                    visible = true,
+                    colorScheme = colorScheme,
+                    topRadius = navTopRadius,
+                    bottomRadius = outerRadius
+                )
+            }
+        }
+    }
+    // ── Custom 3-Dots Menu Bottom Sheet ─────────────────────────────────
         AppMenuBottomSheet(
             showMenu = showMenu,
             onDismiss = { showMenu = false },
@@ -1004,9 +1094,6 @@ fun SpicyPlayerApp(audioPlayer: AudioPlayer) {
             onNavigateToEqualizer = {
                 eqNavigationSource = AppScreen.NOW_PLAYING
                 currentScreen = AppScreen.EQUALIZER
-            },
-            onNavigateToSettings = {
-                currentScreen = AppScreen.SETTINGS
             },
             onClearQueue = {
                 audioPlayer.pause()

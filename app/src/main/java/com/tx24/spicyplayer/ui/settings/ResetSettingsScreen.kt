@@ -77,9 +77,7 @@ fun ResetSettingsScreen(
 
     val appTheme           by vm.appTheme.collectAsStateWithLifecycle()
     val materialYou        by vm.materialYou.collectAsStateWithLifecycle()
-    val controlsStyle      by vm.controlsStyle.collectAsStateWithLifecycle()
     val blur               by vm.backgroundBlur.collectAsStateWithLifecycle()
-    val pureBlack          by vm.pureBlack.collectAsStateWithLifecycle()
     val contrastLevel      by vm.contrastLevel.collectAsStateWithLifecycle()
 
     val keepScreenOn       by vm.keepScreenOn.collectAsStateWithLifecycle()
@@ -169,9 +167,7 @@ fun ResetSettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     ResetOptionItem("App Theme", "$appTheme (Default: SYSTEM)") { vm.setAppTheme("SYSTEM") }
                     ResetOptionItem("Material You", "$materialYou (Default: false)") { vm.setMaterialYou(false) }
-                    ResetOptionItem("Controls Style", "$controlsStyle (Default: EXPRESSIVE)") { vm.setControlsStyle("EXPRESSIVE") }
                     ResetOptionItem("Background Blur", "$blur% (Default: 60%)") { vm.setBackgroundBlur(60) }
-                    ResetOptionItem("AMOLED Pure Black", "$pureBlack (Default: false)") { vm.setPureBlack(false) }
                     ResetOptionItem("Contrast Level", "$contrastLevel (Default: 0.0)") { vm.setContrastLevel(0f) }
                 }
             }

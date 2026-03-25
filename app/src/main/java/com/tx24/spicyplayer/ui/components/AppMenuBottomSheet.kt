@@ -26,7 +26,6 @@ fun AppMenuBottomSheet(
     onDismiss: () -> Unit,
     colorScheme: ColorScheme,
     onNavigateToEqualizer: () -> Unit,
-    onNavigateToSettings: () -> Unit,
     onClearQueue: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -87,17 +86,8 @@ fun AppMenuBottomSheet(
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
-                    ListItem(
-                        headlineContent = { Text("Settings") },
-                        leadingContent = { Icon(Icons.Rounded.Settings, contentDescription = null) },
-                        modifier = Modifier.clickable {
-                            onDismiss()
-                            onNavigateToSettings()
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                    )
                     
-                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = colorScheme.onSurfaceVariant.copy(alpha = 0.1f))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = colorScheme.onSurfaceVariant.copy(alpha = 0.1f))
 
                     ListItem(
                         headlineContent = { Text("Clear Queue", color = colorScheme.error) },

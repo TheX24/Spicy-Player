@@ -62,9 +62,7 @@ fun SettingsScreen(
 
     val appTheme           by vm.appTheme.collectAsStateWithLifecycle()
     val materialYou        by vm.materialYou.collectAsStateWithLifecycle()
-    val controlsStyle      by vm.controlsStyle.collectAsStateWithLifecycle()
     val blur               by vm.backgroundBlur.collectAsStateWithLifecycle()
-    val pureBlack          by vm.pureBlack.collectAsStateWithLifecycle()
     val contrastLevel      by vm.contrastLevel.collectAsStateWithLifecycle()
 
     val keepScreenOn       by vm.keepScreenOn.collectAsStateWithLifecycle()
@@ -124,42 +122,8 @@ fun SettingsScreen(
 
     // ── Content ───────────────────────────────────────────────────────────────
     Scaffold(
-        topBar = {
-            TopAppBar(
-                navigationIcon = {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        onClick = onBack,
-                        modifier = Modifier.padding(start = 8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(end = 24.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = onBack) {
-                                Icon(
-                                    Icons.Rounded.ArrowBackIosNew,
-                                    contentDescription = "Back",
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Text(
-                                text = "Settings",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Medium
-                                )
-                            )
-                        }
-                    }
-                },
-                title = {},
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
+        topBar = {},
+        containerColor = Color.Transparent
     ) { innerPadding ->
         LazyColumn(
             contentPadding = PaddingValues(
@@ -283,14 +247,6 @@ fun SettingsScreen(
                         onCheckedChange = { vm.setMaterialYou(it) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                    SwitchSettingItem(
-                        icon = Icons.Rounded.Brightness1,
-                        title = "AMOLED Pure Black",
-                        subtitle = "Pure black background for OLED screens",
-                        checked = pureBlack,
-                        onCheckedChange = { vm.setPureBlack(it) }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     SegmentedSettingItem(
                         icon = Icons.Rounded.Contrast,
                         title = "Contrast Level",
@@ -301,14 +257,6 @@ fun SettingsScreen(
                             else -> 2
                         },
                         onSelect = { vm.setContrastLevel(when (it) { 1 -> 0.5f; 2 -> 1.0f; else -> 0.0f }) }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                    SegmentedSettingItem(
-                        icon = Icons.Rounded.Style,
-                        title = "Player Controls Style",
-                        options = listOf("Classic", "Expressive"),
-                        selectedIndex = if (controlsStyle == "EXPRESSIVE") 1 else 0,
-                        onSelect = { vm.setControlsStyle(if (it == 1) "EXPRESSIVE" else "CLASSIC") }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     NumberSettingItem(
@@ -411,7 +359,7 @@ fun SettingsScreen(
                         icon = Icons.Rounded.Code,
                         title = "View on GitHub",
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/tx24/spicy-player"))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/thex24/spicy-player"))
                             context.startActivity(intent)
                         }
                     )
