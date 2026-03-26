@@ -24,7 +24,11 @@ val LightBlueColorScheme = lightColorScheme(
     onSurface = Color(0xFF0D1B2A),
     surfaceVariant = Color(0xFFE6EDF4),       // Light surface background for nav, cards
     onSurfaceVariant = Color(0xFF374D63),
-    surfaceContainer = Color(0xFFF9F9F5),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF7F9FF),
+    surfaceContainer = Color(0xFFF0F4F9),
+    surfaceContainerHigh = Color(0xFFE9EEF4),
+    surfaceContainerHighest = Color(0xFFE3E8EE),
 
     error = Color(0xFFB02E0C),                // Rufous
     onError = Color.White,
@@ -61,6 +65,11 @@ val DarkBlueColorScheme = darkColorScheme(
     onSurface = Color(0xFFF9FBF2),
     surfaceVariant = Color(0xFF1F3245),     // For cards, nav bar bg
     onSurfaceVariant = Color(0xFFDDE4EB),
+    surfaceContainerLowest = Color(0xFF070E14),
+    surfaceContainerLow = Color(0xFF1B2631),
+    surfaceContainer = Color(0xFF142A3D),
+    surfaceContainerHigh = Color(0xFF233649),
+    surfaceContainerHighest = Color(0xFF2E4256),
 
     error = Color(0xFFB02E0C),              // Rufous
     onError = Color.White,

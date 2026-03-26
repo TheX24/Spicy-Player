@@ -1,6 +1,7 @@
 package com.omar.nowplaying.queue
 
 
+import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.AnchoredDraggableState
@@ -69,7 +70,8 @@ fun QueueSongRow(
             },
             positionalThreshold = { totalDistance: Float -> .5f * totalDistance },
             velocityThreshold = { with(density) { 50.dp.toPx() } },
-            animationSpec = tween()
+            snapAnimationSpec = tween(),
+            decayAnimationSpec = exponentialDecay()
         )
     }
 
@@ -77,8 +79,8 @@ fun QueueSongRow(
         mutableStateOf(0)
     }
 
-    LaunchedEffect(key1 = anchorState.currentValue) {
-        if (anchorState.currentValue != SwipeToDeleteState.IDLE) {
+    LaunchedEffect(key1 = anchorState.settledValue) {
+        if (anchorState.settledValue != SwipeToDeleteState.IDLE) {
             delay(swipeToDeleteDelay.toLong())
             onRemoveFromQueue()
         }
@@ -101,7 +103,7 @@ fun QueueSongRow(
 
         DeleteBackground(
             modifier = Modifier.fillMaxSize(),
-            swipeProgress = { anchorState.requireOffset() / rowWidth })
+            swipeProgress = { anchorState.offset / rowWidth })
 
         Row(
             modifier = Modifier
@@ -110,7 +112,7 @@ fun QueueSongRow(
                 .offset {
                     IntOffset(
                         anchorState
-                            .requireOffset()
+                            .offset
                             .roundToInt(), 0
                     )
                 }

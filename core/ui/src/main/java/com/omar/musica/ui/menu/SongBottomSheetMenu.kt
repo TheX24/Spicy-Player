@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -77,7 +77,7 @@ fun SongBottomSheetMenu(
             onDismissRequest = { hide({}) },
             sheetState = sheetState,
             dragHandle = null,
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+            shape = MaterialTheme.shapes.extraLarge
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -90,7 +90,7 @@ fun SongBottomSheetMenu(
                     modifier = Modifier
                         .height(imageSize)
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .clip(MaterialTheme.shapes.small),
                     )
                 Column(
                     modifier = Modifier.padding(horizontal = 12.dp)
@@ -135,7 +135,7 @@ fun SongBottomSheetMenu(
                             .clickable(
                                 interactionSource,
                                 enabled = true,
-                                indication = rememberRipple()
+                                indication = ripple()
                             ) { hide(it.callback) }
                             .graphicsLayer {
                                 scaleX = scale

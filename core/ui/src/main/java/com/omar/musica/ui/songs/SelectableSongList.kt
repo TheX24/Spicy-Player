@@ -11,7 +11,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -60,7 +60,7 @@ fun LazyListScope.selectableSongsList(
                 )
                 .combinedClickable(
                     interactionSource = interactionSource,
-                    indication = rememberRipple(),
+                    indication = ripple(),
                     onLongClick = {
                         multiSelectState.toggle(song)
                     }

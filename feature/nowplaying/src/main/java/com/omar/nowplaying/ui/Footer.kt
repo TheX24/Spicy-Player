@@ -50,7 +50,7 @@ fun PlayerFooter(
                 PlainTooltip { Text("Queue") }
             },
             state = rememberTooltipState(),
-            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider()
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider()
         ) {
             IconButton(
                 onClick = onOpenQueue
@@ -71,7 +71,7 @@ fun PlayerFooter(
                 PlainTooltip { Text("Lyrics") }
             },
             state = rememberTooltipState(),
-            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider()
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider()
         ) {
             IconButton(onClick = onToggleLyrics) {
                 Icon(
@@ -94,7 +94,7 @@ fun PlayerFooter(
                 }
             },
             state = rememberTooltipState(),
-            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider()
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider()
         ) {
             IconButton(onClick = onToggleRepeatMode) {
                 Icon(imageVector = repeatMode.getIconVector(), contentDescription = "Repeat Mode")
@@ -107,7 +107,7 @@ fun PlayerFooter(
                 }
             },
             state = rememberTooltipState(),
-            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider()
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider()
         ) {
             IconButton(onClick = onToggleShuffle) {
                 Icon(

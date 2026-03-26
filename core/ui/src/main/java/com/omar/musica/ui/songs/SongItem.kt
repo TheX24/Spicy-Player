@@ -140,7 +140,7 @@ fun SongInfoRow(
         AsyncImage(
             modifier = Modifier
                 .size(48.dp)
-                .clip(RoundedCornerShape(6.dp)),
+                .clip(MaterialTheme.shapes.small),
             model = song.toSongAlbumArtModel(),
             imageLoader = if (efficientThumbnailLoading) LocalEfficientThumbnailImageLoader.current else LocalInefficientThumbnailImageLoader.current,
             contentDescription = "Cover Photo",

@@ -47,7 +47,7 @@ fun SongTextInfo(
                         if (marqueeEffect)
                             Modifier.basicMarquee(
                                 iterations = Int.MAX_VALUE,
-                                delayMillis = 1000,
+                                initialDelayMillis = 1000,
                                 animationMode = MarqueeAnimationMode.Immediately
                             )
                         else Modifier

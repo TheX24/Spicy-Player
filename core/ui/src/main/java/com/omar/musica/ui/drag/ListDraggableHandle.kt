@@ -106,7 +106,7 @@ fun ListDraggableHandle(
                         modifier = Modifier
                             .background(
                                 color = colorScheme.secondaryContainer,
-                                shape = RoundedCornerShape(32.dp)
+                                shape = MaterialTheme.shapes.extraLarge
                             )
                             .padding(horizontal = 32.dp, vertical = 10.dp)
                     ) {

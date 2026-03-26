@@ -16,3 +16,4 @@ local.properties
 /compose_compiler_reports/*
 /compose_compiler_reports/
 spicy-player/
+.agents/

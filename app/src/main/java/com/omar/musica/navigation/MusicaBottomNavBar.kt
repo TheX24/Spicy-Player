@@ -2,6 +2,7 @@ package com.omar.musica.navigation
 
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
@@ -29,7 +30,8 @@ fun MusicaBottomNavBar(
 ) {
 
     NavigationBar(
-        modifier = modifier
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer
     ) {
         topLevelDestinations.forEach { item ->
             val isSelected = currentDestination.isTopLevelDestinationInHierarchy(item)

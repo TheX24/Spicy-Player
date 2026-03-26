@@ -103,7 +103,7 @@ fun SelectionToolbar(
                         Text(text = it.title)
                     } },
                     state = rememberTooltipState(),
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider()
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider()
                 ) {
                     IconButton(modifier = Modifier, onClick = it.callback) {
                         Icon(imageVector = it.icon, contentDescription = null)

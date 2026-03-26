@@ -4,11 +4,12 @@ accompanist = "0.34.0"
 agp = "8.9.2"
 androidDesugarJdkLibs = "2.0.3"
 androidx-test-ext-junit = "1.1.5"
-androidxComposeBom = "2024.02.01"
+androidxComposeBom = "2024.09.03"
 androidxComposeCompiler = "1.5.5"
 androidxHiltNavigationCompose = "1.2.0"
 androidxLifecycle = "2.6.1"
 androidxNavigation = "2.7.7"
+androidxMaterial3 = "1.4.0-alpha04"
 appcompat = "1.6.1"
 coilCompose = "2.4.0"
 composeFoundation = "1.6.0-alpha05"
@@ -25,7 +26,7 @@ kotlin = "2.0.0"
 kotlinxCoroutines = "1.7.1"
 ksp = "1.9.0-1.0.13"
 lifecycle-runtime-ktx = "2.6.1"
-material = "1.11.0"
+material = "1.12.0"
 media3 = "1.1.1"
 okio = "3.6.0"
 org-jetbrains-kotlin-android = "2.0.0"
@@ -46,7 +47,7 @@ androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", versi
 androidx-compose-compiler = { group = "androidx.compose", name = "compiler", version.ref = "androidxComposeCompiler"}
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "composeFoundation" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout" }
-androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" }
 androidx-compose-material3-windowSizeClass = { group = "androidx.compose.material3", name = "material3-window-size-class" }
 androidx-compose-material-iconsExtended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime" }

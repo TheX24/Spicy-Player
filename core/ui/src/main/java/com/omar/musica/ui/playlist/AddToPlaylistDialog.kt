@@ -18,6 +18,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -101,7 +102,7 @@ fun AddToPlaylistDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(4.dp))
+                                .clip(MaterialTheme.shapes.small)
                                 .clickable { dialogEntries.toggle(index) },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -121,7 +122,7 @@ fun AddToPlaylistDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(4.dp))
+                                .clip(MaterialTheme.shapes.small)
                                 .clickable(onClick = createPlaylistDialog::launch)
                                 .padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically

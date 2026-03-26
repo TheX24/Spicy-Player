@@ -3,6 +3,7 @@ package com.omar.musica.ui
 import android.app.Activity
 import android.content.Intent
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.AnchoredDraggableState
@@ -74,18 +75,17 @@ fun MusicaApp2(
             BarState.COLLAPSED,
             positionalThreshold = { distance: Float -> 0.5f * distance },
             velocityThreshold = { with(density) { 70.dp.toPx() } },
-            animationSpec = tween()
+            snapAnimationSpec = tween(),
+            decayAnimationSpec = exponentialDecay()
         )
     }
 
     val appState = rememberMusicaAppState(
         navHostController = navController,
-        isNowPlayingExpanded = nowPlayingScreenAnchors.currentValue == BarState.EXPANDED,
+        isNowPlayingExpanded = nowPlayingScreenAnchors.settledValue == BarState.EXPANDED,
         nowPlayingViewModel = hiltViewModel(),
         nowPlayingScreenOffset = {
-            if (nowPlayingScreenAnchors.anchors.size > 0)
-                nowPlayingScreenAnchors.requireOffset()
-            else 0.0f
+            nowPlayingScreenAnchors.offset
         },
     )
 
@@ -188,7 +188,7 @@ fun MusicaApp2(
     )
 
     NowPlayingCollapser(navController = navController) {
-        if (nowPlayingScreenAnchors.currentValue == BarState.EXPANDED) {
+        if (nowPlayingScreenAnchors.settledValue == BarState.EXPANDED) {
             nowPlayingScreenAnchors.animateTo(BarState.COLLAPSED)
         }
     }
@@ -261,7 +261,7 @@ fun AnchoredDraggableState<BarState>.update(
             BarState.COLLAPSED at offset.toFloat()
             BarState.EXPANDED at 0.0f
         },
-        this.currentValue
+        this.settledValue
     )
     return offset
 }

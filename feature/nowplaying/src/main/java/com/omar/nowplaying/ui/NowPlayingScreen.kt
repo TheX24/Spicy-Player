@@ -4,6 +4,8 @@ import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.sharp.PauseCircle
 import androidx.compose.material.icons.sharp.PlayCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
@@ -103,7 +106,7 @@ fun NowPlayingScreen(
 
     if (uiState is NowPlayingState.Playing)
         NowPlayingScreen(
-            modifier = modifier.clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+            modifier = modifier.clip(MaterialTheme.shapes.large),
             nowPlayingBarPadding = nowPlayingBarPadding,
             uiState = uiState as NowPlayingState.Playing,
             barHeight = barHeight,
@@ -212,7 +215,7 @@ fun FullScreenNowPlaying(
         if (currentSongIndex == pagerState.targetPage || currentSongIndex == pagerState.currentPage) return@LaunchedEffect
 
         if (abs(currentSongIndex - pagerState.targetPage) == 1)
-            pagerState.animateScrollToPage(currentSongIndex, animationSpec = tween(300))
+            pagerState.animateScrollToPage(currentSongIndex, animationSpec = spring(stiffness = Spring.StiffnessMedium))
         else
             pagerState.scrollToPage(currentSongIndex)
     }
@@ -291,9 +294,12 @@ fun FullScreenNowPlaying(
             targetState = isShowingQueue, label = "",
             transitionSpec = {
                 if (this.targetState)
-                    fadeIn() togetherWith fadeOut()
+                    fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) togetherWith 
+                        fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow))
                 else
-                    scaleIn(initialScale = 1.2f) + fadeIn() togetherWith fadeOut()
+                    scaleIn(initialScale = 1.1f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) + 
+                        fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) togetherWith 
+                        fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow))
             }
         ) {
             if (it) {
@@ -350,7 +356,7 @@ fun SongControls(
         ControlButton(
             modifier = Modifier
                 .size(26.dp)
-                .clip(RoundedCornerShape(4.dp)),
+                .clip(MaterialTheme.shapes.small),
             icon = Icons.Outlined.SkipPrevious,
             contentDescription = "Skip Previous",
             onClick = onPrevious
@@ -359,7 +365,7 @@ fun SongControls(
         ControlButton(
             modifier = Modifier
                 .size(26.dp)
-                .clip(RoundedCornerShape(16.dp)),
+                .clip(MaterialTheme.shapes.medium),
             icon = Icons.Outlined.Replay,
             contentDescription = "Jump Back",
             onClick = onJumpBackward
@@ -383,7 +389,7 @@ fun SongControls(
         ControlButton(
             modifier = Modifier
                 .size(26.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(MaterialTheme.shapes.small)
                 .graphicsLayer { scaleX = -1f; },
             icon = Icons.Outlined.Replay,
             contentDescription = "Jump Forward",
@@ -393,7 +399,7 @@ fun SongControls(
         ControlButton(
             modifier = Modifier
                 .size(26.dp)
-                .clip(RoundedCornerShape(4.dp)),
+                .clip(MaterialTheme.shapes.small),
             icon = Icons.Outlined.SkipNext,
             contentDescription = "Skip To Next",
             onClick = onNext

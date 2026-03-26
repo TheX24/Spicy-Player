@@ -20,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.google.android.material.color.utilities.Scheme
@@ -33,8 +32,6 @@ import com.omar.musica.ui.common.LocalAppColorScheme
 import com.omar.musica.ui.common.LocalUserPreferences
 import com.omar.musica.ui.model.AppThemeUi
 import com.omar.musica.ui.model.UserPreferencesUi
-
-
 
 @SuppressLint("RestrictedApi")
 @Composable
@@ -115,6 +112,7 @@ fun MusicaTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,
+            shapes = ExpressiveShapes,
             content = content
         )
     }
@@ -124,48 +122,76 @@ fun MusicaTheme(
 fun Scheme.toLightComposeColorScheme() =
     lightColorScheme(
         primary = Color(primary),
-        primaryContainer = Color(primaryContainer),
         onPrimary = Color(onPrimary),
-        surface = Color(surface),
-        surfaceVariant = Color(surfaceVariant),
-        background = Color(background),
-        secondary = Color(secondary),
-        secondaryContainer = Color(secondaryContainer),
-        onSecondary = Color(onSecondary),
-        tertiary = Color(tertiary),
-        tertiaryContainer = Color(tertiaryContainer),
-        onTertiary = Color(onTertiary),
-        onTertiaryContainer = Color(onTertiaryContainer),
+        primaryContainer = Color(primaryContainer),
         onPrimaryContainer = Color(onPrimaryContainer),
-        inversePrimary = Color(inversePrimary),
+        secondary = Color(secondary),
+        onSecondary = Color(onSecondary),
+        secondaryContainer = Color(secondaryContainer),
         onSecondaryContainer = Color(onSecondaryContainer),
-        onSurface = Color(onSurface),
+        tertiary = Color(tertiary),
+        onTertiary = Color(onTertiary),
+        tertiaryContainer = Color(tertiaryContainer),
+        onTertiaryContainer = Color(onTertiaryContainer),
+        error = Color(error),
+        onError = Color(onError),
+        errorContainer = Color(errorContainer),
+        onErrorContainer = Color(onErrorContainer),
+        background = Color(background),
         onBackground = Color(onBackground),
+        surface = Color(surface),
+        onSurface = Color(onSurface),
+        surfaceVariant = Color(surfaceVariant),
         onSurfaceVariant = Color(onSurfaceVariant),
+        outline = Color(outline),
+        outlineVariant = Color(outlineVariant),
+        scrim = Color(scrim),
+        inverseSurface = Color(inverseSurface),
+        inverseOnSurface = Color(inverseOnSurface),
+        inversePrimary = Color(inversePrimary),
+        surfaceContainerLowest = Color(surface),
+        surfaceContainerLow = Color(surface),
+        surfaceContainer = Color(surface),
+        surfaceContainerHigh = Color(surface),
+        surfaceContainerHighest = Color(surface),
     )
 
 @SuppressLint("RestrictedApi")
 fun Scheme.toDarkComposeColorScheme() =
     darkColorScheme(
         primary = Color(primary),
-        primaryContainer = Color(primaryContainer),
         onPrimary = Color(onPrimary),
-        surface = Color(surface),
-        surfaceVariant = Color(surfaceVariant),
-        background = Color(background),
+        primaryContainer = Color(primaryContainer),
+        onPrimaryContainer = Color(onPrimaryContainer),
         secondary = Color(secondary),
-        secondaryContainer = Color(secondaryContainer),
         onSecondary = Color(onSecondary),
+        secondaryContainer = Color(secondaryContainer),
+        onSecondaryContainer = Color(onSecondaryContainer),
         tertiary = Color(tertiary),
-        tertiaryContainer = Color(tertiaryContainer),
         onTertiary = Color(onTertiary),
         onTertiaryContainer = Color(onTertiaryContainer),
-        onPrimaryContainer = Color(onPrimaryContainer),
-        inversePrimary = Color(inversePrimary),
-        onSecondaryContainer = Color(onSecondaryContainer),
-        onSurface = Color(onSurface),
+        tertiaryContainer = Color(tertiaryContainer),
+        error = Color(error),
+        onError = Color(onError),
+        errorContainer = Color(errorContainer),
+        onErrorContainer = Color(onErrorContainer),
+        background = Color(background),
         onBackground = Color(onBackground),
+        surface = Color(surface),
+        onSurface = Color(onSurface),
+        surfaceVariant = Color(surfaceVariant),
         onSurfaceVariant = Color(onSurfaceVariant),
+        outline = Color(outline),
+        outlineVariant = Color(outlineVariant),
+        scrim = Color(scrim),
+        inverseSurface = Color(inverseSurface),
+        inverseOnSurface = Color(inverseOnSurface),
+        inversePrimary = Color(inversePrimary),
+        surfaceContainerLowest = Color(surface),
+        surfaceContainerLow = Color(surface),
+        surfaceContainer = Color(surface),
+        surfaceContainerHigh = Color(surface),
+        surfaceContainerHighest = Color(surface),
     )
 
 @RequiresApi(Build.VERSION_CODES.S)

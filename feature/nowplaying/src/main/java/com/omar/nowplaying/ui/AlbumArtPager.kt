@@ -87,7 +87,7 @@ fun AlbumArtPager(
         modifier = modifier,
         key = { songs[it].uri }, // optional, improves performance
         contentPadding = PaddingValues(horizontal = 0.dp),
-        beyondBoundsPageCount = 1,
+        beyondViewportPageCount = 1,
     ) { index ->
         val song = songs[index]
         NowPlayingSquareAlbumArt(

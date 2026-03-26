@@ -75,7 +75,7 @@ fun rememberSongDialog(): SongInfoDialog {
                             AsyncImage(
                                 modifier = Modifier
                                     .size(64.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
+                                    .clip(MaterialTheme.shapes.small),
                                 model = safeSong.toSongAlbumArtModel(),
                                 error = painterResource(R.drawable.placeholder),
                                 placeholder = painterResource(R.drawable.placeholder),

@@ -3,7 +3,9 @@ package com.omar.musica.songs.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -185,9 +187,9 @@ internal fun SongsScreen(
         AnimatedVisibility(
             visible = hasShownAnimation,
             enter = fadeIn(
-                animationSpec = tween(durationMillis = 400, easing = LinearOutSlowInEasing)
+                animationSpec = spring(stiffness = Spring.StiffnessLow)
             ) + expandVertically(
-                animationSpec = tween(durationMillis = 400, easing = LinearOutSlowInEasing),
+                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
                 expandFrom = Alignment.Top
             )
         ) {
