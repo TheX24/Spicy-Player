@@ -81,43 +81,5 @@ fun PlayerFooter(
                 )
             }
         }
-        TooltipBox(
-            tooltip = {
-                PlainTooltip {
-                    Text(
-                        text = when (repeatMode) {
-                            RepeatMode.REPEAT_ALL -> "Repeat all"
-                            RepeatMode.REPEAT_SONG -> "Repeat this song"
-                            RepeatMode.NO_REPEAT -> "Don't Repeat"
-                        }
-                    )
-                }
-            },
-            state = rememberTooltipState(),
-            positionProvider = TooltipDefaults.rememberTooltipPositionProvider()
-        ) {
-            IconButton(onClick = onToggleRepeatMode) {
-                Icon(imageVector = repeatMode.getIconVector(), contentDescription = "Repeat Mode")
-            }
-        }
-        TooltipBox(
-            tooltip = {
-                PlainTooltip {
-                    Text(text = "Shuffle Mode")
-                }
-            },
-            state = rememberTooltipState(),
-            positionProvider = TooltipDefaults.rememberTooltipPositionProvider()
-        ) {
-            IconButton(onClick = onToggleShuffle) {
-                Icon(
-                    modifier = if (isShuffleOn) Modifier else Modifier.alpha(0.5f),
-                    imageVector = Icons.Rounded.Shuffle,
-                    contentDescription = "Repeat Mode"
-                )
-            }
-        }
-        NowPlayingOverflowMenu(options = rememberNowPlayingOptions(songUi = songUi))
     }
-
 }

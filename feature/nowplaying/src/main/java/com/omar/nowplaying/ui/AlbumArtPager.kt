@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -87,16 +88,15 @@ fun AlbumArtPager(
         modifier = modifier,
         key = { songs[it].uri }, // optional, improves performance
         contentPadding = PaddingValues(horizontal = 0.dp),
+        pageSpacing = 24.dp,
         beyondViewportPageCount = 1,
     ) { index ->
         val song = songs[index]
         NowPlayingSquareAlbumArt(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 18.dp)
                 .aspectRatio(1f)
-                .shadow(4.dp, shape = RoundedCornerShape(10.dp), clip = true)
-                .clip(RoundedCornerShape(10.dp)),
+                .clip(RoundedCornerShape(12.dp)),
             song = song.toSongAlbumArtModel()
         )
     }

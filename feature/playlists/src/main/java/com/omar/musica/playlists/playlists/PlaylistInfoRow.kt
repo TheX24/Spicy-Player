@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlaylistPlay
+import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,5 +71,13 @@ fun PlaylistInfoRow(
 
 @Composable
 fun PlaylistImage() {
-    Icon(imageVector = Icons.Rounded.PlaylistPlay, contentDescription = "", modifier = Modifier.size(36.dp))
+    Surface(
+        modifier = Modifier.size(48.dp),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(imageVector = Icons.Rounded.PlaylistPlay, contentDescription = "", modifier = Modifier.size(24.dp))
+        }
+    }
 }

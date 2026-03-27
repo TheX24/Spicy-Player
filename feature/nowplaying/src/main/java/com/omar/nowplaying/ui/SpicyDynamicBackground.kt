@@ -24,13 +24,13 @@ fun SpicyDynamicBackground(
     song: Song?,
 ) {
     val context = LocalContext.current
-    val songModel = remember(song) { song?.toSongAlbumArtModel() }
+    val songModel = remember(song?.uri) { song?.toSongAlbumArtModel() }
     
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     
     val imageLoader = LocalInefficientThumbnailImageLoader.current
     
-    LaunchedEffect(songModel) {
+    LaunchedEffect(songModel?.uri) {
         if (songModel == null) {
             bitmap = null
             return@LaunchedEffect

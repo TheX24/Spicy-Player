@@ -58,8 +58,8 @@ fun AlbumsGrid(
             AlbumGridCard(
                 modifier = Modifier
                     .scale(0.95f)
-                    .animateItemPlacement()
-                    .clip(RoundedCornerShape(16.dp))
+                    .animateItem()
+                    .clip(MaterialTheme.shapes.large)
                     .combinedClickable(
                         onLongClick = { onAlbumLongClicked(it) },
                         onClick = { onAlbumClicked(it) }
@@ -84,7 +84,7 @@ fun AlbumGridCard(
     isSelected: Boolean = false,
 ) {
 
-    Card(modifier) {
+    Card(modifier, shape = MaterialTheme.shapes.large) {
 
         Box(modifier = Modifier
             .fillMaxWidth()
@@ -92,7 +92,8 @@ fun AlbumGridCard(
             SongAlbumArtImage(
                 modifier = Modifier
                     .fillMaxSize()
-                    .aspectRatio(1f),
+                    .aspectRatio(1f)
+                    .clip(MaterialTheme.shapes.large),
                 songAlbumArtModel = album.firstSong.toSongAlbumArtModel()
             )
             if (isSelected) {

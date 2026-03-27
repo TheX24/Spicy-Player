@@ -52,7 +52,7 @@ fun SpicyLyricsView(
     BoxWithConstraints(modifier = modifier.fillMaxSize().clipToBounds()) {
         val canvasWidth = constraints.maxWidth.toFloat()
         val canvasHeight = constraints.maxHeight.toFloat()
-        val centerY = canvasHeight * 0.5f
+        val centerY = canvasHeight * 0.20f
         val horizontalPadding = 40f
         val hasDuet = remember(lines) { lines.any { it.oppositeAligned } }
 

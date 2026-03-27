@@ -1,5 +1,7 @@
 package com.omar.nowplaying.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -8,11 +10,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderColors
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.omar.musica.store.model.song.Song
 import com.omar.musica.ui.millisToTime
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -38,6 +43,8 @@ import kotlinx.coroutines.isActive
 fun SongProgressInfo(
     modifier: Modifier,
     songDuration: Long,
+    song: Song,
+    isCollapsed: Boolean,
     tint: Color = MaterialTheme.colorScheme.primary,
     songProgressProvider: () -> Float,
     onUserSeek: (progress: Float) -> Unit
@@ -97,37 +104,62 @@ fun SongProgressInfo(
             value = progressShown,
             onValueChange = { userSetSliderValue = it },
             modifier = Modifier
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .height(48.dp),
             enabled = true,
             onValueChangeFinished = {
                 onUserSeek(userSetSliderValue); useSongProgress = false
             },
             interactionSource = sliderInteractionSource,
-            colors = SliderDefaults.colors(activeTrackColor = tint, thumbColor = tint),
+            colors = SliderDefaults.colors(
+                thumbColor = tint,
+                activeTrackColor = tint,
+                inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+            ),
         )
 
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 8.dp, end = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        AnimatedVisibility(visible = !isCollapsed) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
 
-            Text(
-                text = timestampShown,
-                fontSize = 10.sp,
-                maxLines = 1,
-                fontWeight = FontWeight.Light
-            )
+                Text(
+                    text = timestampShown,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-            Text(
-                text = songLength,
-                fontSize = 10.sp,
-                maxLines = 1,
-                fontWeight = FontWeight.Light
-            )
+                val currentFormat = song.filePath.substringAfterLast('.', "").uppercase()
+                val bitrate = if (song.metadata.durationMillis > 0) {
+                    "${(song.metadata.sizeBytes / song.metadata.durationMillis) * 8} kbps"
+                } else ""
 
+                if (currentFormat.isNotEmpty() || bitrate.isNotEmpty()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Text(
+                            text = "$currentFormat • $bitrate",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+
+                Text(
+                    text = songLength,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+            }
         }
     }
 }

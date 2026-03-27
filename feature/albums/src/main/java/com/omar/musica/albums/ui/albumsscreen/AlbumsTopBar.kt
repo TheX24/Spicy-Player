@@ -7,8 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.omar.musica.ui.menu.SpicyAppMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -24,6 +23,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.omar.musica.model.AlbumsSortOption
@@ -91,23 +96,22 @@ fun GridSizeDropDownMenu(
     onDismissRequest: () -> Unit,
 ) {
 
-    DropdownMenu(expanded = visible, onDismissRequest = onDismissRequest) {
-        Text(
-            text = "Grid Size",
-            modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp, end = 32.dp),
-            style = MaterialTheme.typography.titleMedium
-        )
+    SpicyAppMenu(
+        visible = visible,
+        onDismiss = onDismissRequest,
+        title = "Grid Size"
+    ) {
         (1 until 5).forEach {
-            DropdownMenuItem(
-                text = { Text(it.toString()) },
-                onClick = { onSizeSelected(it) },
-                trailingIcon = {
+            ListItem(
+                headlineContent = { Text(it.toString()) },
+                modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { onSizeSelected(it) },
+                trailingContent = {
                     RadioButton(selected = it == currentSize, onClick = null)
-                }
+                },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
             )
         }
     }
-
 }
 
 @Composable
@@ -120,52 +124,50 @@ fun SortOptionDropdownMenu(
     onDismissRequest: () -> Unit,
 ) {
 
-    DropdownMenu(expanded = visible, onDismissRequest = onDismissRequest) {
-        Text(
-            text = "Sort Albums",
-            modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp, end = 16.dp),
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        DropdownMenuItem(
-            text = { Text(text = "Ascending") },
-            onClick = { onChangeAscending(!isAscending) },
-            trailingIcon = {
+    SpicyAppMenu(
+        visible = visible,
+        onDismiss = onDismissRequest,
+        title = "Sort Albums"
+    ) {
+        ListItem(
+            headlineContent = { Text(text = "Ascending") },
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { onChangeAscending(!isAscending) },
+            trailingContent = {
                 Checkbox(
                     checked = isAscending,
                     onCheckedChange = null
                 )
-            }
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
-        HorizontalDivider()
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f))
 
-
-        DropdownMenuItem(
-            text = { Text("Name") },
-            onClick = { onChangeSortCriteria(AlbumsSortOption.NAME) },
-            trailingIcon = {
+        ListItem(
+            headlineContent = { Text("Name") },
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { onChangeSortCriteria(AlbumsSortOption.NAME) },
+            trailingContent = {
                 RadioButton(selected = sortOption == AlbumsSortOption.NAME, onClick = null)
-            }
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
-        DropdownMenuItem(
-            text = { Text("Artist") },
-            onClick = { onChangeSortCriteria(AlbumsSortOption.ARTIST) },
-            trailingIcon = {
+        ListItem(
+            headlineContent = { Text("Artist") },
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { onChangeSortCriteria(AlbumsSortOption.ARTIST) },
+            trailingContent = {
                 RadioButton(selected = sortOption == AlbumsSortOption.ARTIST, onClick = null)
-            }
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
-        Spacer(modifier = Modifier.width(16.dp))
-        DropdownMenuItem(
-            text = { Text("Number of Songs") },
-            onClick = { onChangeSortCriteria(AlbumsSortOption.NUMBER_OF_SONGS) },
-            trailingIcon = {
+        ListItem(
+            headlineContent = { Text("Number of Songs") },
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { onChangeSortCriteria(AlbumsSortOption.NUMBER_OF_SONGS) },
+            trailingContent = {
                 RadioButton(
                     selected = sortOption == AlbumsSortOption.NUMBER_OF_SONGS,
                     onClick = null
                 )
-            }
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
-
     }
-
 }

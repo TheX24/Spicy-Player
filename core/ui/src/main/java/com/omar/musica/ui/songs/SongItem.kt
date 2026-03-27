@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import com.omar.musica.ui.anim.expressiveSpring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,8 +52,7 @@ import com.omar.musica.ui.albumart.toSongAlbumArtModel
 import com.omar.musica.ui.common.LocalUserPreferences
 import com.omar.musica.ui.menu.BottomSheetMenuLayout
 import com.omar.musica.ui.menu.MenuActionItem
-import com.omar.musica.ui.menu.SongBottomSheetMenu
-import com.omar.musica.ui.menu.SongDropdownMenu
+import com.omar.musica.ui.menu.SpicyActionMenu
 import com.omar.musica.ui.millisToTime
 import timber.log.Timber
 
@@ -105,7 +105,7 @@ fun SongRow(
                     SongRowState.SELECTION_STATE_SELECTED,
                     SongRowState.SELECTION_STATE_NOT_SELECTED
                 ),
-                enter = scaleIn(spring(Spring.DampingRatioMediumBouncy)),
+                enter = scaleIn(expressiveSpring),
                 exit = scaleOut()
             ) {
                 Icon(
@@ -140,7 +140,7 @@ fun SongInfoRow(
         AsyncImage(
             modifier = Modifier
                 .size(48.dp)
-                .clip(MaterialTheme.shapes.small),
+                .clip(MaterialTheme.shapes.medium),
             model = song.toSongAlbumArtModel(),
             imageLoader = if (efficientThumbnailLoading) LocalEfficientThumbnailImageLoader.current else LocalInefficientThumbnailImageLoader.current,
             contentDescription = "Cover Photo",
@@ -199,10 +199,10 @@ fun SongOverflowMenu(menuOptions: List<MenuActionItem>) {
     IconButton(onClick = { expanded = true }) {
         Icon(imageVector = Icons.Rounded.MoreVert, contentDescription = null)
     }
-    SongDropdownMenu(
-        expanded = expanded,
-        onDismissRequest = { expanded = false },
-        actions = menuOptions
+    SpicyActionMenu(
+        visible = expanded,
+        onDismiss = { expanded = false },
+        items = menuOptions
     )
 }
 
@@ -212,10 +212,12 @@ fun SongOverflowMenu(song: Song, menuOptions: List<MenuActionItem>) {
     IconButton(onClick = { expanded = true }) {
         Icon(imageVector = Icons.Rounded.MoreVert, contentDescription = null)
     }
-    val dividers = remember { listOf(2, 4) }
-    SongBottomSheetMenu(
-        song,
-        remember { BottomSheetMenuLayout(menuOptions, dividers) },
-        expanded,
-        { expanded = false })
+    val subtitle = remember(song) { "${song.metadata.artistName.orEmpty()}  •  ${song.metadata.albumName}" }
+    SpicyActionMenu(
+        visible = expanded,
+        onDismiss = { expanded = false },
+        title = song.metadata.title,
+        subtitle = subtitle,
+        items = menuOptions
+    )
 }

@@ -3,6 +3,8 @@ package com.omar.musica.ui.topbar
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -35,6 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.omar.musica.ui.menu.MenuActionItem
+import com.omar.musica.ui.menu.SpicyActionMenu
 import com.omar.musica.ui.common.MultiSelectState
 
 
@@ -52,10 +55,11 @@ fun <T> SelectionTopAppBarScaffold(
     AnimatedContent(
         targetState = isMultiSelectEnabled, label = "",
         transitionSpec = {
+            val expressiveSpring = spring<Float>(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
             if (targetState) {
-                scaleIn(initialScale = 0.8f) + fadeIn() togetherWith scaleOut(targetScale = 1.2f) + fadeOut()
+                scaleIn(initialScale = 0.8f, animationSpec = expressiveSpring) + fadeIn() togetherWith scaleOut(targetScale = 1.2f, animationSpec = expressiveSpring) + fadeOut()
             } else {
-                scaleIn(initialScale = 1.2f) + fadeIn() togetherWith scaleOut(targetScale = 0.8f) + fadeOut()
+                scaleIn(initialScale = 1.2f, animationSpec = expressiveSpring) + fadeIn() togetherWith scaleOut(targetScale = 0.8f, animationSpec = expressiveSpring) + fadeOut()
             }
         }
     ) {
@@ -133,24 +137,10 @@ fun OverflowMenu(
             Icon(imageVector = icon, contentDescription = null)
         }
 
-        DropdownMenu(
-            expanded = visible,
-            onDismissRequest = { visible = false }
-        ) {
-            actionItems.forEach {
-                DropdownMenuItem(
-                    leadingIcon =
-                    if (showIcons) {
-                        { Icon(imageVector = it.icon, contentDescription = null) }
-                    } else {
-                        null
-                    },
-                    text = { Text(text = it.title) },
-                    contentPadding = contentPaddingValues,
-                    onClick = { visible = false; it.callback() }
-                )
-            }
-        }
-
+        SpicyActionMenu(
+            visible = visible,
+            onDismiss = { visible = false },
+            items = actionItems
+        )
     }
 }

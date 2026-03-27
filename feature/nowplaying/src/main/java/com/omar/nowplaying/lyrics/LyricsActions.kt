@@ -28,26 +28,8 @@ import com.omar.musica.model.lyrics.LyricsFetchSource
  */
 @Composable
 fun LyricsActions(
-    modifier: Modifier,
-    isShown: Boolean,
-    lyricsFetchSource: LyricsFetchSource,
-    onFetchWebVersion: () -> Unit,
-    onCopy: () -> Unit,
+    modifier: Modifier = Modifier,
+    isShown: Boolean = false,
 ) {
-    AnimatedVisibility(modifier = modifier, visible = isShown, enter = fadeIn(), exit = fadeOut()) {
-        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.End) {
-
-            val rippleColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.26f)
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            IconButton(
-                modifier = Modifier.background(rippleColor, CircleShape),
-                onClick = onCopy
-            ) {
-                Icon(imageVector = Icons.Rounded.CopyAll, contentDescription = null)
-            }
-
-        }
-    }
+    // Component removed as requested (previously contained copy button)
 }

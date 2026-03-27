@@ -308,18 +308,7 @@ fun SyncedLyricsState(
             modifier = Modifier.fillMaxSize()
         )
 
-        LyricsActions(
-            modifier = Modifier
-                .fillMaxHeight()
-                .align(Alignment.CenterEnd),
-            isShown = actionsShown,
-            lyricsFetchSource = lyricsFetchSource,
-            onFetchWebVersion = { /*TODO*/ },
-            onCopy = {
-                clipboardManager.setText(AnnotatedString(synchronizedLyrics.constructStringForSharing()))
-                actionsShown = false
-            }
-        )
+
     }
 }
 
@@ -370,22 +359,7 @@ fun TtmlLyricsState(
             modifier = Modifier.fillMaxSize()
         )
 
-        LyricsActions(
-            modifier = Modifier
-                .fillMaxHeight()
-                .align(Alignment.CenterEnd),
-            isShown = actionsShown,
-            lyricsFetchSource = lyricsFetchSource,
-            onFetchWebVersion = { /*TODO*/ },
-            onCopy = {
-                val fullText = parsedLyrics.lines.filter { !it.isInterlude && !it.isSongwriter }
-                    .joinToString("\n") { line ->
-                        line.words.joinToString(" ") { it.text }
-                    }
-                clipboardManager.setText(AnnotatedString(fullText))
-                actionsShown = false
-            }
-        )
+
     }
 }
 

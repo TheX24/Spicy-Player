@@ -23,8 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.omar.musica.store.model.album.AlbumSong
 import com.omar.musica.ui.common.LocalCommonSongsAction
-import com.omar.musica.ui.menu.BottomSheetMenuLayout
-import com.omar.musica.ui.menu.SongBottomSheetMenu
+import com.omar.musica.ui.menu.SpicyActionMenu
 import com.omar.musica.ui.menu.buildCommonSongActions
 
 
@@ -78,17 +77,15 @@ fun AlbumSongRow(
             }
         }
 
-        val bottomSheetLayout = remember(actions) {
-            BottomSheetMenuLayout(actions, listOf(2, 3))
-        }
-
         var isBottomSheetVisible by remember { mutableStateOf(false) }
-
-        SongBottomSheetMenu(
-            song.song,
-            bottomSheetLayout,
-            isBottomSheetVisible
-        ) { isBottomSheetVisible = false }
+        val subtitle = remember(song) { "${song.song.metadata.artistName.orEmpty()}  •  ${song.song.metadata.albumName}" }
+        SpicyActionMenu(
+            visible = isBottomSheetVisible,
+            onDismiss = { isBottomSheetVisible = false },
+            title = song.song.metadata.title,
+            subtitle = subtitle,
+            items = actions
+        )
         IconButton(onClick = { isBottomSheetVisible = true }) {
             Icon(imageVector = Icons.Rounded.MoreHoriz, contentDescription = null)
         }

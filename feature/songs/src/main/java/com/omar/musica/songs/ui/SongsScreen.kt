@@ -27,6 +27,11 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -37,16 +42,15 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import com.omar.musica.ui.menu.SpicyAppMenu
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -158,7 +162,7 @@ internal fun SongsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     title = { Text(text = "Songs", fontWeight = FontWeight.SemiBold) },
                     actions = {
-                        IconButton(onSearchClicked) {
+                        IconButton(onClick = onSearchClicked) {
                             Icon(Icons.Rounded.Search, contentDescription = null)
                         }
                         OverflowMenu(
@@ -372,90 +376,47 @@ fun SortBottomSheet(
     onDismissRequest: () -> Unit,
 ) {
 
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
-
-    val hide: () -> Unit = {
-        scope.launch { sheetState.hide() }
-            .invokeOnCompletion { if (!sheetState.isVisible) onDismissRequest() }
-    }
-
-    if (visible)
-        ModalBottomSheet(onDismissRequest = hide, sheetState = sheetState) {
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-            ) {
-                Icon(
-                    modifier = Modifier.size(24.dp),
-                    imageVector = Icons.AutoMirrored.Rounded.Sort,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Column(
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                ) {
-                    Text(
-                        "Sort by",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontFamily = ManropeFontFamily,
-                        maxLines = 1,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        "Select option again to change sort order",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Normal
-                    )
-                }
+    SpicyAppMenu(
+        visible = visible,
+        onDismiss = onDismissRequest,
+        title = "Sort by",
+        subtitle = "Select option again to change sort order"
+    ) {
+        sortOptions.forEach {
+            val selected = it == selectedSortOption
+            val onClick: () -> Unit = {
+                if (selected) onSortOptionChanged(it, !isAscending)
+                else onSortOptionChanged(it, isAscending)
+                onDismissRequest()
             }
-            HorizontalDivider(thickness = 3.dp)
-            sortOptions.forEach {
-                val selected = it == selectedSortOption
-                val onClick: () -> Unit = {
-                    if (selected) onSortOptionChanged(it, !isAscending)
-                    else onSortOptionChanged(it, isAscending)
-                    hide()
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onClick)
-                        .then(
-                            if (selected) Modifier.background(
-                                MaterialTheme.colorScheme.primaryContainer
-                            ) else Modifier
-                        )
-                        .padding(vertical = 12.dp, horizontal = 12.dp)
-                ) {
+            
+            ListItem(
+                headlineContent = { 
                     Text(
                         it.title,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Start,
-                        maxLines = 1,
                         style = MaterialTheme.typography.titleSmall,
                         fontFamily = ManropeFontFamily,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                     )
+                },
+                modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick),
+                trailingContent = {
                     if (selected) {
-                        val icon =
-                            if (isAscending) Icons.Rounded.ArrowUpward else Icons.Rounded.ArrowDownward
+                        val icon = if (isAscending) Icons.Rounded.ArrowUpward else Icons.Rounded.ArrowDownward
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
-                }
-                if (it != sortOptions.last()) {
-                    Spacer(Modifier.height(2.dp))
-                }
+                },
+                colors = ListItemDefaults.colors(
+                    containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                )
+            )
+            if (it != sortOptions.last()) {
+                Spacer(Modifier.height(4.dp))
             }
         }
-
-    LaunchedEffect(visible) {
-        if (visible)
-            sheetState.show()
     }
 }

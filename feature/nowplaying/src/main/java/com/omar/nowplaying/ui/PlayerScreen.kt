@@ -6,22 +6,39 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.ColorInt
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Lyrics
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
@@ -34,8 +51,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -66,44 +86,58 @@ fun PlayingScreen2(
     repeatMode: RepeatMode,
     isShuffleOn: Boolean,
     playbackState: PlayerState,
+    isShowingLyrics: Boolean,
+    onToggleLyrics: () -> Unit,
     screenSize: NowPlayingScreenSize,
     nowPlayingActions: INowPlayingViewModel,
     onOpenQueue: () -> Unit = {},
+    onCollapse: () -> Unit = {}
 ) {
 
     when (screenSize) {
         NowPlayingScreenSize.COMPACT -> {
             CompactPlayerScreen(
-                modifier,
-                song,
-                playbackState,
-                nowPlayingActions,
-                onOpenQueue
+                modifier = modifier,
+                song = song,
+                playbackState = playbackState,
+                repeatMode = repeatMode,
+                isShuffleOn = isShuffleOn,
+                isShowingLyrics = isShowingLyrics,
+                nowPlayingActions = nowPlayingActions,
+                onOpenQueue = onOpenQueue,
+                onToggleLyrics = onToggleLyrics,
+                onCollapse = onCollapse
             )
         }
 
         NowPlayingScreenSize.PORTRAIT -> {
             PortraitPlayerScreen(
-                modifier,
-                songs,
-                songIndex,
-                playbackState,
-                repeatMode,
-                isShuffleOn,
-                nowPlayingActions,
-                onOpenQueue
+                modifier = modifier,
+                songs = songs,
+                songIndex = songIndex,
+                playbackState = playbackState,
+                repeatMode = repeatMode,
+                isShuffleOn = isShuffleOn,
+                isShowingLyrics = isShowingLyrics,
+                nowPlayingActions = nowPlayingActions,
+                onOpenQueue = onOpenQueue,
+                onToggleLyrics = onToggleLyrics,
+                onCollapse = onCollapse
             )
         }
 
         NowPlayingScreenSize.LANDSCAPE -> {
             LandscapePlayerScreen(
-                modifier,
-                song,
-                playbackState,
-                repeatMode,
-                isShuffleOn,
-                nowPlayingActions,
-                onOpenQueue
+                modifier = modifier,
+                song = song,
+                playbackState = playbackState,
+                repeatMode = repeatMode,
+                isShuffleOn = isShuffleOn,
+                isShowingLyrics = isShowingLyrics,
+                nowPlayingActions = nowPlayingActions,
+                onOpenQueue = onOpenQueue,
+                onToggleLyrics = onToggleLyrics,
+                onCollapse = onCollapse
             )
         }
     }
@@ -115,50 +149,111 @@ fun CompactPlayerScreen(
     modifier: Modifier,
     song: Song,
     playbackState: PlayerState,
+    repeatMode: RepeatMode,
+    isShuffleOn: Boolean,
+    isShowingLyrics: Boolean,
     nowPlayingActions: INowPlayingViewModel,
-    onOpenQueue: () -> Unit
+    onOpenQueue: () -> Unit,
+    onToggleLyrics: () -> Unit,
+    onCollapse: () -> Unit
 ) {
+
+    var controlsCollapsed by remember {
+        mutableStateOf(false)
+    }
+
     Column(
-        modifier,
-        verticalArrangement = Arrangement.SpaceEvenly,
+        modifier = modifier.padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         SongTextInfo(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             song = song,
             showArtist = false,
             showAlbum = false
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        SongProgressInfo(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            songDuration = song.metadata.durationMillis,
-            songProgressProvider = nowPlayingActions::currentSongProgress,
-            onUserSeek = nowPlayingActions::onUserSeek
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        SongControls(
-            modifier = Modifier.fillMaxWidth(),
-            isPlaying = playbackState == PlayerState.PLAYING,
-            playButtonColor = MaterialTheme.colorScheme.primary,
-            onPrevious = nowPlayingActions::previousSong,
-            onTogglePlayback = nowPlayingActions::togglePlayback,
-            onNext = nowPlayingActions::nextSong,
-            onJumpForward = nowPlayingActions::jumpForward,
-            onJumpBackward = nowPlayingActions::jumpBackward
-        )
-        Spacer(modifier = Modifier.height(32.dp))
-
-        TextButton(
-            onClick = onOpenQueue,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
+            shape = RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            tonalElevation = 6.dp,
+            shadowElevation = 12.dp
         ) {
-            Icon(imageVector = Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = "Queue")
-            Text(text = "Queue")
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { controlsCollapsed = !controlsCollapsed }) {
+                        Icon(
+                            imageVector = if (controlsCollapsed) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = "Collapse"
+                        )
+                    }
+
+                    SongProgressInfo(
+                        modifier = Modifier.weight(1f),
+                        songDuration = song.metadata.durationMillis,
+                        song = song,
+                        isCollapsed = controlsCollapsed,
+                        songProgressProvider = nowPlayingActions::currentSongProgress,
+                        onUserSeek = nowPlayingActions::onUserSeek
+                    )
+
+                    IconButton(onClick = onToggleLyrics) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lyrics,
+                            contentDescription = "Lyrics",
+                            modifier = if (isShowingLyrics) Modifier else Modifier.alpha(0.5f)
+                        )
+                    }
+                }
+
+                AnimatedVisibility(visible = !controlsCollapsed) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SongControls(
+                            modifier = Modifier.fillMaxWidth(),
+                            isPlaying = playbackState == PlayerState.PLAYING,
+                            isShuffleOn = isShuffleOn,
+                            repeatMode = repeatMode,
+                            playButtonColor = MaterialTheme.colorScheme.primary,
+                            onPrevious = nowPlayingActions::previousSong,
+                            onTogglePlayback = nowPlayingActions::togglePlayback,
+                            onNext = nowPlayingActions::nextSong,
+                            onToggleShuffle = nowPlayingActions::toggleShuffleMode,
+                            onToggleRepeat = nowPlayingActions::toggleRepeatMode
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
+                        ) {
+                            SuggestionChip(
+                                onClick = onOpenQueue,
+                                label = { Text("Queue", fontWeight = FontWeight.ExtraBold) },
+                                icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null) },
+                                shape = CircleShape,
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    iconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            )
+
+                            NowPlayingOverflowChip(options = rememberNowPlayingOptions(songUi = song))
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -256,9 +351,16 @@ fun PortraitPlayerScreen(
     playbackState: PlayerState,
     repeatMode: RepeatMode,
     isShuffleOn: Boolean,
+    isShowingLyrics: Boolean,
     nowPlayingActions: INowPlayingViewModel,
-    onOpenQueue: () -> Unit
+    onOpenQueue: () -> Unit,
+    onToggleLyrics: () -> Unit,
+    onCollapse: () -> Unit
 ) {
+
+    var controlsCollapsed by remember {
+        mutableStateOf(false)
+    }
 
     val song = remember(songs, songIndex) { songs[songIndex] }
 
@@ -268,103 +370,159 @@ fun PortraitPlayerScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        var isShowingLyrics by remember {
-            mutableStateOf(false)
-        }
+        val lyricsWeight by animateFloatAsState(
+            targetValue = if (isShowingLyrics) 1f else 0.001f,
+            animationSpec = tween(800, easing = LinearOutSlowInEasing),
+            label = "LyricsWeight"
+        )
 
-        AnimatedContent(
+        Column(
             modifier = Modifier.weight(1f),
-            targetState = isShowingLyrics, label = ""
+            verticalArrangement = Arrangement.Top
         ) {
-            if (it) {
-                val context = LocalContext.current as Activity
-                DisposableEffect(key1 = Unit) {
-                    context.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                    onDispose { context.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
-                }
-                val fadeBrush = remember {
-                    Brush.verticalGradient(
-                        0.0f to Color.Red,
-                        0.7f to Color.Red,
-                        1.0f to Color.Transparent
-                    )
-                }
-                LiveLyricsScreen(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .fadingEdge(fadeBrush)
-                        .padding(horizontal = 16.dp, vertical = 2.dp),
-                )
-                BackHandler {
-                    isShowingLyrics = false
-                }
-            } else {
-                AlbumArtPager(
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1.0f),
+            val headerBoxModifier = if (!isShowingLyrics) Modifier.weight(1f) else Modifier.wrapContentHeight()
+            val headerVerticalBias by animateFloatAsState(
+                targetValue = if (isShowingLyrics) -1f else -0.2f,
+                animationSpec = tween(800, easing = LinearOutSlowInEasing),
+                label = "HeaderVerticalBias"
+            )
+            Box(
+                modifier = Modifier.then(headerBoxModifier),
+                contentAlignment = BiasAlignment(0f, headerVerticalBias)
+            ) {
+                NowPlayingHeader(
                     songs = songs,
-                    currentSongIndex = songIndex,
-                ) { newIndex ->
-                    if (newIndex != songIndex)
-                        nowPlayingActions.playSongAtIndex(newIndex)
+                    songIndex = songIndex,
+                    isShowingLyrics = isShowingLyrics,
+                    onSongSwitched = { newIndex ->
+                        if (newIndex != songIndex)
+                            nowPlayingActions.playSongAtIndex(newIndex)
+                    }
+                )
+            }
+
+            Box(modifier = Modifier.weight(lyricsWeight)) {
+                if (isShowingLyrics) {
+                    val context = LocalContext.current as Activity
+                    DisposableEffect(key1 = Unit) {
+                        context.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        onDispose { context.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+                    }
+                    val fadeBrush = remember {
+                        Brush.verticalGradient(
+                            0.0f to Color.Red,
+                            0.7f to Color.Red,
+                            1.0f to Color.Transparent
+                        )
+                    }
+                    LiveLyricsScreen(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(16.dp))
+                            .fadingEdge(fadeBrush)
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                    )
+                    BackHandler {
+                        onToggleLyrics()
+                    }
                 }
             }
         }
 
-
         val contentColor = nowPlayingScreenTint(songAlbumArtModel = song.toSongAlbumArtModel())
 
         Column(
-            modifier = Modifier.weight(1f).padding(start = 16.dp, end = 16.dp, top = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceEvenly
         ) {
 
+            Surface(
+                modifier = Modifier
+                    .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(32.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                tonalElevation = 6.dp,
+                shadowElevation = 12.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { controlsCollapsed = !controlsCollapsed }) {
+                            Icon(
+                                imageVector = if (controlsCollapsed) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "Collapse"
+                            )
+                        }
 
-            SongProgressInfo(
-                modifier = Modifier.fillMaxWidth(),
-                songDuration = song.metadata.durationMillis,
-                tint = contentColor,
-                songProgressProvider = nowPlayingActions::currentSongProgress,
-                onUserSeek = nowPlayingActions::onUserSeek
-            )
+                        SongProgressInfo(
+                            modifier = Modifier.weight(1f),
+                            songDuration = song.metadata.durationMillis,
+                            tint = contentColor,
+                            song = song,
+                            isCollapsed = controlsCollapsed,
+                            songProgressProvider = nowPlayingActions::currentSongProgress,
+                            onUserSeek = nowPlayingActions::onUserSeek
+                        )
 
+                        IconButton(onClick = onToggleLyrics) {
+                            Icon(
+                                imageVector = Icons.Rounded.Lyrics,
+                                contentDescription = "Lyrics",
+                                modifier = if (isShowingLyrics) Modifier else Modifier.alpha(0.5f)
+                            )
+                        }
+                    }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                    AnimatedVisibility(visible = !controlsCollapsed) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            SongControls(
+                                modifier = Modifier.fillMaxWidth(),
+                                isPlaying = playbackState == PlayerState.PLAYING,
+                                isShuffleOn = isShuffleOn,
+                                repeatMode = repeatMode,
+                                playButtonColor = contentColor,
+                                onPrevious = nowPlayingActions::previousSong,
+                                onTogglePlayback = nowPlayingActions::togglePlayback,
+                                onNext = nowPlayingActions::nextSong,
+                                onToggleShuffle = nowPlayingActions::toggleShuffleMode,
+                                onToggleRepeat = nowPlayingActions::toggleRepeatMode
+                            )
 
-            SongTextInfo(
-                modifier = Modifier.fillMaxWidth(),
-                song = song,
-                showAlbum = false
-            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                SuggestionChip(
+                                    onClick = onOpenQueue,
+                                    label = { Text("Queue", fontWeight = FontWeight.ExtraBold) },
+                                    icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null) },
+                                    shape = CircleShape,
+                                    colors = SuggestionChipDefaults.suggestionChipColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        iconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                )
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            SongControls(
-                modifier = Modifier.fillMaxWidth(),
-                isPlaying = playbackState == PlayerState.PLAYING,
-                playButtonColor = contentColor,
-                onPrevious = nowPlayingActions::previousSong,
-                onTogglePlayback = nowPlayingActions::togglePlayback,
-                onNext = nowPlayingActions::nextSong,
-                onJumpForward = nowPlayingActions::jumpForward,
-                onJumpBackward = nowPlayingActions::jumpBackward
-            )
-            Spacer(modifier = Modifier.height(32.dp))
+                                NowPlayingOverflowChip(options = rememberNowPlayingOptions(songUi = song))
+                            }
+                        }
+                    }
+                }
+            }
         }
-        PlayerFooter(
-            modifier = Modifier
-                .padding(bottom = 12.dp)
-                .fillMaxWidth(),
-            songUi = song,
-            isShuffleOn = isShuffleOn,
-            repeatMode = repeatMode,
-            isLyricsOpen = isShowingLyrics,
-            onOpenQueue = onOpenQueue,
-            onToggleLyrics = { isShowingLyrics = !isShowingLyrics },
-            onToggleRepeatMode = nowPlayingActions::toggleRepeatMode,
-            onToggleShuffle = nowPlayingActions::toggleShuffleMode
-        )
     }
 }
 
@@ -376,26 +534,25 @@ fun LandscapePlayerScreen(
     playbackState: PlayerState,
     repeatMode: RepeatMode,
     isShuffleOn: Boolean,
+    isShowingLyrics: Boolean,
     nowPlayingActions: INowPlayingViewModel,
-    onOpenQueue: () -> Unit
+    onOpenQueue: () -> Unit,
+    onToggleLyrics: () -> Unit,
+    onCollapse: () -> Unit
 ) {
+
+    var controlsCollapsed by remember {
+        mutableStateOf(false)
+    }
+
     Row(
         modifier,
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
 
-        var isShowingLyrics by remember {
-            mutableStateOf(false)
-        }
-
-        val photoLyricsWeight by animateFloatAsState(
-            targetValue = if (isShowingLyrics) 2.5f else 1.5f,
-            label = ""
-        )
-
         AnimatedContent(
-            modifier = Modifier.weight(photoLyricsWeight),
+            modifier = Modifier.weight(1.5f),
             targetState = isShowingLyrics,
             label = ""
         ) {
@@ -420,7 +577,7 @@ fun LandscapePlayerScreen(
                         .padding(vertical = 4.dp),
                 )
                 BackHandler {
-                    isShowingLyrics = false
+                    onToggleLyrics()
                 }
             } else {
                 CrossFadingAlbumArt(
@@ -441,54 +598,100 @@ fun LandscapePlayerScreen(
         Spacer(modifier = Modifier.width(8.dp))
 
         Column(
-            modifier = Modifier.weight(2f),
+            modifier = Modifier.weight(2f).padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
         ) {
             SongTextInfo(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 song = song,
                 showAlbum = false,
                 marqueeEffect = false
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
-            SongProgressInfo(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                songDuration = song.metadata.durationMillis,
-                songProgressProvider = nowPlayingActions::currentSongProgress,
-                onUserSeek = nowPlayingActions::onUserSeek
-            )
+                shape = RoundedCornerShape(32.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                tonalElevation = 6.dp,
+                shadowElevation = 12.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { controlsCollapsed = !controlsCollapsed }) {
+                            Icon(
+                                imageVector = if (controlsCollapsed) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "Collapse"
+                            )
+                        }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                        SongProgressInfo(
+                            modifier = Modifier.weight(1f),
+                            songDuration = song.metadata.durationMillis,
+                            song = song,
+                            isCollapsed = controlsCollapsed,
+                            songProgressProvider = nowPlayingActions::currentSongProgress,
+                            onUserSeek = nowPlayingActions::onUserSeek
+                        )
 
-            SongControls(
-                modifier = Modifier.fillMaxWidth(),
-                isPlaying = playbackState == PlayerState.PLAYING,
-                playButtonColor = MaterialTheme.colorScheme.primary,
-                onPrevious = nowPlayingActions::previousSong,
-                onTogglePlayback = nowPlayingActions::togglePlayback,
-                onNext = nowPlayingActions::nextSong,
-                onJumpForward = nowPlayingActions::jumpForward,
-                onJumpBackward = nowPlayingActions::jumpBackward
-            )
-            Spacer(modifier = Modifier.height(32.dp))
+                        IconButton(onClick = onToggleLyrics) {
+                            Icon(
+                                imageVector = Icons.Rounded.Lyrics,
+                                contentDescription = "Lyrics",
+                                modifier = if (isShowingLyrics) Modifier else Modifier.alpha(0.5f)
+                            )
+                        }
+                    }
 
-            PlayerFooter(
-                modifier = Modifier
-                    .padding(bottom = 6.dp)
-                    .fillMaxWidth(),
-                songUi = song,
-                isShuffleOn = isShuffleOn,
-                repeatMode = repeatMode,
-                isLyricsOpen = isShowingLyrics,
-                onOpenQueue = onOpenQueue,
-                onToggleLyrics = { isShowingLyrics = !isShowingLyrics },
-                onToggleRepeatMode = nowPlayingActions::toggleRepeatMode,
-                onToggleShuffle = nowPlayingActions::toggleShuffleMode
-            )
+                    AnimatedVisibility(visible = !controlsCollapsed) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            SongControls(
+                                modifier = Modifier.fillMaxWidth(),
+                                isPlaying = playbackState == PlayerState.PLAYING,
+                                isShuffleOn = isShuffleOn,
+                                repeatMode = repeatMode,
+                                playButtonColor = MaterialTheme.colorScheme.primary,
+                                onPrevious = nowPlayingActions::previousSong,
+                                onTogglePlayback = nowPlayingActions::togglePlayback,
+                                onNext = nowPlayingActions::nextSong,
+                                onToggleShuffle = nowPlayingActions::toggleShuffleMode,
+                                onToggleRepeat = nowPlayingActions::toggleRepeatMode
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
+                            ) {
+                                SuggestionChip(
+                                    onClick = onOpenQueue,
+                                    label = { Text("Queue", fontWeight = FontWeight.ExtraBold) },
+                                    icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null) },
+                                    shape = CircleShape,
+                                    colors = SuggestionChipDefaults.suggestionChipColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        iconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                )
+
+                                NowPlayingOverflowChip(options = rememberNowPlayingOptions(songUi = song))
+                            }
+                        }
+                    }
+                }
+            }
         }
-
     }
 }

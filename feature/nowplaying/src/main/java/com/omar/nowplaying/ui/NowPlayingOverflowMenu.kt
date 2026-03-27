@@ -1,16 +1,21 @@
 package com.omar.nowplaying.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.omar.musica.store.model.song.Song
 import com.omar.musica.ui.common.LocalCommonSongsAction
 import com.omar.musica.ui.menu.MenuActionItem
+import com.omar.musica.ui.menu.SpicyActionMenu
 import com.omar.musica.ui.menu.SongBottomSheetMenu
 import com.omar.musica.ui.menu.addToPlaylists
 import com.omar.musica.ui.menu.delete
@@ -80,6 +85,61 @@ fun NowPlayingOverflowMenu(
 
     )
 
+}
+
+@Composable
+fun NowPlayingOverflowChip(
+    options: NowPlayingOptions
+) {
+    val sleepTimerViewModel: SleepTimerViewModel = hiltViewModel()
+    val context = LocalContext.current
+    val sleepTimerDialog = rememberSleepTimerDialog(
+        onSetTimer = { minutes, finishLastSong ->
+            sleepTimerViewModel.schedule(minutes, finishLastSong)
+            context.showShortToast("Sleep timer set")
+        },
+        onDeleteTimer = {
+            sleepTimerViewModel.deleteTimer()
+            context.showShortToast("Sleep timer deleted")
+        }
+    )
+    val playbackSpeedDialog = rememberPlaybackSpeedDialog(viewModel = hiltViewModel())
+
+    val actionItems = remember {
+        mutableListOf<MenuActionItem>().apply {
+            sleepTimer { sleepTimerDialog.launch() }
+            addToPlaylists(options::addToPlaylist)
+            playbackSpeed { playbackSpeedDialog.launch() }
+            setAsRingtone(options::setAsRingtone)
+            share(options::share)
+            tagEditor(options::editTags)
+            equalizer(options::equalizer)
+            songInfo(options::songInfo)
+            delete(options::deleteFromDevice)
+        }
+    }
+
+    var visible by remember { mutableStateOf(false) }
+
+    Box {
+        SuggestionChip(
+            onClick = { visible = !visible },
+            label = { Text("More", fontWeight = FontWeight.ExtraBold) },
+            icon = { Icon(Icons.Rounded.MoreHoriz, contentDescription = null) },
+            shape = CircleShape,
+            colors = SuggestionChipDefaults.suggestionChipColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                iconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        )
+
+        SpicyActionMenu(
+            visible = visible,
+            onDismiss = { visible = false },
+            items = actionItems
+        )
+    }
 }
 
 @Composable

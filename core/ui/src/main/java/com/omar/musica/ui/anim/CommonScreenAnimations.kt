@@ -13,12 +13,12 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 
-private val expressiveSpring = spring<Float>(
+val expressiveSpring = spring<Float>(
     dampingRatio = Spring.DampingRatioLowBouncy,
     stiffness = Spring.StiffnessLow
 )
 
-private val expressiveSlideSpring = spring<androidx.compose.ui.unit.IntOffset>(
+val expressiveSlideSpring = spring<androidx.compose.ui.unit.IntOffset>(
     dampingRatio = Spring.DampingRatioNoBouncy,
     stiffness = Spring.StiffnessLow
 )

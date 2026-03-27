@@ -1,6 +1,8 @@
 package com.omar.nowplaying.ui
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -25,32 +27,39 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Replay
-import androidx.compose.material.icons.outlined.SkipNext
-import androidx.compose.material.icons.outlined.SkipPrevious
-import androidx.compose.material.icons.sharp.PauseCircle
-import androidx.compose.material.icons.sharp.PlayCircle
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material3.*
+import androidx.compose.ui.draw.alpha
+import com.omar.musica.model.playback.RepeatMode
+import kotlin.math.abs
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.zIndex
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +73,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.omar.musica.ui.common.LocalUserPreferences
 import com.omar.musica.ui.model.AppThemeUi
@@ -111,6 +123,7 @@ fun NowPlayingScreen(
             uiState = uiState as NowPlayingState.Playing,
             barHeight = barHeight,
             isExpanded = isExpanded,
+            onCollapseNowPlaying = onCollapseNowPlaying,
             onExpandNowPlaying = onExpandNowPlaying,
             progressProvider = progressProvider,
             nowPlayingActions = viewModel
@@ -124,6 +137,7 @@ internal fun NowPlayingScreen(
     uiState: NowPlayingState.Playing,
     barHeight: Dp,
     isExpanded: Boolean,
+    onCollapseNowPlaying: () -> Unit,
     onExpandNowPlaying: () -> Unit,
     progressProvider: () -> Float,
     nowPlayingActions: INowPlayingViewModel
@@ -134,6 +148,33 @@ internal fun NowPlayingScreen(
         AppThemeUi.DARK -> true
         AppThemeUi.LIGHT -> false
         else -> isSystemInDarkTheme()
+    }
+
+    val context = LocalContext.current
+    val window = remember(context) {
+        var c = context
+        while (c is ContextWrapper) {
+            if (c is Activity) break
+            c = c.baseContext
+        }
+        (c as? Activity)?.window
+    }
+    val insetsController = remember(window) { window?.let { WindowCompat.getInsetsController(it, it.decorView) } }
+
+    SideEffect {
+        if (isExpanded) {
+            insetsController?.hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
+            insetsController?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            insetsController?.show(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            // Restore bars when this screen is completely removed from the hierarchy
+            insetsController?.show(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
+        }
     }
 
     // Since we use a darker background image for the NowPlaying screen
@@ -157,12 +198,14 @@ internal fun NowPlayingScreen(
                 FullScreenNowPlaying(
                     Modifier
                         .fillMaxSize()
+                        .zIndex(1f)
                         .graphicsLayer {
                             alpha = ((progressProvider() - 0.15f) * 2.0f).coerceIn(0.0f, 1.0f)
                         },
                     isShowingQueue,
                     { isShowingQueue = false },
                     { isShowingQueue = true },
+                    onCollapseNowPlaying,
                     progressProvider,
                     uiState,
                     nowPlayingActions = nowPlayingActions
@@ -176,8 +219,10 @@ internal fun NowPlayingScreen(
                     .fillMaxWidth()
                     .height(barHeight)
                     .padding(nowPlayingBarPadding)
-                    .pointerInput(Unit) {
-                        detectTapGestures { onExpandNowPlaying() }
+                    .pointerInput(isExpanded) {
+                        if (!isExpanded) {
+                            detectTapGestures { onExpandNowPlaying() }
+                        }
                     }
                     .graphicsLayer {
                         alpha = (1 - (progressProvider() * 6.66f).coerceAtMost(1.0f))
@@ -201,6 +246,7 @@ fun FullScreenNowPlaying(
     isShowingQueue: Boolean,
     onCloseQueue: () -> Unit,
     onOpenQueue: () -> Unit,
+    onCollapse: () -> Unit,
     progressProvider: () -> Float,
     uiState: NowPlayingState.Playing,
     nowPlayingActions: INowPlayingViewModel,
@@ -209,6 +255,10 @@ fun FullScreenNowPlaying(
     val song = uiState.song
 
     val pagerState = rememberPagerState(remember { uiState.songIndex }) { uiState.queue.size }
+
+    var isShowingLyrics by remember {
+        mutableStateOf(false)
+    }
 
     val currentSongIndex = uiState.songIndex
     LaunchedEffect(currentSongIndex) {
@@ -235,25 +285,10 @@ fun FullScreenNowPlaying(
 
                 SpicyDynamicBackground(
                     modifier = Modifier.fillMaxSize(),
-                    song = uiState.queue.getOrNull(pagerState.currentPage)
+                    song = uiState.song
                 )
 
-                val screenHeight = LocalContext.current.resources.displayMetrics.heightPixels
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(0.7f),
-                                    Color.Black.copy(alpha = 1.0f)
-                                ),
-                                startY = screenHeight * 0.2f,
-                                endY = Float.POSITIVE_INFINITY
-                            )
-                        )
-                )
+
             }
         }
 
@@ -275,18 +310,18 @@ fun FullScreenNowPlaying(
             if (screenSize == NowPlayingScreenSize.LANDSCAPE)
                 Modifier.padding(16.dp)
             else
-                Modifier.padding(top = 32.dp)
-
+                Modifier
         }
 
         val playerScreenModifier = remember(paddingModifier) {
             Modifier
                 .fillMaxSize()
+                .zIndex(1f)
                 .graphicsLayer {
                     alpha = ((progressProvider() - 0.15f) * 2.0f).coerceIn(0.0f, 1.0f)
                 }
                 .then(paddingModifier)
-                .statusBarsPadding()
+                .safeDrawingPadding()
         }
 
         AnimatedContent(
@@ -306,6 +341,7 @@ fun FullScreenNowPlaying(
                 QueueScreen(
                     modifier = Modifier
                         .fillMaxSize()
+                        .safeDrawingPadding()
                         .graphicsLayer { alpha = progressProvider() * 2 },
                     onClose = onCloseQueue
                 )
@@ -322,9 +358,12 @@ fun FullScreenNowPlaying(
                         playbackState = uiState.playbackState,
                         repeatMode = uiState.repeatMode,
                         isShuffleOn = uiState.isShuffleOn,
+                        isShowingLyrics = isShowingLyrics,
+                        onToggleLyrics = { isShowingLyrics = !isShowingLyrics },
                         screenSize = screenSize,
                         nowPlayingActions = nowPlayingActions,
-                        onOpenQueue = onOpenQueue
+                        onOpenQueue = onOpenQueue,
+                        onCollapse = onCollapse
                     )
                 }
             }
@@ -339,75 +378,85 @@ fun FullScreenNowPlaying(
 fun SongControls(
     modifier: Modifier,
     isPlaying: Boolean,
+    isShuffleOn: Boolean,
+    repeatMode: RepeatMode,
     playButtonColor: Color,
     onPrevious: () -> Unit,
     onTogglePlayback: () -> Unit,
     onNext: () -> Unit,
-    onJumpForward: () -> Unit,
-    onJumpBackward: () -> Unit
+    onToggleShuffle: () -> Unit,
+    onToggleRepeat: () -> Unit
 ) {
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically
     ) {
 
-        ControlButton(
-            modifier = Modifier
-                .size(26.dp)
-                .clip(MaterialTheme.shapes.small),
-            icon = Icons.Outlined.SkipPrevious,
-            contentDescription = "Skip Previous",
-            onClick = onPrevious
-        )
-
-        ControlButton(
-            modifier = Modifier
-                .size(26.dp)
-                .clip(MaterialTheme.shapes.medium),
-            icon = Icons.Outlined.Replay,
-            contentDescription = "Jump Back",
-            onClick = onJumpBackward
-        )
-
-
-        val pausePlayButton = remember(isPlaying) {
-            if (isPlaying) Icons.Sharp.PauseCircle else Icons.Sharp.PlayCircle
+        // Shuffle
+        IconButton(onClick = onToggleShuffle, modifier = Modifier.size(48.dp)) {
+            Icon(
+                modifier = if (isShuffleOn) Modifier else Modifier.alpha(0.5f),
+                imageVector = Icons.Rounded.Shuffle,
+                contentDescription = "Shuffle",
+                tint = MaterialTheme.colorScheme.onSurface
+            )
         }
 
-        ControlButton(
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape),
-            icon = pausePlayButton,
-            tint = playButtonColor,
-            contentDescription = "Skip Previous",
-            onClick = onTogglePlayback
-        )
+        // Prev
+        IconButton(
+            onClick = onPrevious,
+            modifier = Modifier.size(64.dp)
+        ) {
+            Icon(
+                Icons.Rounded.SkipPrevious,
+                contentDescription = "Previous",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(36.dp)
+            )
+        }
 
-        ControlButton(
-            modifier = Modifier
-                .size(26.dp)
-                .clip(MaterialTheme.shapes.small)
-                .graphicsLayer { scaleX = -1f; },
-            icon = Icons.Outlined.Replay,
-            contentDescription = "Jump Forward",
-            onClick = onJumpForward
-        )
+        // Play/Pause (Squircle, Giant)
+        FilledIconButton(
+            onClick = onTogglePlayback,
+            modifier = Modifier.size(88.dp),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = playButtonColor,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            shape = RoundedCornerShape(28.dp)
+        ) {
+            Icon(
+                if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                contentDescription = "Play/Pause",
+                modifier = Modifier.size(48.dp)
+            )
+        }
 
-        ControlButton(
-            modifier = Modifier
-                .size(26.dp)
-                .clip(MaterialTheme.shapes.small),
-            icon = Icons.Outlined.SkipNext,
-            contentDescription = "Skip To Next",
-            onClick = onNext
-        )
+        // Next
+        IconButton(
+            onClick = onNext,
+            modifier = Modifier.size(64.dp)
+        ) {
+            Icon(
+                Icons.Rounded.SkipNext,
+                contentDescription = "Next",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(36.dp)
+            )
+        }
+
+        // Repeat
+        IconButton(onClick = onToggleRepeat, modifier = Modifier.size(48.dp)) {
+            Icon(
+                imageVector = repeatMode.getIconVector(),
+                contentDescription = "Repeat",
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        }
 
     }
-
-
 }
 
 @Composable

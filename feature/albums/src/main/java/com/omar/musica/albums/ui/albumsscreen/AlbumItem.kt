@@ -45,7 +45,7 @@ fun AlbumRow(
             modifier = Modifier
                 .size(56.dp)
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(8.dp)),
+                .clip(MaterialTheme.shapes.large),
             songAlbumArtModel = album.firstSong.toSongAlbumArtModel(),
             crossFadeDuration = 150
         )
