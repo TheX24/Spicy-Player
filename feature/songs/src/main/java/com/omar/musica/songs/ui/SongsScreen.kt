@@ -165,19 +165,9 @@ internal fun SongsScreen(
                         IconButton(onClick = onSearchClicked) {
                             Icon(Icons.Rounded.Search, contentDescription = null)
                         }
-                        OverflowMenu(
-                            actionItems = listOf(
-                                MenuActionItem(
-                                    Icons.Rounded.Settings,
-                                    "Settings"
-                                ) {
-                                    onSettingsClicked()
-                                }),
-                            contentPaddingValues = PaddingValues(
-                                vertical = 16.dp,
-                                horizontal = 16.dp
-                            )
-                        )
+                        IconButton(onClick = onSettingsClicked) {
+                            Icon(Icons.Rounded.Settings, contentDescription = "Settings")
+                        }
                     },
                     scrollBehavior = scrollBehavior
                 )
