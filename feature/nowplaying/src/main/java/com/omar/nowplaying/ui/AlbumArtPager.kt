@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import com.omar.musica.store.model.song.Song
 import com.omar.musica.ui.albumart.toSongAlbumArtModel
 import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import kotlin.math.abs
 
 
@@ -68,12 +71,31 @@ fun AlbumArtPager(
         beyondViewportPageCount = 1,
     ) { index ->
         val song = songs[index]
-        NowPlayingSquareAlbumArt(
-            modifier = Modifier
-                .fillMaxSize()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(12.dp)),
-            song = song.toSongAlbumArtModel()
-        )
+        
+        var highResMetadata by remember(song.filePath) { mutableStateOf<NowPlayingMetadata?>(null) }
+        
+        LaunchedEffect(song.filePath) {
+            highResMetadata = NowPlayingMetadataCache.getMetadata(song)
+        }
+
+        if (highResMetadata?.art != null) {
+            Image(
+                bitmap = highResMetadata!!.art!!.asImageBitmap(),
+                contentDescription = "Cover",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(12.dp))
+            )
+        } else {
+            NowPlayingSquareAlbumArt(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(12.dp)),
+                song = song.toSongAlbumArtModel()
+            )
+        }
     }
 }

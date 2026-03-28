@@ -5,28 +5,29 @@ import com.omar.musica.model.prefs.PlayerSettings
 
 
 @Stable
-/**
- * Settings applied to the player
- */
 data class PlayerSettingsUi(
-    /**
-     * The amount of time skipped when jumping forward in milliseconds
-     */
-    val jumpInterval: Int,
-
-    /**
-     * Pause when volume reaches zero?
-     */
-    val pauseOnVolumeZero: Boolean,
-
-    /**
-     * Should we start playback when volume increases
-     * if it was paused before due to zero volume
-     */
-    val resumeWhenVolumeIncreases: Boolean,
+    val previousSkipThreshold: Int = 5000,
+    val pauseOnVolumeZero: Boolean = true,
+    val resumeWhenVolumeIncreases: Boolean = true,
+    val crossfadeDuration: Int = 0,
+    val gaplessPlayback: Boolean = true,
+    val audioFocusBehavior: String = "PAUSE",
+    val showTranslation: Boolean = false,
+    val replayGain: Boolean = false,
+    val visualizerEnabled: Boolean = false
 )
 
 
 
 fun PlayerSettings.toPlayerSettingsUi() =
-    PlayerSettingsUi(jumpInterval, pauseOnVolumeZero, resumeWhenVolumeIncreases)
+    PlayerSettingsUi(
+        previousSkipThreshold,
+        pauseOnVolumeZero,
+        resumeWhenVolumeIncreases,
+        crossfadeDuration,
+        gaplessPlayback,
+        audioFocusBehavior,
+        showTranslation,
+        replayGain,
+        visualizerEnabled
+    )

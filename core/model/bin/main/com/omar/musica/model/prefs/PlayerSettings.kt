@@ -5,11 +5,7 @@ package com.omar.musica.model.prefs
  * Settings applied to the player
  */
 data class PlayerSettings(
-    /**
-     * The amount of time skipped when jumping forward in milliseconds
-     */
-    val jumpInterval: Int,
-
+    val previousSkipThreshold: Int = 5,
     /**
      * Pause when volume reaches zero?
      */
@@ -20,7 +16,28 @@ data class PlayerSettings(
      * if it was paused before due to zero volume
      */
     val resumeWhenVolumeIncreases: Boolean,
-)
+
+    val crossfadeDuration: Int = 0,
+    val gaplessPlayback: Boolean = true,
+    val audioFocusBehavior: String = "DUCK",
+    val showTranslation: Boolean = false,
+    val replayGain: Boolean = false,
+    val visualizerEnabled: Boolean = false
+) {
+    sealed class VolumeAction {
+        object Pause : VolumeAction()
+        object Lower : VolumeAction()
+        object None : VolumeAction()
+    }
+
+    fun getVolumeAction(level: Int): VolumeAction {
+        return if (level < 1 && pauseOnVolumeZero) {
+            VolumeAction.Pause
+        } else {
+            VolumeAction.None
+        }
+    }
+}
 
 
 

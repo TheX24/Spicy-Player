@@ -133,6 +133,7 @@ fun MusicaApp2(
                 )
                 settingsGraph(
                     contentModifier = contentModifier,
+                    navController = navController,
                     onBackPressed = { navController.popBackStack() },
                     enterAnimationFactory = ::getEnterAnimationForRoute,
                     exitAnimationFactory = ::getExitAnimationForRoute,

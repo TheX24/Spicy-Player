@@ -22,13 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowBack
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.BlurCircular
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.LightMode
-import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.foundation.layout.PaddingValues
+import com.omar.musica.settings.common.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,16 +73,27 @@ import getPath
 
 
 @Composable
-fun SettingsScreen(
-    modifier: Modifier,
+fun SettingsRoute(
+    modifier: Modifier = Modifier,
     onBackPressed: () -> Unit,
+    onNavigateToReset: () -> Unit,
     settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by settingsViewModel.state.collectAsState()
+    val scanDirectory by settingsViewModel.scanDirectory.collectAsState()
+    val scanProgress by settingsViewModel.scanProgress.collectAsState()
+    val scanHistory by settingsViewModel.scanHistory.collectAsState()
+    val updateStatus by settingsViewModel.updateStatus.collectAsState()
+
     SettingsScreen(
         modifier = modifier,
         state = state,
+        scanDirectory = scanDirectory,
+        scanProgress = scanProgress,
+        scanHistory = scanHistory,
+        updateStatus = updateStatus,
         onBackPressed = onBackPressed,
+        onNavigateToReset = onNavigateToReset,
         settingsCallbacks = settingsViewModel
     )
 }
@@ -95,7 +103,12 @@ fun SettingsScreen(
 fun SettingsScreen(
     modifier: Modifier,
     state: SettingsState,
+    scanDirectory: String,
+    scanProgress: com.omar.musica.store.ScanProgress?,
+    scanHistory: List<String>,
+    updateStatus: com.omar.musica.settings.components.UpdateStatus,
     onBackPressed: () -> Unit,
+    onNavigateToReset: () -> Unit,
     settingsCallbacks: ISettingsViewModel
 ) {
 
@@ -112,6 +125,20 @@ fun SettingsScreen(
             contentAlignment = Alignment.Center
         ) {
 
+            if (scanProgress != null) {
+                com.omar.musica.ui.dialogs.ScanProgressDialog(
+                    isScanning = true,
+                    scanProgress = scanProgress!!,
+                    scanHistory = scanHistory
+                )
+            }
+            
+            com.omar.musica.settings.components.UpdateDialog(
+                status = updateStatus,
+                onClearStatus = { settingsCallbacks.clearUpdateStatus() },
+                context = LocalContext.current
+            )
+
             if (state is SettingsState.Loading) {
                 LinearProgressIndicator(
                     modifier = Modifier
@@ -122,7 +149,9 @@ fun SettingsScreen(
                 SettingsList(
                     modifier = Modifier.fillMaxSize(),
                     userPreferences = state.userPreferences,
+                    scanDirectory = scanDirectory,
                     settingsCallbacks = settingsCallbacks,
+                    onNavigateToReset = onNavigateToReset,
                     nestedScrollConnection = topBarScrollBehaviour.nestedScrollConnection,
                 )
             }
@@ -137,284 +166,322 @@ fun SettingsScreen(
 fun SettingsList(
     modifier: Modifier,
     userPreferences: UserPreferencesUi,
+    scanDirectory: String,
     settingsCallbacks: ISettingsViewModel,
+    onNavigateToReset: () -> Unit,
     nestedScrollConnection: NestedScrollConnection
 ) {
-    val sectionTitleModifier = Modifier
-        .fillMaxWidth()
-        .padding(start = 32.dp, top = 16.dp)
-
     LazyColumn(
-        modifier.nestedScroll(nestedScrollConnection)
+        modifier = modifier.nestedScroll(nestedScrollConnection),
+        contentPadding = PaddingValues(vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            Divider(Modifier.fillMaxWidth())
-        }
-        item {
-            SectionTitle(modifier = sectionTitleModifier, title = "Interface")
-        }
-        item {
-            var appThemeDialogVisible by remember {
-                mutableStateOf(false)
-            }
-            AppThemeDialog(
-                visible = appThemeDialogVisible,
-                currentSelected = userPreferences.uiSettings.theme,
-                onDismissRequest = { appThemeDialogVisible = false },
-                onThemeSelected = {
-                    appThemeDialogVisible = false
-                    settingsCallbacks.onThemeSelected(it)
-                }
-            )
-            val text = when (userPreferences.uiSettings.theme) {
-                AppThemeUi.SYSTEM -> "Follow System Settings"
-                AppThemeUi.LIGHT -> "Light"
-                AppThemeUi.DARK -> "Dark"
-            }
-            GeneralSettingsItem(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { appThemeDialogVisible = true }
-                    .padding(horizontal = 32.dp, vertical = 16.dp),
-                title = "App Theme",
-                subtitle = text
-            )
-        }
 
+        // ━━ Lyrics ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        item { SettingsSectionHeader("Lyrics") }
         item {
-            SwitchSettingsItem(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                title = "Use Black Background for Dark Theme",
-                subtitle = "Preserves battery on AMOLED screens",
-                toggled = userPreferences.uiSettings.blackBackgroundForDarkTheme,
-                onToggle = { settingsCallbacks.toggleBlackBackgroundForDarkTheme() }
-            )
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            item {
-                SwitchSettingsItem(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    title = "Dynamic Color Scheme",
-                    toggled = userPreferences.uiSettings.isUsingDynamicColor,
-                    onToggle = { settingsCallbacks.toggleDynamicColorScheme() }
+            SettingsSection {
+                NumberSettingItem(
+                    icon = Icons.Rounded.Tune,
+                    title = "Global Sync Offset",
+                    value = userPreferences.uiSettings.lyricsOffsetMs,
+                    onValueChange = { settingsCallbacks.setLyricsOffsetMs(it) },
+                    valueRange = -5000..5000,
+                    step = 50,
+                    suffix = "ms"
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SegmentedSettingItem(
+                    icon = Icons.Rounded.FormatSize,
+                    title = "Font Size",
+                    options = listOf("Small", "Medium", "Large"),
+                    selectedIndex = when (userPreferences.uiSettings.lyricsFontSize) { "SMALL" -> 0; "LARGE" -> 2; else -> 1 },
+                    onSelect = { settingsCallbacks.setLyricsFontSize(when (it) { 0 -> "SMALL"; 2 -> "LARGE"; else -> "MEDIUM" }) }
                 )
             }
         }
 
+        // ━━ Audio & Playback ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        item { SettingsSectionHeader("Audio & Playback") }
         item {
-            var accentColorDialogVisible by remember {
-                mutableStateOf(false)
-            }
-            if (accentColorDialogVisible) {
-                ColorPickerDialog(
-                    initialColor = userPreferences.uiSettings.accentColor.fromIntToAccentColor(),
-                    onColorChanged = { color -> settingsCallbacks.setAccentColor(color.toInt()) },
-                    onDismissRequest = { accentColorDialogVisible = false }
+            SettingsSection {
+                SwitchSettingItem(
+                    icon = Icons.Rounded.MusicNote,
+                    title = "Gapless Playback",
+                    checked = userPreferences.playerSettings.gaplessPlayback,
+                    onCheckedChange = { settingsCallbacks.setGaplessPlayback(it) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SwitchSettingItem(
+                    icon = Icons.Rounded.Science,
+                    title = "Replay Gain",
+                    subtitle = "Coming Soon",
+                    checked = false,
+                    onCheckedChange = {},
+                    enabled = false
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SliderSettingItem(
+                    icon = Icons.Rounded.BlurOn,
+                    title = "Crossfade Duration",
+                    valueLabel = if (userPreferences.playerSettings.crossfadeDuration == 0) "Off" else "${userPreferences.playerSettings.crossfadeDuration}s",
+                    value = userPreferences.playerSettings.crossfadeDuration.toFloat(),
+                    onValueChange = { settingsCallbacks.setCrossfadeDuration(it.toInt()) },
+                    onValueChangeFinished = {},
+                    valueRange = 0f..10f,
+                    steps = 9
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SliderSettingItem(
+                    icon = Icons.Rounded.Replay,
+                    title = "Previous Skip Threshold",
+                    valueLabel = "${userPreferences.playerSettings.previousSkipThreshold}s",
+                    value = userPreferences.playerSettings.previousSkipThreshold.toFloat(),
+                    onValueChange = { settingsCallbacks.setPreviousSkipThreshold(it.toInt()) },
+                    valueRange = 0f..10f,
+                    steps = 9
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SegmentedSettingItem(
+                    icon = Icons.AutoMirrored.Rounded.VolumeDown,
+                    title = "Audio Focus Behavior",
+                    options = listOf("Pause", "Continue"),
+                    selectedIndex = if (userPreferences.playerSettings.audioFocusBehavior == "PAUSE") 0 else 1,
+                    onSelect = { settingsCallbacks.setAudioFocusBehavior(if (it == 0) "PAUSE" else "DUCK") }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SwitchSettingItem(
+                    icon = Icons.Rounded.VolumeOff,
+                    title = "Pause on Volume Zero",
+                    checked = userPreferences.playerSettings.pauseOnVolumeZero,
+                    onCheckedChange = { settingsCallbacks.togglePauseVolumeZero() }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SwitchSettingItem(
+                    icon = Icons.Rounded.VolumeUp,
+                    title = "Resume when gaining volume",
+                    checked = userPreferences.playerSettings.resumeWhenVolumeIncreases,
+                    onCheckedChange = { settingsCallbacks.toggleResumeVolumeNotZero() }
                 )
             }
-            GeneralSettingsItem(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { accentColorDialogVisible = true }
-                    .padding(horizontal = 32.dp, vertical = 16.dp),
-                title = "Accent Color",
-                subtitle = "Color of the app theme"
-            )
         }
 
+        // ━━ Appearance & Display ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        item { SettingsSectionHeader("Appearance & Display") }
         item {
-            SwitchSettingsItem(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                title = "MiniPlayer Extra Controls",
-                subtitle = "Show next and previous buttons in MiniPlayer",
-                toggled = userPreferences.uiSettings.showMiniPlayerExtraControls,
-                onToggle = settingsCallbacks::toggleShowExtraControls,
-            )
-        }
-
-        item {
-            var playerThemeDialogVisible by remember {
-                mutableStateOf(false)
-            }
-            PlayerThemeDialog(
-                playerThemeDialogVisible,
-                userPreferences.uiSettings.playerThemeUi,
-                onThemeSelected = {
-                    playerThemeDialogVisible = false
-                    settingsCallbacks.onPlayerThemeChanged(it)
-                },
-                onDismissRequest = { playerThemeDialogVisible = false },
-            )
-            GeneralSettingsItem(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { playerThemeDialogVisible = true }
-                    .padding(horizontal = 32.dp, vertical = 16.dp),
-                title = "Player Theme",
-                subtitle = when (userPreferences.uiSettings.playerThemeUi) {
-                    PlayerThemeUi.SOLID -> "Solid"
-                    PlayerThemeUi.BLUR -> "Blur"
+            SettingsSection {
+                SegmentedSettingItem(
+                    icon = Icons.Rounded.DarkMode,
+                    title = "App Theme",
+                    options = listOf("Light", "Dark", "System"),
+                    selectedIndex = when (userPreferences.uiSettings.theme) { AppThemeUi.LIGHT -> 0; AppThemeUi.DARK -> 1; else -> 2 },
+                    onSelect = { settingsCallbacks.onThemeSelected(when (it) { 0 -> AppThemeUi.LIGHT; 1 -> AppThemeUi.DARK; else -> AppThemeUi.SYSTEM }) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    SwitchSettingItem(
+                        icon = Icons.Rounded.AutoAwesome,
+                        title = "Dynamic Color Scheme",
+                        checked = userPreferences.uiSettings.isUsingDynamicColor,
+                        onCheckedChange = { settingsCallbacks.toggleDynamicColorScheme() }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 }
-            )
-        }
-
-        item {
-            HorizontalDivider(
-                Modifier
-                    .fillMaxWidth()
-            )
-        }
-
-        item {
-            SectionTitle(modifier = sectionTitleModifier, title = "Library")
-        }
-
-        item {
-            var blacklistDialogVisible by remember {
-                mutableStateOf(false)
+                var accentColorDialogVisible by remember { mutableStateOf(false) }
+                if (accentColorDialogVisible) {
+                    ColorPickerDialog(
+                        initialColor = userPreferences.uiSettings.accentColor.fromIntToAccentColor(),
+                        onColorChanged = { color -> settingsCallbacks.setAccentColor(color.toInt()) },
+                        onDismissRequest = { accentColorDialogVisible = false }
+                    )
+                }
+                NavigationSettingItem(
+                    icon = Icons.Rounded.ColorLens,
+                    title = "Accent Color",
+                    subtitle = "Tap to pick primary color",
+                    onClick = { accentColorDialogVisible = true }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                
+                SegmentedSettingItem(
+                    icon = Icons.Rounded.Contrast,
+                    title = "Contrast Level",
+                    options = listOf("Standard", "Medium", "High"),
+                    selectedIndex = when {
+                        userPreferences.uiSettings.contrastLevel <= 0.1f -> 0
+                        userPreferences.uiSettings.contrastLevel <= 0.75f -> 1
+                        else -> 2
+                    },
+                    onSelect = { settingsCallbacks.setContrastLevel(when (it) { 1 -> 0.5f; 2 -> 1.0f; else -> 0.0f }) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SwitchSettingItem(
+                    icon = Icons.Rounded.DarkMode,
+                    title = "Pure Black Dark Mode",
+                    checked = userPreferences.uiSettings.blackBackgroundForDarkTheme,
+                    onCheckedChange = { settingsCallbacks.toggleBlackBackgroundForDarkTheme() }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                NavigationSettingItem(
+                    icon = Icons.Rounded.Equalizer,
+                    title = "Visualizer",
+                    subtitle = "Coming soon",
+                    onClick = {}
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SegmentedSettingItem(
+                    icon = Icons.Rounded.Palette,
+                    title = "Now Playing Background",
+                    options = listOf("Solid", "Dynamic"),
+                    selectedIndex = when (userPreferences.uiSettings.playerThemeUi) { PlayerThemeUi.SOLID -> 0; else -> 1 },
+                    onSelect = { settingsCallbacks.onPlayerThemeChanged(when (it) { 0 -> PlayerThemeUi.SOLID; else -> PlayerThemeUi.BLUR }) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                NumberSettingItem(
+                    icon = Icons.Rounded.BlurCircular,
+                    title = "Background Blur Intensity",
+                    value = userPreferences.uiSettings.backgroundBlur,
+                    onValueChange = { settingsCallbacks.setBackgroundBlur(it) },
+                    valueRange = 0..100,
+                    step = 5,
+                    suffix = "%"
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SwitchSettingItem(
+                    icon = Icons.Rounded.ScreenLockPortrait,
+                    title = "Keep Screen On",
+                    checked = userPreferences.uiSettings.keepScreenOn,
+                    onCheckedChange = { settingsCallbacks.setKeepScreenOn(it) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SwitchSettingItem(
+                    icon = Icons.Rounded.SmartDisplay,
+                    title = "MiniPlayer Extra Controls",
+                    checked = userPreferences.uiSettings.showMiniPlayerExtraControls,
+                    onCheckedChange = { settingsCallbacks.toggleShowExtraControls() }
+                )
             }
-            BlacklistedFoldersDialog(
-                isVisible = blacklistDialogVisible,
-                folders = userPreferences.librarySettings.excludedFolders,
-                onFolderAdded = { settingsCallbacks.onFolderAdded(it) },
-                onFolderDeleted = settingsCallbacks::onFolderDeleted,
-                onDismissRequest = { blacklistDialogVisible = false }
-            )
-            GeneralSettingsItem(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { blacklistDialogVisible = true }
-                    .padding(horizontal = 32.dp, vertical = 16.dp),
-                title = "Blacklisted Folders",
-                subtitle = "Music in these folders will not appear in the app"
-            )
         }
 
+        // ━━ Library & Storage ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        item { SettingsSectionHeader("Library & Storage") }
         item {
-            SwitchSettingsItem(
-                modifier = Modifier.fillMaxWidth(),
-                title = "Cache Album Art",
-                info = SettingInfo(
-                    title = "Album Art Cache",
-                    text = "If enabled, this will cache the album art of one song and reuse it for all songs which have the same album name.\n\n" +
-                            "This will greatly improve efficiency and loading times. However, this might cause problems if two songs in the same album " +
-                            "don't have the same artwork.\n\n" +
-                            "If disabled, this will load the album art of each song separately, which will result in correct artwork, at the expense of loading times" +
-                            " and memory.",
-                    icon = Icons.Rounded.Info
-                ),
-                toggled = userPreferences.librarySettings.cacheAlbumCoverArt,
-                onToggle = { settingsCallbacks.onToggleCacheAlbumArt() }
-            )
-        }
+            SettingsSection {
+                var blacklistDialogVisible by remember { mutableStateOf(false) }
+                BlacklistedFoldersDialog(
+                    isVisible = blacklistDialogVisible,
+                    folders = userPreferences.librarySettings.excludedFolders,
+                    onFolderAdded = { settingsCallbacks.onFolderAdded(it) },
+                    onFolderDeleted = settingsCallbacks::onFolderDeleted,
+                    onDismissRequest = { blacklistDialogVisible = false }
+                )
+                NavigationSettingItem(
+                    icon = Icons.Rounded.Block,
+                    title = "Blacklisted Folders",
+                    subtitle = "Music in these folders will not appear in the app",
+                    onClick = { blacklistDialogVisible = true }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SwitchSettingItem(
+                    icon = Icons.Rounded.Cached,
+                    title = "Cache Album Art",
+                    subtitle = "Reuses album art to improve loading",
+                    checked = userPreferences.librarySettings.cacheAlbumCoverArt,
+                    onCheckedChange = { settingsCallbacks.onToggleCacheAlbumArt() }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                val context = LocalContext.current
+                
+                val directoryPicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.OpenDocumentTree(),
+                    onResult = { uri ->
+                        if (uri == null) return@rememberLauncherForActivityResult
+                        val documentTree = DocumentsContract.buildDocumentUriUsingTree(
+                            uri,
+                            DocumentsContract.getTreeDocumentId(uri)
+                        )
+                        val path = getPath(context, documentTree) ?: return@rememberLauncherForActivityResult
+                        settingsCallbacks.setScanDirectory(path)
+                    }
+                )
 
-        item {
-            HorizontalDivider(
-                Modifier
-                    .fillMaxWidth()
-            )
-        }
+                NavigationSettingItem(
+                    icon = Icons.Rounded.FolderOpen,
+                    title = "Scan Directory",
+                    subtitle = scanDirectory,
+                    onClick = { directoryPicker.launch(null) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                ButtonSettingItem(
+                    icon = Icons.Rounded.Sync,
+                    title = "Rescan Library",
+                    subtitle = "Trigger background library deep scan",
+                    buttonLabel = "Scan",
+                    onClick = {
+                        val intent = android.content.Intent(context, com.omar.musica.store.ScanService::class.java).apply {
+                            putExtra("scan_path", scanDirectory)
+                        }
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            context.startForegroundService(intent)
+                        } else {
+                            context.startService(intent)
+                        }
+                        android.widget.Toast.makeText(context, "Scanning Started", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                )
 
-        item {
-            SectionTitle(modifier = sectionTitleModifier, title = "Player")
-        }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
 
-        item {
-            SwitchSettingsItem(
-                modifier = Modifier.fillMaxWidth(),
-                title = "Pause on Volume Zero",
-                "Pause if the volume is set to zero",
-                toggled = userPreferences.playerSettings.pauseOnVolumeZero,
-                onToggle = { settingsCallbacks.togglePauseVolumeZero() }
-            )
-        }
-
-        item {
-            SwitchSettingsItem(
-                modifier = Modifier.fillMaxWidth(),
-                title = "Resume when gaining volume",
-                "Resume if the volume increases, if it was paused due to volume loss",
-                toggled = userPreferences.playerSettings.resumeWhenVolumeIncreases,
-                onToggle = { settingsCallbacks.toggleResumeVolumeNotZero() }
-            )
-        }
-
-        item {
-            var jumpDurationDialogVisible by remember {
-                mutableStateOf(false)
+                ButtonSettingItem(
+                    icon = Icons.Rounded.Photo,
+                    title = "Clear Image Cache",
+                    subtitle = "Album art bitmaps",
+                    buttonLabel = "Clear",
+                    onClick = {
+                        context.cacheDir.listFiles()?.filter {
+                            it.name.endsWith(".png") || it.name.endsWith(".jpg") || it.name.endsWith(".webp")
+                        }?.forEach { it.delete() }
+                        android.widget.Toast.makeText(context, "Image cache cleared", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                ButtonSettingItem(
+                    icon = Icons.Rounded.Lyrics,
+                    title = "Clear Lyrics Cache",
+                    subtitle = "Cached TTML parse results",
+                    buttonLabel = "Clear",
+                    onClick = {
+                        context.cacheDir.listFiles()?.filter { it.name.endsWith(".ttml") }?.forEach { it.delete() }
+                        android.widget.Toast.makeText(context, "Lyrics cache cleared", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
-            JumpDurationDialog(
-                jumpDurationDialogVisible,
-                userPreferences.playerSettings.jumpInterval,
-                onDurationChanged = {
-                    jumpDurationDialogVisible = false
-                    settingsCallbacks.onJumpDurationChanged(it)
-                },
-                { jumpDurationDialogVisible = false }
-            )
-            GeneralSettingsItem(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { jumpDurationDialogVisible = true }
-                    .padding(horizontal = 32.dp, vertical = 16.dp),
-                title = "Jump Interval",
-                subtitle = "${userPreferences.playerSettings.jumpInterval / 1000} seconds"
-            )
         }
-
-
+        
+        // ━━ Advanced ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        item { SettingsSectionHeader("Advanced") }
+        item {
+            SettingsSection {
+                ButtonSettingItem(
+                    icon = Icons.Rounded.Update,
+                    title = "Check for Updates",
+                    subtitle = "Verify latest GitHub release",
+                    buttonLabel = "Check",
+                    onClick = { settingsCallbacks.checkForUpdates(true) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                NavigationSettingItem(
+                    icon = Icons.Rounded.Restore,
+                    title = "Reset Defaults",
+                    subtitle = "Restore all settings to original values",
+                    onClick = onNavigateToReset
+                )
+            }
+        }
     }
-
-
 }
 
 
-@Composable
-fun JumpDurationDialog(
-    visible: Boolean,
-    currentDurationMillis: Int,
-    onDurationChanged: (Int) -> Unit,
-    onDismissRequest: () -> Unit
-) {
-
-    if (!visible) return
-
-    var durationString by remember(currentDurationMillis) {
-        mutableStateOf((currentDurationMillis / 1000).toString())
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        dismissButton = { TextButton(onClick = onDismissRequest) { Text(text = "Close") } },
-        confirmButton = {
-            TextButton(onClick = {
-                val duration = durationString.toIntOrNull() ?: return@TextButton
-                onDurationChanged(duration * 1000)
-            }) { Text(text = "Confirm") }
-        },
-        icon = {
-            Icon(
-                modifier = Modifier.graphicsLayer { scaleX = -1f; },
-                imageVector = Icons.Rounded.Replay,
-                contentDescription = null
-            )
-        },
-        title = { Text(text = "Jump Interval") },
-        text = {
-            TextField(
-                value = durationString,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                onValueChange = { durationString = it })
-        }
-    )
-
-
-}
-
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BlacklistedFoldersDialog(
     isVisible: Boolean,
@@ -452,7 +519,7 @@ fun BlacklistedFoldersDialog(
                 LazyColumn(modifier = Modifier) {
                     items(folders) {
                         Row(
-                            modifier = Modifier.animateItemPlacement(),
+                            modifier = Modifier,
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -471,7 +538,7 @@ fun BlacklistedFoldersDialog(
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                Divider(Modifier.fillMaxWidth())
+                HorizontalDivider(Modifier.fillMaxWidth())
                 Row(
                     verticalAlignment = Alignment.CenterVertically, modifier = Modifier
                         .fillMaxWidth()

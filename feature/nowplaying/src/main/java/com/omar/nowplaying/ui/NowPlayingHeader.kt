@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
@@ -56,6 +60,13 @@ fun NowPlayingHeader(
         val horizontalBias = -1f + expansionProgress // -1f (Left) to 0f (Center)
 
         val song = if (songIndex in songs.indices) songs[songIndex] else null
+        var metadata by remember(song?.filePath) { mutableStateOf<NowPlayingMetadata?>(null) }
+        
+        LaunchedEffect(song?.filePath) {
+            if (song != null) {
+                metadata = NowPlayingMetadataCache.getMetadata(song)
+            }
+        }
 
         // 1. Track Info Column (Orbiting) - Drawn FIRST (Under)
         val offsetX = lerp(smallImageSize + 16.dp, 0.dp, expansionProgress)
@@ -100,6 +111,20 @@ fun NowPlayingHeader(
                         repeatDelayMillis = 2000
                     )
                 )
+                if (metadata != null && metadata!!.bitrate.isNotEmpty()) {
+                    Text(
+                        text = "\${metadata!!.format} • \${metadata!!.bitrate}",
+                        color = Color.White.copy(alpha = 0.5f),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Visible,
+                        softWrap = false,
+                        modifier = Modifier.padding(top = 4.dp).basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            repeatDelayMillis = 2000
+                        )
+                    )
+                }
             }
         }
 

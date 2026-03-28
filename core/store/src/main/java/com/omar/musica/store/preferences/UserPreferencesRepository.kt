@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
 import com.omar.musica.database.dao.BlacklistedFoldersDao
 import com.omar.musica.database.entities.prefs.BlacklistedFolderEntity
 import com.omar.musica.model.AlbumsSortOption
@@ -142,10 +143,67 @@ class UserPreferencesRepository @Inject constructor(
         blacklistDao.addFolder(BlacklistedFolderEntity(0, folder))
     }
 
-    suspend fun changeJumpDurationMillis(duration: Int) {
+    suspend fun setPreviousSkipThreshold(duration: Int) {
         context.datastore.edit {
-            it[JUMP_DURATION_KEY] = duration
+            it[PREVIOUS_SKIP_THRESHOLD_KEY] = duration
         }
+    }
+
+    suspend fun setShowTranslation(show: Boolean) {
+        context.datastore.edit { it[SHOW_TRANSLATION_KEY] = show }
+    }
+
+    suspend fun setReplayGain(gain: Boolean) {
+        context.datastore.edit { it[REPLAY_GAIN_KEY] = gain }
+    }
+
+    suspend fun setVisualizerEnabled(enabled: Boolean) {
+        context.datastore.edit { it[VISUALIZER_ENABLED_KEY] = enabled }
+    }
+
+    suspend fun setLyricsOffsetMs(offset: Int) {
+        context.datastore.edit { it[LYRICS_OFFSET_KEY] = offset }
+    }
+
+    suspend fun setLyricsFontSize(size: String) {
+        context.datastore.edit { it[LYRICS_FONT_SIZE_KEY] = size }
+    }
+
+    suspend fun setBackgroundBlur(blur: Int) {
+        context.datastore.edit { it[BACKGROUND_BLUR_KEY] = blur }
+    }
+
+    suspend fun setContrastLevel(contrast: Float) {
+        context.datastore.edit { it[CONTRAST_LEVEL_KEY] = contrast }
+    }
+
+    suspend fun onContrastLevelChanged(level: Float) {
+        context.datastore.edit { it[CONTRAST_LEVEL_KEY] = level }
+    }
+
+    suspend fun clear() {
+        context.datastore.edit { it.clear() }
+    }
+
+    suspend fun onCrossfadeDurationChanged(duration: Int) {
+        context.datastore.edit { it[CROSSFADE_DURATION_KEY] = duration }
+    }
+
+    suspend fun setGaplessPlayback(gapless: Boolean) {
+        context.datastore.edit { it[GAPLESS_PLAYBACK_KEY] = gapless }
+    }
+
+    suspend fun setKeepScreenOn(keep: Boolean) {
+        context.datastore.edit { it[KEEP_SCREEN_ON_KEY] = keep }
+    }
+
+    suspend fun setCrossfadeDuration(duration: Int) {
+        context.datastore.edit { it[CROSSFADE_DURATION_KEY] = duration }
+    }
+
+
+    suspend fun setAudioFocusBehavior(behavior: String) {
+        context.datastore.edit { it[AUDIO_FOCUS_BEHAVIOR_KEY] = behavior }
     }
 
     private suspend fun toggleBoolean(key: Preferences.Key<Boolean>, default: Boolean = true) {
@@ -156,13 +214,25 @@ class UserPreferencesRepository @Inject constructor(
 
 
     private fun Preferences.getPlayerSettings(): PlayerSettings {
-        val jumpDuration = this[JUMP_DURATION_KEY] ?: DEFAULT_JUMP_DURATION_MILLIS
+        val previousSkipThreshold = this[PREVIOUS_SKIP_THRESHOLD_KEY] ?: 5
         val pauseOnVolumeZero = this[PAUSE_IF_VOLUME_ZERO] ?: false
-        val resumeOnVolumeNotZero = this[RESUME_IF_VOLUME_INCREASED] ?: false
+        val resumeWhenVolumeIncreases = this[RESUME_IF_VOLUME_INCREASED] ?: false
+        val crossfadeDuration = this[CROSSFADE_DURATION_KEY] ?: 0
+        val gaplessPlayback = this[GAPLESS_PLAYBACK_KEY] ?: true
+        val audioFocusBehavior = this[AUDIO_FOCUS_BEHAVIOR_KEY] ?: "DUCK"
+        val showTranslation = this[SHOW_TRANSLATION_KEY] ?: false
+        val replayGain = this[REPLAY_GAIN_KEY] ?: false
+        val visualizerEnabled = this[VISUALIZER_ENABLED_KEY] ?: false
         return PlayerSettings(
-            jumpDuration,
+            previousSkipThreshold,
             pauseOnVolumeZero,
-            resumeOnVolumeNotZero
+            resumeWhenVolumeIncreases,
+            crossfadeDuration,
+            gaplessPlayback,
+            audioFocusBehavior,
+            showTranslation,
+            replayGain,
+            visualizerEnabled
         )
     }
 
@@ -173,6 +243,13 @@ class UserPreferencesRepository @Inject constructor(
         val blackBackgroundForDarkTheme = this[BLACK_BACKGROUND_FOR_DARK_THEME_KEY] ?: false
         val accentColor = this[ACCENT_COLOR_KEY] ?: DEFAULT_ACCENT_COLOR
         val miniPlayerExtraControls = this[MINI_PLAYER_EXTRA_CONTROLS] ?: false
+        
+        val lyricsOffsetMs = this[LYRICS_OFFSET_KEY] ?: 0
+        val lyricsFontSize = this[LYRICS_FONT_SIZE_KEY] ?: "MEDIUM"
+        val backgroundBlur = this[BACKGROUND_BLUR_KEY] ?: 60
+        val contrastLevel = this[CONTRAST_LEVEL_KEY] ?: 0f
+        val keepScreenOn = this[KEEP_SCREEN_ON_KEY] ?: false
+
         return UiSettings(
             theme,
             isUsingDynamicColor,
@@ -180,7 +257,12 @@ class UserPreferencesRepository @Inject constructor(
             blackBackgroundForDarkTheme,
             MiniPlayerMode.PINNED,
             accentColor,
-            miniPlayerExtraControls
+            miniPlayerExtraControls,
+            lyricsOffsetMs,
+            lyricsFontSize,
+            backgroundBlur,
+            contrastLevel,
+            keepScreenOn
         )
     }
 
@@ -198,9 +280,10 @@ class UserPreferencesRepository @Inject constructor(
 
 
         val cacheAlbumCoverArt = this[CACHE_ALBUM_COVER_ART_KEY] ?: true
+        val scanDirectory = this[SCAN_DIRECTORY_KEY] ?: "/sdcard/Music/"
 
         return LibrarySettings(
-            songsSortOrder, albumsSortOrder, albumsGridSize, cacheAlbumCoverArt, excludedFolders
+            songsSortOrder, albumsSortOrder, albumsGridSize, cacheAlbumCoverArt, excludedFolders, scanDirectory
         )
     }
 
@@ -213,6 +296,12 @@ class UserPreferencesRepository @Inject constructor(
         prefs.getPlayerSettings()
     )
 
+    suspend fun setScanDirectory(dir: String) {
+        context.datastore.edit { preferences ->
+            preferences[SCAN_DIRECTORY_KEY] = dir
+        }
+    }
+
     companion object {
         val SONGS_SORT_ORDER_KEY = stringPreferencesKey("SONGS_SORT")
         val ALBUMS_SORT_ORDER_KEY = stringPreferencesKey("ALBUMS_SORT")
@@ -222,7 +311,7 @@ class UserPreferencesRepository @Inject constructor(
         val BLACK_BACKGROUND_FOR_DARK_THEME_KEY =
             booleanPreferencesKey("BLACK_BACKGROUND_FOR_DARK_THEME")
         val CACHE_ALBUM_COVER_ART_KEY = booleanPreferencesKey("CACHE_ALBUM_COVER_ART")
-        val JUMP_DURATION_KEY = intPreferencesKey("JUMP_DURATION_KEY")
+        val PREVIOUS_SKIP_THRESHOLD_KEY = intPreferencesKey("PREVIOUS_SKIP_THRESHOLD_KEY")
         val SONG_URI_KEY = stringPreferencesKey("SONG_URI")
         val SONG_POSITION_KEY = longPreferencesKey("SONG_POSITION")
         val PAUSE_IF_VOLUME_ZERO = booleanPreferencesKey("PAUSE_VOLUME_ZERO")
@@ -230,6 +319,20 @@ class UserPreferencesRepository @Inject constructor(
         val ACCENT_COLOR_KEY = intPreferencesKey("ACCENT_COLOR")
         val MINI_PLAYER_EXTRA_CONTROLS = booleanPreferencesKey("MINI_PLAYER_EXTRA_CONTROLS")
         val ALBUMS_GRID_SIZE_KEY = intPreferencesKey("ALBUMS_GRID_SIZE")
+
+        val LYRICS_OFFSET_KEY = intPreferencesKey("LYRICS_OFFSET")
+        val LYRICS_FONT_SIZE_KEY = stringPreferencesKey("LYRICS_FONT_SIZE")
+        val BACKGROUND_BLUR_KEY = intPreferencesKey("BACKGROUND_BLUR")
+        val CONTRAST_LEVEL_KEY = floatPreferencesKey("CONTRAST_LEVEL")
+        val KEEP_SCREEN_ON_KEY = booleanPreferencesKey("KEEP_SCREEN_ON")
+
+        val CROSSFADE_DURATION_KEY = intPreferencesKey("CROSSFADE_DURATION")
+        val GAPLESS_PLAYBACK_KEY = booleanPreferencesKey("GAPLESS_PLAYBACK")
+        val AUDIO_FOCUS_BEHAVIOR_KEY = stringPreferencesKey("AUDIO_FOCUS_BEHAVIOR")
+        val SHOW_TRANSLATION_KEY = booleanPreferencesKey("SHOW_TRANSLATION")
+        val REPLAY_GAIN_KEY = booleanPreferencesKey("REPLAY_GAIN")
+        val VISUALIZER_ENABLED_KEY = booleanPreferencesKey("VISUALIZER_ENABLED")
+        val SCAN_DIRECTORY_KEY = stringPreferencesKey("SCAN_DIRECTORY")
     }
 
 }

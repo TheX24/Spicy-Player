@@ -36,5 +36,10 @@ data class LibrarySettings(
     /**
      * Files in these folders should not appear in the app
      */
-    val excludedFolders: List<String>
+    val excludedFolders: List<String>,
+
+    /**
+     * Directory used for manual deep-scanning of music and TTML files
+     */
+    val scanDirectory: String = "/sdcard/Music/"
 )

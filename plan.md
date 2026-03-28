@@ -66,13 +66,14 @@
         - [ ] Fetch audio session ID from ExoPlayer to drive visualizer data
         - [ ] Multiple visualizer styles (e.g., bar graph, waveform, circular aura around cover art)
   - Settings
-    - [ ] Update to M3E
-    - [ ] Lyrics settings
-      - [ ] Global offset/delay adjustment (e.g., ±500ms) for out-of-sync lyrics
-      - [ ] Custom font size
+    - [x] Update to M3E
+    - [x] Lyrics settings
+      - [x] Global offset/delay adjustment (e.g., ±500ms) for out-of-sync lyrics
+      - [x] Custom font size
     - [ ] Audio player settings
       - [ ] Musicolet-like EQ
-      - [ ] Crossfade duration slider (0-10 seconds) and gapless playback toggle
+      - [ ] Crossfade duration slider (0-10 seconds)
+      - [x] Gapless playback toggle
     - [x] General settings
       - [x] App theme selector (Light, Dark, System Default, Material You)
       - [ ] Cache management (clear cached images/lyrics to free up space)
@@ -109,3 +110,17 @@
   - [x] Low quality cover art
   - [ ] Fix TTML & song matching
   - [x] Overflow menu shadow fades too slow
+        Settings fixes:
+  - [ ] fix crossfade
+    - [ ] fix skipping
+  - [ ] test previous skip threshold
+  - [ ] fix audio focus behavior
+  - [ ] fix accent color selection screen
+  - [ ] fix contrast level
+  - [ ] test keep screen on
+  - [ ] test/confirm caching
+  - [ ] fix info
+  - [ ] center section text
+  - [ ] fix update
+  - [ ] fix reset default page
+  - [ ] fix track info in npv

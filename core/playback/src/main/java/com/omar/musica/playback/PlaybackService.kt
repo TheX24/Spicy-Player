@@ -8,8 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC
-import androidx.media3.common.C.USAGE_MEDIA
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
@@ -22,7 +21,6 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import com.omar.musica.model.prefs.DEFAULT_JUMP_DURATION_MILLIS
 import com.omar.musica.model.prefs.PlayerSettings
 import com.omar.musica.playback.activity.ListeningAnalytics
 import com.omar.musica.playback.extensions.toDBQueueItem
@@ -69,8 +67,13 @@ class PlaybackService :
     private lateinit var listeningAnalytics: ListeningAnalytics
 
 
-    private lateinit var player: ExoPlayer
+    private lateinit var player1: ExoPlayer
+    private lateinit var player2: ExoPlayer
+    private var activePlayer: ExoPlayer? = null
+    private lateinit var crossfadePlayerWrapper: CrossfadePlayerWrapper
     private var mediaSession: MediaSession? = null
+
+    private var crossfadeJob: kotlinx.coroutines.Job? = null
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -93,13 +96,20 @@ class PlaybackService :
         Timber.d("PlaybackService started")
         Log.d("PlaybackService", "PlaybackService started")
 
-        player = buildPlayer().apply { addListener(this@PlaybackService) }
+        player1 = buildPlayer()
+        player2 = buildPlayer()
+        activePlayer = player1
+        activePlayer?.addListener(this@PlaybackService)
+
+        crossfadePlayerWrapper = CrossfadePlayerWrapper(player1)
+        setupCrossfadeTriggers()
+
         createAnalyticsService()
 
         mediaSession = buildMediaSession()
 
         sleepTimerManager = SleepTimerManager(this)
-        player.addListener(sleepTimerManager)
+        activePlayer?.addListener(sleepTimerManager)
 
 
         playerSettings = userPreferencesRepository.playerSettingsFlow
@@ -107,11 +117,21 @@ class PlaybackService :
                 scope,
                 started = SharingStarted.Eagerly,
                 PlayerSettings(
-                    DEFAULT_JUMP_DURATION_MILLIS,
                     pauseOnVolumeZero = false,
                     resumeWhenVolumeIncreases = false
                 )
             )
+
+        scope.launch(Dispatchers.Main) {
+            playerSettings.collect { settings ->
+                val handleAudio = settings.audioFocusBehavior != "IGNORE"
+                val attributes = AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build()
+                activePlayer?.setAudioAttributes(attributes, handleAudio)
+            }
+        }
 
         volumeObserver = VolumeChangeObserver(
             applicationContext,
@@ -128,10 +148,59 @@ class PlaybackService :
         }
     }
 
+    private fun setupCrossfadeTriggers() {
+        crossfadePlayerWrapper.onSkipNext = { performCrossfade(isNext = true) }
+        crossfadePlayerWrapper.onSkipPrevious = { performCrossfade(isNext = false) }
+    }
+
+    private fun performCrossfade(isNext: Boolean) {
+        val oldPlayer = activePlayer ?: return
+        val newPlayer = if (oldPlayer === player1) player2 else player1
+
+        // Figure out next item
+        val nextIndex = if (isNext) oldPlayer.nextMediaItemIndex else oldPlayer.previousMediaItemIndex
+        if (nextIndex == C.INDEX_UNSET) return
+
+        val items = List(oldPlayer.mediaItemCount) { oldPlayer.getMediaItemAt(it) }
+        val startOldVol = oldPlayer.volume
+
+        crossfadeJob?.cancel()
+
+        newPlayer.setMediaItems(items, nextIndex, C.TIME_UNSET)
+        newPlayer.prepare()
+        newPlayer.volume = 0f
+        newPlayer.playWhenReady = oldPlayer.playWhenReady
+
+        activePlayer = newPlayer
+        crossfadePlayerWrapper.switchActivePlayer(newPlayer)
+
+        val crossfadeDurationMs = 2000L // 2 seconds crossfade
+
+        crossfadeJob = scope.launch(Dispatchers.Main) {
+            val startTime = android.os.SystemClock.elapsedRealtime()
+
+            while (isActive) {
+                val elapsed = android.os.SystemClock.elapsedRealtime() - startTime
+                if (elapsed >= crossfadeDurationMs) break
+
+                val progress = elapsed.toFloat() / crossfadeDurationMs.toFloat()
+                
+                oldPlayer.volume = (startOldVol * (1f - progress)).coerceIn(0f, 1f)
+                newPlayer.volume = progress.coerceIn(0f, 1f)
+                
+                delay(30)
+            }
+
+            oldPlayer.stop()
+            oldPlayer.clearMediaItems()
+            oldPlayer.volume = 1.0f
+            newPlayer.volume = 1.0f
+        }
+    }
 
 
     private fun createAnalyticsService() {
-        listeningAnalytics = listeningAnalyticsFactory.create(player)
+        listeningAnalytics = listeningAnalyticsFactory.create(player1)
     }
 
     private fun buildPendingIntent(): PendingIntent {
@@ -141,27 +210,20 @@ class PlaybackService :
     }
 
     private suspend fun saveCurrentPosition() {
-        val uriString = player.currentMediaItem?.requestMetadata?.mediaUri
-        val position = player.currentPosition
-        withContext(Dispatchers.IO) {
-            userPreferencesRepository.saveCurrentPosition(uriString.toString(), position)
+        val currentPlay = activePlayer ?: return
+        val uriString = currentPlay.currentMediaItem?.localConfiguration?.uri
+        if (uriString != null) {
+            val position = currentPlay.currentPosition
+            withContext(Dispatchers.IO) {
+                userPreferencesRepository.saveCurrentPosition(uriString.toString(), position)
+            }
         }
     }
 
     private suspend fun restorePosition() = userPreferencesRepository.getSavedPosition()
 
     private fun buildCommandButtons(): List<CommandButton> {
-        val rewindCommandButton = CommandButton.Builder()
-            .setEnabled(true)
-            .setDisplayName("Jump Backward")
-            .setSessionCommand(SessionCommand(Commands.JUMP_BACKWARD, Bundle()))
-            .setIconResId(R.drawable.outline_fast_rewind_24).build()
-        val fastForwardCommandButton = CommandButton.Builder()
-            .setEnabled(true)
-            .setSessionCommand(SessionCommand(Commands.JUMP_FORWARD, Bundle()))
-            .setDisplayName("Jump Forward")
-            .setIconResId(R.drawable.outline_fast_forward_24).build()
-        return listOf(rewindCommandButton, fastForwardCommandButton)
+        return emptyList()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession {
@@ -174,7 +236,7 @@ class PlaybackService :
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     private fun buildMediaSession(): MediaSession {
         return MediaSession
-            .Builder(applicationContext, player)
+            .Builder(applicationContext, crossfadePlayerWrapper)
             .setCallback(buildCustomCallback())
             .setCustomLayout(buildCommandButtons())
             .setSessionActivity(buildPendingIntent())
@@ -184,8 +246,8 @@ class PlaybackService :
     private fun buildPlayer(): ExoPlayer {
         return ExoPlayer.Builder(applicationContext)
             .setAudioAttributes(
-                AudioAttributes.Builder().setContentType(AUDIO_CONTENT_TYPE_MUSIC)
-                    .setUsage(USAGE_MEDIA).build(),
+                AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .setUsage(C.USAGE_MEDIA).build(),
                 true
             )
             .setHandleAudioBecomingNoisy(true)
@@ -200,7 +262,8 @@ class PlaybackService :
      * the application.
      */
     private fun saveQueue() {
-        val mediaItems = List(player.mediaItemCount) { player.getMediaItemAt(it) }
+        val currentPlay = activePlayer ?: return
+        val mediaItems = List(currentPlay.mediaItemCount) { currentPlay.getMediaItemAt(it) }
         queueRepository.saveQueueFromDBQueueItems(mediaItems.map { it.toDBQueueItem() })
     }
 
@@ -211,78 +274,54 @@ class PlaybackService :
             val (lastSongUri, lastPosition) = restorePosition()
             val songIndex = queue.indexOfFirst { it.songUri.toString() == lastSongUri }
 
-            player.setMediaItems(
+            activePlayer?.setMediaItems(
                 queue.mapIndexed { index, item -> item.toMediaItem(index) },
                 if (songIndex in queue.indices) songIndex else 0,
                 lastPosition
             )
-            player.prepare()
+            activePlayer?.prepare()
         }
     }
 
 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+        val currentPlay = activePlayer ?: return
         if (shuffleModeEnabled) {
             // user enabled shuffle, we have to store the current MediaItems
 
-            val currentMediaItemIndex = player.currentMediaItemIndex
-            val originalMediaItems = List(player.mediaItemCount) { i -> player.getMediaItemAt(i) }
+            val currentMediaItemIndex = currentPlay.currentMediaItemIndex
+            val originalMediaItems = List(currentPlay.mediaItemCount) { i -> currentPlay.getMediaItemAt(i) }
 
             val shuffledQueue = originalMediaItems.toMutableList()
                 .shuffled()
                 .toMutableList()
                 .apply {
                     // remove the current playing media item because we will move it
-                    remove(player.getMediaItemAt(currentMediaItemIndex))
+                    remove(currentPlay.getMediaItemAt(currentMediaItemIndex))
                 }
 
-            player.moveMediaItem(currentMediaItemIndex, 0)
-            player.replaceMediaItems(1, Int.MAX_VALUE, shuffledQueue)
-            player.setShuffleOrder(UnshuffledShuffleOrder(player.mediaItemCount))
+            currentPlay.moveMediaItem(currentMediaItemIndex, 0)
+            currentPlay.replaceMediaItems(1, Int.MAX_VALUE, shuffledQueue)
+            currentPlay.setShuffleOrder(UnshuffledShuffleOrder(currentPlay.mediaItemCount))
 
             originalQueue = originalMediaItems
         } else {
 
-            // user disabled shuffle mode, now we have to restore the original queue
-            // and try to maintain the original order
+            val currentMediaItem = currentPlay.currentMediaItem
 
-            val currentMediaItemIndex = player.currentMediaItemIndex
-            val currentMediaItem = player.getMediaItemAt(currentMediaItemIndex)
+            currentPlay.replaceMediaItems(0, currentPlay.mediaItemCount, originalQueue)
+            val currentMediaItemIndex = originalQueue.indexOf(currentMediaItem)
 
-            // hashset to determine quickly if a media item was removed when the
-            // user had shuffle enabled
-            val mediaItemsSet = HashSet<MediaItem>()
-            for (i in 0 until player.mediaItemCount) {
-                mediaItemsSet.add(player.getMediaItemAt(i))
-            }
-
-            val songsBeforeCurrentPlaying = mutableListOf<MediaItem>()
-            val songsAfterCurrentPlaying = mutableListOf<MediaItem>()
-
-            var passedCurrentPlaying = false
-            for (i in originalQueue) {
-                if (i == currentMediaItem)
-                    passedCurrentPlaying = true
-                else {
-                    if (i !in mediaItemsSet) continue
-                    if (passedCurrentPlaying)
-                        songsAfterCurrentPlaying.add(i)
-                    else
-                        songsBeforeCurrentPlaying.add(i)
-                }
-            }
-
-            player.replaceMediaItems(0, currentMediaItemIndex, songsBeforeCurrentPlaying)
-            player.replaceMediaItems(player.currentMediaItemIndex + 1, Int.MAX_VALUE, songsAfterCurrentPlaying)
+            currentPlay.seekTo(currentMediaItemIndex, currentPlay.currentPosition)
         }
     }
 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
         if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
-            if (player.shuffleModeEnabled) {
-                player.setShuffleOrder(UnshuffledShuffleOrder(player.mediaItemCount))
+            if (activePlayer?.shuffleModeEnabled == true) {
+                activePlayer?.setShuffleOrder(UnshuffledShuffleOrder(activePlayer!!.mediaItemCount))
             }
             saveQueue()
         }
@@ -300,7 +339,6 @@ class PlaybackService :
                     .add(SessionCommand(Commands.SET_SLEEP_TIMER, Bundle.EMPTY))
                     .add(SessionCommand(Commands.CANCEL_SLEEP_TIMER, Bundle.EMPTY))
                 customCommands.forEach { commandButton ->
-                    // Add custom command to available session commands.
                     commandButton.sessionCommand?.let { availableSessionCommands.add(it) }
                 }
                 return MediaSession.ConnectionResult.accept(
@@ -315,12 +353,6 @@ class PlaybackService :
                 customCommand: SessionCommand,
                 args: Bundle
             ): ListenableFuture<SessionResult> {
-                if (Commands.JUMP_FORWARD == customCommand.customAction) {
-                    seekForward()
-                }
-                if (Commands.JUMP_BACKWARD == customCommand.customAction) {
-                    seekBackward()
-                }
                 if (Commands.SET_SLEEP_TIMER == customCommand.customAction) {
                     val minutes = args.getInt("MINUTES", 0)
                     val finishLastSong = args.getBoolean("FINISH_LAST_SONG", false)
@@ -338,35 +370,27 @@ class PlaybackService :
 
     private var pausedDueToVolume = false
     override fun onVolumeChanged(level: Int) {
-        val shouldPause = playerSettings.value.pauseOnVolumeZero
-        val shouldResume = playerSettings.value.resumeWhenVolumeIncreases
-        if (level < 1 && shouldPause && player.playWhenReady) {
-            player.pause()
+        val settings = playerSettings.value
+        val shouldPause = settings.pauseOnVolumeZero
+        val shouldResume = settings.resumeWhenVolumeIncreases
+        
+        if (level < 1 && shouldPause && activePlayer?.playWhenReady == true) {
+            activePlayer?.pause()
             if (shouldResume)
                 pausedDueToVolume = true
         }
-        if (level >= 1 && pausedDueToVolume && shouldResume && !player.playWhenReady) {
-            player.play()
+        if (level >= 1 && pausedDueToVolume && shouldResume && activePlayer?.playWhenReady == false) {
+            activePlayer?.play()
             pausedDueToVolume = false
         }
-        if (player.playWhenReady) pausedDueToVolume = false
+        if (activePlayer?.playWhenReady == true) pausedDueToVolume = false
     }
 
     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-        // to avoid resuming playback when the headphones disconnect
         if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY)
             pausedDueToVolume = false
     }
 
-    fun seekForward() {
-        val currentPosition = player.currentPosition
-        player.seekTo(currentPosition + playerSettings.value.jumpInterval)
-    }
-
-    fun seekBackward() {
-        val currentPosition = player.currentPosition
-        player.seekTo(currentPosition - playerSettings.value.jumpInterval)
-    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
@@ -376,7 +400,8 @@ class PlaybackService :
     }
 
     override fun onSleepTimerFinished() {
-        player.pause()
+        activePlayer?.pause()
+        sleepTimerManager.deleteTimer()
     }
 
     override fun onDestroy() {
@@ -386,7 +411,8 @@ class PlaybackService :
             saveCurrentPosition()
         }
         mediaSession?.run {
-            player.release()
+            player1.release()
+            player2.release()
             release()
             mediaSession = null
         }
@@ -398,7 +424,7 @@ class PlaybackService :
         super.onTaskRemoved(rootIntent)
         Timber.d("onTaskRemoved called")
         Log.d("PlaybackService", "onTaskRemoved Called")
-        if (!player.playWhenReady) {
+        if (activePlayer?.playWhenReady == false) {
             stopSelf()
         }
     }

@@ -39,6 +39,12 @@ data class UiSettings(
      * Show next and previous buttons in MiniPlayer
      */
     val showMiniPlayerExtraControls: Boolean = false,
+
+    val lyricsOffsetMs: Int = 0,
+    val lyricsFontSize: String = "MEDIUM",
+    val backgroundBlur: Int = 60,
+    val contrastLevel: Float = 0f,
+    val keepScreenOn: Boolean = false,
 )
 
 enum class PlayerTheme {

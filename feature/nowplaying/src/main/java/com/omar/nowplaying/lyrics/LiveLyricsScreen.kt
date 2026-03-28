@@ -159,7 +159,11 @@ fun LyricLine(
                 }
                 .then(if (isShowingContextMenu) Modifier.shimmerLoadingAnimation() else Modifier),
             text = line,
-            fontSize = 25.sp,
+            fontSize = when (com.omar.musica.ui.common.LocalUserPreferences.current.uiSettings.lyricsFontSize) {
+                "SMALL" -> 20.sp
+                "LARGE" -> 30.sp
+                else -> 25.sp
+            },
             fontWeight = FontWeight.ExtraBold
         )
     }
@@ -271,9 +275,17 @@ fun SyncedLyricsState(
 
     var currentTimeMs by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(synchronizedLyrics) {
+    val uiSettings = com.omar.musica.ui.common.LocalUserPreferences.current.uiSettings
+    val lyricsOffsetMs = uiSettings.lyricsOffsetMs
+    val fontSizeScale = when (uiSettings.lyricsFontSize) {
+        "SMALL" -> 0.85f
+        "LARGE" -> 1.15f
+        else -> 1.0f
+    }
+
+    LaunchedEffect(synchronizedLyrics, lyricsOffsetMs) {
         while (isActive) {
-            currentTimeMs = songProgressMillis()
+            currentTimeMs = songProgressMillis() + lyricsOffsetMs
             delay(16)
         }
     }
@@ -302,10 +314,11 @@ fun SyncedLyricsState(
             lines = spicyLines,
             currentTimeMs = currentTimeMs,
             onSeekWord = {
-                onSeekToPositionMillis(it)
+                onSeekToPositionMillis(it - lyricsOffsetMs)
                 actionsShown = false
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            fontSizeScale = fontSizeScale
         )
 
 
@@ -322,9 +335,17 @@ fun TtmlLyricsState(
 ) {
     var currentTimeMs by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(parsedLyrics) {
+    val uiSettings = com.omar.musica.ui.common.LocalUserPreferences.current.uiSettings
+    val lyricsOffsetMs = uiSettings.lyricsOffsetMs
+    val fontSizeScale = when (uiSettings.lyricsFontSize) {
+        "SMALL" -> 0.85f
+        "LARGE" -> 1.15f
+        else -> 1.0f
+    }
+
+    LaunchedEffect(parsedLyrics, lyricsOffsetMs) {
         while (isActive) {
-            currentTimeMs = songProgressMillis()
+            currentTimeMs = songProgressMillis() + lyricsOffsetMs
             delay(16)
         }
     }
@@ -353,10 +374,11 @@ fun TtmlLyricsState(
             lines = parsedLyrics.lines,
             currentTimeMs = currentTimeMs,
             onSeekWord = {
-                onSeekToPositionMillis(it)
+                onSeekToPositionMillis(it - lyricsOffsetMs)
                 actionsShown = false
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            fontSizeScale = fontSizeScale
         )
 
 

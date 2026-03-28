@@ -5,6 +5,12 @@ plugins {
 
 android {
     namespace = "com.omar.musica.settings"
+    buildFeatures {
+        buildConfig = true
+    }
+    defaultConfig {
+        buildConfigField("String", "VERSION_NAME", "\"1.0.0\"")
+    }
 }
 
 dependencies {

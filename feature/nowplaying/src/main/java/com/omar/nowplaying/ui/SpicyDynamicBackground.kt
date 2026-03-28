@@ -18,12 +18,15 @@ import com.omar.musica.ui.albumart.LocalInefficientThumbnailImageLoader
 import com.omar.musica.ui.albumart.toSongAlbumArtModel
 import com.omar.nowplaying.spicy.canvas.DynamicBackgroundView
 
+import com.omar.musica.ui.common.LocalUserPreferences
+
 @Composable
 fun SpicyDynamicBackground(
     modifier: Modifier,
     song: Song?,
 ) {
     val context = LocalContext.current
+    val blurIntensity = LocalUserPreferences.current.uiSettings.backgroundBlur
     val songModel = remember(song?.uri) { song?.toSongAlbumArtModel() }
     
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -55,6 +58,7 @@ fun SpicyDynamicBackground(
 
     DynamicBackgroundView(
         coverArtBitmap = bitmap,
-        modifier = modifier
+        modifier = modifier,
+        blurIntensity = blurIntensity
     )
 }

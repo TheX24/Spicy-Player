@@ -9,34 +9,18 @@ import com.omar.musica.model.prefs.UiSettings
 
 
 @Stable
-/**
- * Settings related to Ui of the Application
- */
 data class UiSettingsUi(
-    /**
-     * Light or Dark or System
-     */
-    val theme: AppThemeUi,
-
-    /**
-     * Android 12+ dynamic theming
-     */
-    val isUsingDynamicColor: Boolean,
-
-    val playerThemeUi: PlayerThemeUi,
-
-    val blackBackgroundForDarkTheme: Boolean,
-
-    /**
-     * Color used as a primary color in the application.
-     * The most significant byte is ignored. 0xIIRRGGBB
-     */
+    val theme: AppThemeUi = AppThemeUi.SYSTEM,
+    val isUsingDynamicColor: Boolean = false,
+    val playerThemeUi: PlayerThemeUi = PlayerThemeUi.SOLID,
+    val blackBackgroundForDarkTheme: Boolean = false,
     val accentColor: Int = DEFAULT_ACCENT_COLOR,
-
-    /**
-     * Show next and previous buttons in MiniPlayer
-     */
     val showMiniPlayerExtraControls: Boolean = false,
+    val lyricsOffsetMs: Int = 0,
+    val lyricsFontSize: String = "MEDIUM",
+    val backgroundBlur: Int = 60,
+    val contrastLevel: Float = 0f,
+    val keepScreenOn: Boolean = false,
 )
 
 @Stable
@@ -70,5 +54,10 @@ fun UiSettings.toUiSettingsUi() =
         playerTheme.toPlayerThemeUi(),
         blackBackgroundForDarkTheme,
         accentColor,
-        showMiniPlayerExtraControls
+        showMiniPlayerExtraControls,
+        lyricsOffsetMs,
+        lyricsFontSize,
+        backgroundBlur,
+        contrastLevel,
+        keepScreenOn
     )
