@@ -15,7 +15,8 @@ data class NowPlayingMetadata(
     val artist: String,
     val art: Bitmap?,
     val bitrate: String,
-    val format: String
+    val format: String,
+    val sampleRate: String
 )
 
 object NowPlayingMetadataCache {
@@ -40,6 +41,16 @@ object NowPlayingMetadataCache {
                     ?: "Unknown Artist"
                 val br = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
                     ?.let { (it.toInt() / 1000).toString() + " kbps" } ?: ""
+                
+                var sr = ""
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    sr = retriever.extractMetadata(38) // METADATA_KEY_SAMPLERATE = 38
+                        ?.let { 
+                            val khz = it.toFloat() / 1000f
+                            String.format("%.1f kHz", khz)
+                        } ?: ""
+                }
+                
                 val ext = audioFile.extension.uppercase()
                 
                 val artBytes = retriever.embeddedPicture
@@ -52,21 +63,22 @@ object NowPlayingMetadataCache {
                     }
                 }
                 
-                val metadata = NowPlayingMetadata(t, a, bmp, br, ext)
+                val metadata = NowPlayingMetadata(t, a, bmp, br, ext, sr)
                 cache.put(song.filePath, metadata)
                 return@withContext metadata
             } finally {
                 retriever.release()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to extract metadata for \${song.filePath}", e)
+            Log.e(TAG, "Failed to extract metadata for ${song.filePath}", e)
             val format = File(song.filePath).extension.uppercase()
             val fallback = NowPlayingMetadata(
                 title = song.metadata.title,
                 artist = song.metadata.artistName ?: "Unknown",
                 art = null,
                 bitrate = "",
-                format = format
+                format = format,
+                sampleRate = ""
             )
             cache.put(song.filePath, fallback)
             return@withContext fallback

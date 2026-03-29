@@ -23,8 +23,8 @@ sealed class UpdateStatus {
 
 object GitHubUpdateChecker {
     private const val REPO_OWNER = "TheX24"
-    private const val REPO_NAME = "Material-3-Music-Player"
-    private const val LATEST_RELEASE_URL = "https://api.github.com/repos/\$REPO_OWNER/\$REPO_NAME/releases/latest"
+    private const val REPO_NAME = "Spicy-Player"
+    private const val LATEST_RELEASE_URL = "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
 
     suspend fun getLatestRelease(): GitHubRelease? = withContext(Dispatchers.IO) {
         try {
@@ -44,7 +44,7 @@ object GitHubUpdateChecker {
                     body = json.optString("body", "")
                 )
             } else {
-                Log.e("GitHubUpdateChecker", "Failed to fetch release: \${connection.responseCode}")
+                Log.e("GitHubUpdateChecker", "Failed to fetch release: ${connection.responseCode}")
                 null
             }
         } catch (e: Exception) {

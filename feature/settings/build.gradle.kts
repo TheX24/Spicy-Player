@@ -10,6 +10,7 @@ android {
     }
     defaultConfig {
         buildConfigField("String", "VERSION_NAME", "\"1.0.0\"")
+        buildConfigField("int", "VERSION_CODE", "1")
     }
 }
 

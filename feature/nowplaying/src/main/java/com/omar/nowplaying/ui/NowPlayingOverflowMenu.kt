@@ -9,8 +9,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.omar.musica.store.model.song.Song
 import com.omar.musica.ui.common.LocalCommonSongsAction
@@ -124,8 +127,8 @@ fun NowPlayingOverflowChip(
     Box {
         SuggestionChip(
             onClick = { visible = !visible },
-            label = { Text("More", fontWeight = FontWeight.ExtraBold) },
-            icon = { Icon(Icons.Rounded.MoreHoriz, contentDescription = null) },
+            label = { Text("More", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp) },
+            icon = { Icon(Icons.Rounded.MoreHoriz, contentDescription = null, modifier = Modifier.size(20.dp)) },
             shape = CircleShape,
             colors = SuggestionChipDefaults.suggestionChipColors(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,

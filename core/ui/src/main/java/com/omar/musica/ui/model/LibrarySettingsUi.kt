@@ -13,10 +13,11 @@ data class LibrarySettingsUi(
     val albumsSortOrder: Pair<AlbumsSortOption, IsAscending> = AlbumsSortOption.NAME to true,
     val albumsGridSize: Int = 2,
     val cacheAlbumCoverArt: Boolean = true,
-    val excludedFolders: List<String> = emptyList()
+    val excludedFolders: List<String> = emptyList(),
+    val scanDirectory: String = "/sdcard/Music/"
 )
 
 fun LibrarySettings.toLibrarySettingsUi() =
     LibrarySettingsUi(
-        songsSortOrder, albumsSortOrder, albumsGridSize, cacheAlbumCoverArt, excludedFolders
+        songsSortOrder, albumsSortOrder, albumsGridSize, cacheAlbumCoverArt, excludedFolders, scanDirectory
     )

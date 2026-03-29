@@ -371,18 +371,15 @@ fun NavigationSettingItem(
 
 @Composable
 fun SettingsSectionHeader(title: String) {
-    Row(
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 10.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
+            .padding(top = 8.dp, bottom = 0.dp),
+        textAlign = TextAlign.Center
+    )
 }
 
 // ── Section card wrapper ──────────────────────────────────────────────────────

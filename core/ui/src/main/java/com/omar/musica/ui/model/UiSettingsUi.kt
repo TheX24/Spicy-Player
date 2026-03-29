@@ -19,7 +19,6 @@ data class UiSettingsUi(
     val lyricsOffsetMs: Int = 0,
     val lyricsFontSize: String = "MEDIUM",
     val backgroundBlur: Int = 60,
-    val contrastLevel: Float = 0f,
     val keepScreenOn: Boolean = false,
 )
 
@@ -58,6 +57,5 @@ fun UiSettings.toUiSettingsUi() =
         lyricsOffsetMs,
         lyricsFontSize,
         backgroundBlur,
-        contrastLevel,
         keepScreenOn
     )

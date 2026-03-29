@@ -11,6 +11,8 @@ import com.omar.musica.store.model.song.Song
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -18,6 +20,8 @@ import javax.inject.Inject
 class ScanService : Service() {
 
     @Inject lateinit var scanStateRepository: ScanStateRepository
+
+    @Inject lateinit var userPreferencesRepository: com.omar.musica.store.preferences.UserPreferencesRepository
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var scanJob: Job? = null
@@ -65,7 +69,8 @@ class ScanService : Service() {
         scanJob?.cancel()
         scanJob = serviceScope.launch {
             try {
-                val results = performScan(this@ScanService, scanPath) { progress ->
+                val excludedFolders = userPreferencesRepository.librarySettingsFlow.map { it.excludedFolders }.first()
+                val results = performScan(this@ScanService, scanPath, excludedFolders) { progress ->
                     CoroutineScope(Dispatchers.Main).launch {
                         scanStateRepository.scanProgress.value = progress
                         val currentHistory = scanStateRepository.scanHistory.value.toMutableList()
@@ -88,7 +93,7 @@ class ScanService : Service() {
                 }
                 
                 _resultFlow.emit(results)
-                Log.d("ScanService", "Scan completed: \${results.size} songs")
+                Log.d("ScanService", "Scan completed: ${results.size} songs")
             } catch (e: Exception) {
                 Log.e("ScanService", "Scan failed", e)
             } finally {

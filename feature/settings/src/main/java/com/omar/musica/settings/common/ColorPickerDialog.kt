@@ -3,8 +3,12 @@ package com.omar.musica.settings.common
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Slider
@@ -39,7 +43,7 @@ fun ColorPickerDialog(
     AlertDialog(
         confirmButton = {
             TextButton(onClick = { onColorChanged(color) }) {
-                Text(text = "Confirm")
+                Text(text = "Apply")
             }
         },
         dismissButton = {
@@ -57,14 +61,14 @@ fun ColorPickerDialog(
                 // Color Preview
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(1.0f)
-                        .heightIn(max = 200.dp)
-                        .weight(1f)
+                        .fillMaxWidth(1f)
+                        .aspectRatio(1f)
                         .clip(RoundedCornerShape(12.dp))
                         .drawBehind {
                             drawRect(color)
                         }
                 )
+                Spacer(modifier = Modifier.height(24.dp))
 
                 ColorComponentSlider(
                     currentValue = (color.red * 255).toInt(),

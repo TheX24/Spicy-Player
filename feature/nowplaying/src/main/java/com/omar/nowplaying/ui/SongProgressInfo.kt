@@ -133,26 +133,6 @@ fun SongProgressInfo(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                val currentFormat = song.filePath.substringAfterLast('.', "").uppercase()
-                val bitrate = if (song.metadata.durationMillis > 0) {
-                    "${(song.metadata.sizeBytes / song.metadata.durationMillis) * 8} kbps"
-                } else ""
-
-                if (currentFormat.isNotEmpty() || bitrate.isNotEmpty()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                    ) {
-                        Text(
-                            text = "$currentFormat • $bitrate",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
-
                 Text(
                     text = songLength,
                     style = MaterialTheme.typography.titleSmall,

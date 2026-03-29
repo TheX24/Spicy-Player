@@ -122,12 +122,23 @@ class MediaRepository @Inject constructor(
             }
 
         }.combine(
-            userPreferencesRepository.librarySettingsFlow.map { it.excludedFolders }
-        ) { songs: List<Song>, excludedFolders: List<String> ->
-
+            userPreferencesRepository.librarySettingsFlow
+        ) { songs: List<Song>, librarySettings ->
+            val excludedFolders = librarySettings.excludedFolders
+            val scanPath = librarySettings.scanDirectory.ifBlank { "/sdcard/Music/" }
+            
+            val cachedScan = loadCachedScan(context, scanPath) ?: emptyList()
+            
             val filteredSongs = songs.filter { song ->
                 !excludedFolders.any { folder ->
                     song.filePath.startsWith(folder)
+                }
+            }.map { msSong ->
+                val cached = cachedScan.find { it.filePath == msSong.filePath }
+                if (cached?.lyricsPath != null) {
+                    msSong.copy(lyricsPath = cached.lyricsPath)
+                } else {
+                    msSong
                 }
             }
 

@@ -43,7 +43,7 @@ fun ResetOptionItem(
             onClick = onReset,
             colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.primary)
         ) {
-            Icon(Icons.Rounded.Restore, contentDescription = "Reset \$title")
+            Icon(Icons.Rounded.Restore, contentDescription = "Reset $title")
         }
     }
 }
@@ -109,9 +109,15 @@ fun ResetSettingsScreen(
             item { SettingsSectionHeader("Lyrics") }
             item {
                 SettingsSection {
-                    ResetOptionItem("Global Sync Offset", "\${userPreferences.uiSettings.lyricsOffsetMs}ms (Default: 0ms)") { settingsCallbacks.setLyricsOffsetMs(0) }
+                    com.omar.musica.settings.common.ButtonSettingItem(
+                        icon = Icons.Rounded.Restore, 
+                        title = "Reset Lyrics Section", 
+                        buttonLabel = "Reset", 
+                        onClick = { settingsCallbacks.resetLyrics() }
+                    )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                    ResetOptionItem("Font Size", "\${userPreferences.uiSettings.lyricsFontSize} (Default: MEDIUM)") { settingsCallbacks.setLyricsFontSize("MEDIUM") }
+                    ResetOptionItem("Global Sync Offset", "${userPreferences.uiSettings.lyricsOffsetMs}ms (Default: 0ms)") { settingsCallbacks.setLyricsOffsetMs(0) }
+                    ResetOptionItem("Font Size", "${userPreferences.uiSettings.lyricsFontSize} (Default: MEDIUM)") { settingsCallbacks.setLyricsFontSize("MEDIUM") }
                 }
             }
 
@@ -119,11 +125,20 @@ fun ResetSettingsScreen(
             item { SettingsSectionHeader("Audio & Playback") }
             item {
                 SettingsSection {
+                    com.omar.musica.settings.common.ButtonSettingItem(
+                        icon = Icons.Rounded.Restore, 
+                        title = "Reset Audio & Playback", 
+                        buttonLabel = "Reset", 
+                        onClick = { settingsCallbacks.resetAudio() }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     ResetOptionItem("Crossfade Duration", "${userPreferences.playerSettings.crossfadeDuration}s (Default: 0s)") { settingsCallbacks.setCrossfadeDuration(0) }
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     ResetOptionItem("Gapless Playback", "${userPreferences.playerSettings.gaplessPlayback} (Default: true)") { settingsCallbacks.setGaplessPlayback(true) }
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     ResetOptionItem("Previous Skip Threshold", "${userPreferences.playerSettings.previousSkipThreshold}s (Default: 5s)") { settingsCallbacks.setPreviousSkipThreshold(5) }
+                    ResetOptionItem("Audio Focus Behavior", "${userPreferences.playerSettings.audioFocusBehavior} (Default: PAUSE)") { settingsCallbacks.setAudioFocusBehavior("PAUSE") }
+                    ResetOptionItem("Replay Gain", "${userPreferences.playerSettings.replayGain} (Default: false)") { settingsCallbacks.setReplayGain(false) }
+                    ResetOptionItem("Pause on Vol 0", "${userPreferences.playerSettings.pauseOnVolumeZero} (Default: false)") { if (userPreferences.playerSettings.pauseOnVolumeZero) settingsCallbacks.togglePauseVolumeZero() }
+                    ResetOptionItem("Resume on Vol > 0", "${userPreferences.playerSettings.resumeWhenVolumeIncreases} (Default: false)") { if (userPreferences.playerSettings.resumeWhenVolumeIncreases) settingsCallbacks.toggleResumeVolumeNotZero() }
                 }
             }
 
@@ -131,11 +146,35 @@ fun ResetSettingsScreen(
             item { SettingsSectionHeader("Appearance & Display") }
             item {
                 SettingsSection {
+                    com.omar.musica.settings.common.ButtonSettingItem(
+                        icon = Icons.Rounded.Restore, 
+                        title = "Reset Appearance", 
+                        buttonLabel = "Reset", 
+                        onClick = { settingsCallbacks.resetAppearance() }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     ResetOptionItem("App Theme", "${userPreferences.uiSettings.theme} (Default: SYSTEM)") { settingsCallbacks.onThemeSelected(com.omar.musica.ui.model.AppThemeUi.SYSTEM) }
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     ResetOptionItem("Dynamic Color", "${userPreferences.uiSettings.isUsingDynamicColor} (Default: false)") { if (userPreferences.uiSettings.isUsingDynamicColor) settingsCallbacks.toggleDynamicColorScheme() }
+                    ResetOptionItem("Black Background (Dark)", "${userPreferences.uiSettings.blackBackgroundForDarkTheme} (Default: false)") { if (userPreferences.uiSettings.blackBackgroundForDarkTheme) settingsCallbacks.toggleBlackBackgroundForDarkTheme() }
+                    ResetOptionItem("Background Blur", "${userPreferences.uiSettings.backgroundBlur}% (Default: 60%)") { settingsCallbacks.setBackgroundBlur(60) }
+                    ResetOptionItem("Extra Controls", "${userPreferences.uiSettings.showMiniPlayerExtraControls} (Default: false)") { if (userPreferences.uiSettings.showMiniPlayerExtraControls) settingsCallbacks.toggleShowExtraControls() }
+                    ResetOptionItem("Visualizer Enabled", "${userPreferences.playerSettings.visualizerEnabled} (Default: false)") { if (userPreferences.playerSettings.visualizerEnabled) settingsCallbacks.setVisualizerEnabled(false) }
+                }
+            }
+
+            // ━━ Player & Library ━━━━
+            item { SettingsSectionHeader("Player & Library") }
+            item {
+                SettingsSection {
+                    com.omar.musica.settings.common.ButtonSettingItem(
+                        icon = Icons.Rounded.Restore, 
+                        title = "Reset Player & Library", 
+                        buttonLabel = "Reset", 
+                        onClick = { settingsCallbacks.resetPlayer() }
+                    )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                    ResetOptionItem("Contrast Level", "${userPreferences.uiSettings.contrastLevel} (Default: 0.0)") { settingsCallbacks.setContrastLevel(0f) }
+                    ResetOptionItem("Keep Screen On", "${userPreferences.uiSettings.keepScreenOn} (Default: false)") { settingsCallbacks.setKeepScreenOn(false) }
+                    ResetOptionItem("Scan Directory", "${userPreferences.librarySettings.scanDirectory} (Default: /sdcard/Music/)") { settingsCallbacks.setScanDirectory("/sdcard/Music/") }
                 }
             }
 
@@ -150,7 +189,10 @@ fun SettingsSectionHeader(title: String) {
         text = title,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp, bottom = 0.dp),
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
     )
 }
 

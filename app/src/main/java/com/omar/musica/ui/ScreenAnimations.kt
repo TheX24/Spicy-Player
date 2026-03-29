@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.navigation.NavBackStackEntry
 import com.omar.musica.playlists.navigation.PLAYLISTS_ROUTE
 import com.omar.musica.playlists.navigation.PLAYLIST_DETAILS_ROUTE
+import com.omar.musica.settings.navigation.RESET_SETTINGS_ROUTE
 import com.omar.musica.settings.navigation.SETTINGS_ROUTE
 import com.omar.musica.albums.navigation.ALBUMS_ROUTE
 import com.omar.musica.albums.navigation.ALBUM_DETAIL_ROUTE
@@ -32,7 +33,7 @@ private fun getRouteIndex(route: String?): Int {
         route.contains("songs", ignoreCase = true) || route.contains("search", ignoreCase = true) -> 0
         route.contains("playlist", ignoreCase = true) -> 1
         route.contains("album", ignoreCase = true) -> 2
-        route.contains("settings", ignoreCase = true) -> 3
+        route.contains("settings", ignoreCase = true) || route.contains("reset", ignoreCase = true) -> 3
         route.contains("tag", ignoreCase = true) -> 4
         else -> -1
     }
@@ -82,6 +83,9 @@ fun getEnterAnimationForRoute(
     if (route == SETTINGS_ROUTE)
         return OPEN_SCREEN_ENTER_ANIMATION
 
+    if (route == RESET_SETTINGS_ROUTE)
+        return OPEN_SCREEN_ENTER_ANIMATION
+
     if (route == SEARCH_ROUTE)
         return SLIDE_UP_ENTER_ANIMATION
 
@@ -124,6 +128,9 @@ fun getExitAnimationForRoute(
         return OPEN_SCREEN_EXIT_ANIMATION
 
     if (route == SETTINGS_ROUTE)
+        return OPEN_SCREEN_EXIT_ANIMATION
+
+    if (route == RESET_SETTINGS_ROUTE)
         return OPEN_SCREEN_EXIT_ANIMATION
 
     if (route == SEARCH_ROUTE)
@@ -171,6 +178,9 @@ fun getPopEnterAnimationForRoute(
     if (route == SETTINGS_ROUTE)
         return POP_SCREEN_ENTER_ANIMATION
 
+    if (route == RESET_SETTINGS_ROUTE)
+        return POP_SCREEN_ENTER_ANIMATION
+
     if (route == SEARCH_ROUTE)
         return SLIDE_UP_ENTER_ANIMATION
 
@@ -215,6 +225,9 @@ fun getPopExitAnimationForRoute(
         return POP_SCREEN_EXIT_ANIMATION
 
     if (route == SETTINGS_ROUTE)
+        return POP_SCREEN_EXIT_ANIMATION
+
+    if (route == RESET_SETTINGS_ROUTE)
         return POP_SCREEN_EXIT_ANIMATION
 
     if (route == SEARCH_ROUTE)

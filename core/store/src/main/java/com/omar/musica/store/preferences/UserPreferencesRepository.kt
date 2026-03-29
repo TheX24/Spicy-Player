@@ -103,6 +103,10 @@ class UserPreferencesRepository @Inject constructor(
         toggleBoolean(BLACK_BACKGROUND_FOR_DARK_THEME_KEY)
     }
 
+    suspend fun setBlackBackgroundForDarkTheme(enabled: Boolean) {
+        context.datastore.edit { it[BLACK_BACKGROUND_FOR_DARK_THEME_KEY] = enabled }
+    }
+
     suspend fun setAccentColor(color: Int) {
         context.datastore.edit {
             it[ACCENT_COLOR_KEY] = color
@@ -123,16 +127,32 @@ class UserPreferencesRepository @Inject constructor(
         toggleBoolean(DYNAMIC_COLOR_KEY)
     }
 
+    suspend fun setDynamicColor(enabled: Boolean) {
+        context.datastore.edit { it[DYNAMIC_COLOR_KEY] = enabled }
+    }
+
     suspend fun togglePauseVolumeZero() {
         toggleBoolean(PAUSE_IF_VOLUME_ZERO)
+    }
+
+    suspend fun setPauseVolumeZero(enabled: Boolean) {
+        context.datastore.edit { it[PAUSE_IF_VOLUME_ZERO] = enabled }
     }
 
     suspend fun toggleMiniPlayerExtraControls() {
         toggleBoolean(MINI_PLAYER_EXTRA_CONTROLS)
     }
 
+    suspend fun setMiniPlayerExtraControls(enabled: Boolean) {
+        context.datastore.edit { it[MINI_PLAYER_EXTRA_CONTROLS] = enabled }
+    }
+
     suspend fun toggleResumeVolumeNotZero() {
         toggleBoolean(RESUME_IF_VOLUME_INCREASED)
+    }
+
+    suspend fun setResumeVolumeNotZero(enabled: Boolean) {
+        context.datastore.edit { it[RESUME_IF_VOLUME_INCREASED] = enabled }
     }
 
     suspend fun deleteFolderFromBlacklist(folder: String) = withContext(Dispatchers.IO) {
@@ -173,13 +193,6 @@ class UserPreferencesRepository @Inject constructor(
         context.datastore.edit { it[BACKGROUND_BLUR_KEY] = blur }
     }
 
-    suspend fun setContrastLevel(contrast: Float) {
-        context.datastore.edit { it[CONTRAST_LEVEL_KEY] = contrast }
-    }
-
-    suspend fun onContrastLevelChanged(level: Float) {
-        context.datastore.edit { it[CONTRAST_LEVEL_KEY] = level }
-    }
 
     suspend fun clear() {
         context.datastore.edit { it.clear() }
@@ -219,7 +232,7 @@ class UserPreferencesRepository @Inject constructor(
         val resumeWhenVolumeIncreases = this[RESUME_IF_VOLUME_INCREASED] ?: false
         val crossfadeDuration = this[CROSSFADE_DURATION_KEY] ?: 0
         val gaplessPlayback = this[GAPLESS_PLAYBACK_KEY] ?: true
-        val audioFocusBehavior = this[AUDIO_FOCUS_BEHAVIOR_KEY] ?: "DUCK"
+        val audioFocusBehavior = this[AUDIO_FOCUS_BEHAVIOR_KEY] ?: "PAUSE"
         val showTranslation = this[SHOW_TRANSLATION_KEY] ?: false
         val replayGain = this[REPLAY_GAIN_KEY] ?: false
         val visualizerEnabled = this[VISUALIZER_ENABLED_KEY] ?: false
@@ -247,7 +260,6 @@ class UserPreferencesRepository @Inject constructor(
         val lyricsOffsetMs = this[LYRICS_OFFSET_KEY] ?: 0
         val lyricsFontSize = this[LYRICS_FONT_SIZE_KEY] ?: "MEDIUM"
         val backgroundBlur = this[BACKGROUND_BLUR_KEY] ?: 60
-        val contrastLevel = this[CONTRAST_LEVEL_KEY] ?: 0f
         val keepScreenOn = this[KEEP_SCREEN_ON_KEY] ?: false
 
         return UiSettings(
@@ -261,7 +273,6 @@ class UserPreferencesRepository @Inject constructor(
             lyricsOffsetMs,
             lyricsFontSize,
             backgroundBlur,
-            contrastLevel,
             keepScreenOn
         )
     }
@@ -323,7 +334,6 @@ class UserPreferencesRepository @Inject constructor(
         val LYRICS_OFFSET_KEY = intPreferencesKey("LYRICS_OFFSET")
         val LYRICS_FONT_SIZE_KEY = stringPreferencesKey("LYRICS_FONT_SIZE")
         val BACKGROUND_BLUR_KEY = intPreferencesKey("BACKGROUND_BLUR")
-        val CONTRAST_LEVEL_KEY = floatPreferencesKey("CONTRAST_LEVEL")
         val KEEP_SCREEN_ON_KEY = booleanPreferencesKey("KEEP_SCREEN_ON")
 
         val CROSSFADE_DURATION_KEY = intPreferencesKey("CROSSFADE_DURATION")

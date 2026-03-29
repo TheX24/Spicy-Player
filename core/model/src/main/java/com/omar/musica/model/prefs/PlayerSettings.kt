@@ -19,7 +19,7 @@ data class PlayerSettings(
 
     val crossfadeDuration: Int = 0,
     val gaplessPlayback: Boolean = true,
-    val audioFocusBehavior: String = "DUCK",
+    val audioFocusBehavior: String = "PAUSE",
     val showTranslation: Boolean = false,
     val replayGain: Boolean = false,
     val visualizerEnabled: Boolean = false

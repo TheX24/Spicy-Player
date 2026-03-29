@@ -14,4 +14,5 @@ data class Song(
     val filePath: String,
     val albumId: Long?,
     val metadata: BasicSongMetadata,
+    val lyricsPath: String? = null
 )

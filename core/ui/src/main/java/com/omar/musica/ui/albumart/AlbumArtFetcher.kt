@@ -55,7 +55,7 @@ class AlbumArtFetcher(
         return SourceResult(
             ImageSource(bufferedSource, options.context),
             "image/*",
-            DataSource.MEMORY
+            DataSource.DISK
         )
     }
 

@@ -3,6 +3,7 @@ package com.omar.musica.ui.dialogs
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -68,6 +69,7 @@ fun ScanProgressDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(colorScheme.surfaceVariant.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
+                            .animateContentSize()
                             .padding(16.dp)
                     ) {
                         scanHistory.forEach { historyItem ->
@@ -90,17 +92,23 @@ fun ScanProgressDialog(
                                 .height(8.dp)
                                 .clip(RoundedCornerShape(4.dp)),
                             color = colorScheme.primary,
-                            trackColor = colorScheme.surfaceVariant
+                            trackColor = colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
                         )
                         
                         Spacer(modifier = Modifier.height(12.dp))
+                        
+                        val scanText = remember(scanProgress) {
+                            if (scanProgress.summary.isNotEmpty()) scanProgress.summary else scanProgress.phase
+                        }
+                        
                         Text(
-                            text = "Scan: \${if (scanProgress.summary.isNotEmpty()) scanProgress.summary else scanProgress.phase}",
+                            text = "Scan: $scanText",
                             style = MaterialTheme.typography.bodySmall,
                             color = colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        
                         if (scanProgress.isUpdating) {
                             Text(
                                 text = "Syncing with media session...",

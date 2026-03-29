@@ -10,6 +10,7 @@ import com.omar.musica.store.ScanProgress
 import com.omar.musica.store.ScanStateRepository
 import com.omar.musica.store.preferences.UserPreferencesRepository
 import com.omar.musica.ui.model.AppThemeUi
+import com.omar.musica.model.prefs.AppTheme
 import com.omar.musica.ui.model.PlayerThemeUi
 import com.omar.musica.ui.model.UserPreferencesUi
 import com.omar.musica.ui.model.toAppTheme
@@ -59,7 +60,8 @@ class SettingsViewModel @Inject constructor(
             val release = GitHubUpdateChecker.getLatestRelease()
             if (release != null) {
                 val currentVersion = BuildConfig.VERSION_NAME
-                if ("v\$currentVersion" != release.tagName) {
+                val latestTag = release.tagName.lowercase().removePrefix("v")
+                if (currentVersion.lowercase().removePrefix("v") != latestTag) {
                     _updateStatus.value = UpdateStatus.NewVersion(release)
                 } else {
                     _updateStatus.value = UpdateStatus.UpToDate(isManual)
@@ -174,15 +176,47 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { userPreferencesRepository.setBackgroundBlur(blur) }
     }
 
-    override fun setContrastLevel(level: Float) {
-        viewModelScope.launch {
-            userPreferencesRepository.onContrastLevelChanged(level)
-        }
-    }
 
     override fun resetAll() {
         viewModelScope.launch {
             userPreferencesRepository.clear()
+        }
+    }
+
+    override fun resetLyrics() {
+        viewModelScope.launch {
+            userPreferencesRepository.setLyricsOffsetMs(0)
+            userPreferencesRepository.setLyricsFontSize("MEDIUM")
+        }
+    }
+
+    override fun resetAudio() {
+        viewModelScope.launch {
+            userPreferencesRepository.setCrossfadeDuration(0)
+            userPreferencesRepository.setGaplessPlayback(true)
+            userPreferencesRepository.setPreviousSkipThreshold(5)
+            userPreferencesRepository.setAudioFocusBehavior("PAUSE")
+            userPreferencesRepository.setReplayGain(false)
+        }
+    }
+
+    override fun resetAppearance() {
+        viewModelScope.launch {
+            userPreferencesRepository.changeTheme(AppTheme.SYSTEM)
+            userPreferencesRepository.setDynamicColor(false)
+            userPreferencesRepository.setBlackBackgroundForDarkTheme(false)
+            userPreferencesRepository.setBackgroundBlur(60)
+        }
+    }
+
+    override fun resetPlayer() {
+        viewModelScope.launch {
+            userPreferencesRepository.setPauseVolumeZero(false)
+            userPreferencesRepository.setResumeVolumeNotZero(false)
+            userPreferencesRepository.setMiniPlayerExtraControls(false)
+            userPreferencesRepository.setVisualizerEnabled(false)
+            userPreferencesRepository.setKeepScreenOn(false)
+            userPreferencesRepository.setScanDirectory("/sdcard/Music/")
         }
     }
 
@@ -246,8 +280,11 @@ interface ISettingsViewModel {
     fun setLyricsOffsetMs(offset: Int)
     fun setLyricsFontSize(size: String)
     fun setBackgroundBlur(blur: Int)
-    fun setContrastLevel(level: Float)
     fun resetAll()
+    fun resetLyrics()
+    fun resetAudio()
+    fun resetAppearance()
+    fun resetPlayer()
     fun setKeepScreenOn(keep: Boolean)
     fun setCrossfadeDuration(duration: Int)
     fun setGaplessPlayback(gapless: Boolean)

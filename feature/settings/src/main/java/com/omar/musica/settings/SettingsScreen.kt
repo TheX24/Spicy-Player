@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -139,6 +140,88 @@ fun SettingsScreen(
                 context = LocalContext.current
             )
 
+            var showLicensesDialog by remember { mutableStateOf(false) }
+
+            if (showLicensesDialog) {
+                AlertDialog(
+                    onDismissRequest = { showLicensesDialog = false },
+                    title = { Text("Open Source Licenses", style = MaterialTheme.typography.headlineSmall) },
+                    text = {
+                        Column(
+                            modifier = Modifier
+                                .height(400.dp)
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                            androidx.compose.foundation.lazy.LazyColumn(state = listState) {
+                                val libraries = listOf(
+                                    "AndroidX (Core, Lifecycle, Activity, Compose, Palette, DataStore)" to "Apache License 2.0",
+                                    "Kotlin & Coroutines" to "Apache License 2.0",
+                                    "Media3 / ExoPlayer" to "Apache License 2.0",
+                                    "Material Design 3" to "Apache License 2.0",
+                                    "Material Color Utilities" to "Apache License 2.0",
+                                    "Hilt / Dagger" to "Apache License 2.0",
+                                    "Timber" to "Apache License 2.0"
+                                )
+                                items(libraries) { (name, license) ->
+                                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                                        Text(name, style = MaterialTheme.typography.titleSmall)
+                                        Text(license, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showLicensesDialog = false }) {
+                            Text("Dismiss")
+                        }
+                    }
+                )
+            }
+
+            var showAboutAppDialog by remember { mutableStateOf(false) }
+
+            if (showAboutAppDialog) {
+                AlertDialog(
+                    onDismissRequest = { showAboutAppDialog = false },
+                    title = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                            Icon(
+                                imageVector = Icons.Rounded.MusicNote,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text("Spicy Player", style = MaterialTheme.typography.headlineMedium)
+                        }
+                    },
+                    text = {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "An offline Android music player with a port of Spicy Lyrics based on Material 3 Music Player by Omar Walid.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Text("Developed by TX24", style = MaterialTheme.typography.labelLarge)
+                            val versionText = remember { "Version ${BuildConfig.VERSION_NAME}" }
+                            Text(versionText, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showAboutAppDialog = false }) {
+                            Text("Dismiss")
+                        }
+                    }
+                )
+            }
+
             if (state is SettingsState.Loading) {
                 LinearProgressIndicator(
                     modifier = Modifier
@@ -153,6 +236,8 @@ fun SettingsScreen(
                     settingsCallbacks = settingsCallbacks,
                     onNavigateToReset = onNavigateToReset,
                     nestedScrollConnection = topBarScrollBehaviour.nestedScrollConnection,
+                    showLicenses = { showLicensesDialog = true },
+                    showAbout = { showAboutAppDialog = true }
                 )
             }
 
@@ -169,12 +254,15 @@ fun SettingsList(
     scanDirectory: String,
     settingsCallbacks: ISettingsViewModel,
     onNavigateToReset: () -> Unit,
-    nestedScrollConnection: NestedScrollConnection
+    nestedScrollConnection: NestedScrollConnection,
+    showLicenses: () -> Unit,
+    showAbout: () -> Unit
 ) {
+    val context = LocalContext.current
     LazyColumn(
         modifier = modifier.nestedScroll(nestedScrollConnection),
         contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
 
         // ━━ Lyrics ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -221,17 +309,17 @@ fun SettingsList(
                     enabled = false
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                SliderSettingItem(
-                    icon = Icons.Rounded.BlurOn,
-                    title = "Crossfade Duration",
-                    valueLabel = if (userPreferences.playerSettings.crossfadeDuration == 0) "Off" else "${userPreferences.playerSettings.crossfadeDuration}s",
-                    value = userPreferences.playerSettings.crossfadeDuration.toFloat(),
-                    onValueChange = { settingsCallbacks.setCrossfadeDuration(it.toInt()) },
-                    onValueChangeFinished = {},
-                    valueRange = 0f..10f,
-                    steps = 9
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+//                SliderSettingItem(
+//                    icon = Icons.Rounded.BlurOn,
+//                    title = "Crossfade Duration",
+//                    valueLabel = if (userPreferences.playerSettings.crossfadeDuration == 0) "Off" else "${userPreferences.playerSettings.crossfadeDuration}s",
+//                    value = userPreferences.playerSettings.crossfadeDuration.toFloat(),
+//                    onValueChange = { settingsCallbacks.setCrossfadeDuration(it.toInt()) },
+//                    onValueChangeFinished = {},
+//                    valueRange = 0f..10f,
+//                    steps = 9
+//                )
+//                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 SliderSettingItem(
                     icon = Icons.Rounded.Replay,
                     title = "Previous Skip Threshold",
@@ -245,9 +333,9 @@ fun SettingsList(
                 SegmentedSettingItem(
                     icon = Icons.AutoMirrored.Rounded.VolumeDown,
                     title = "Audio Focus Behavior",
-                    options = listOf("Pause", "Continue"),
+                    options = listOf("Pause", "Ignore"),
                     selectedIndex = if (userPreferences.playerSettings.audioFocusBehavior == "PAUSE") 0 else 1,
-                    onSelect = { settingsCallbacks.setAudioFocusBehavior(if (it == 0) "PAUSE" else "DUCK") }
+                    onSelect = { settingsCallbacks.setAudioFocusBehavior(if (it == 0) "PAUSE" else "IGNORE") }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 SwitchSettingItem(
@@ -278,6 +366,13 @@ fun SettingsList(
                     onSelect = { settingsCallbacks.onThemeSelected(when (it) { 0 -> AppThemeUi.LIGHT; 1 -> AppThemeUi.DARK; else -> AppThemeUi.SYSTEM }) }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SwitchSettingItem(
+                    icon = Icons.Rounded.DarkMode,
+                    title = "Pure Black Dark Mode",
+                    checked = userPreferences.uiSettings.blackBackgroundForDarkTheme,
+                    onCheckedChange = { settingsCallbacks.toggleBlackBackgroundForDarkTheme() }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     SwitchSettingItem(
                         icon = Icons.Rounded.AutoAwesome,
@@ -300,26 +395,6 @@ fun SettingsList(
                     title = "Accent Color",
                     subtitle = "Tap to pick primary color",
                     onClick = { accentColorDialogVisible = true }
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                
-                SegmentedSettingItem(
-                    icon = Icons.Rounded.Contrast,
-                    title = "Contrast Level",
-                    options = listOf("Standard", "Medium", "High"),
-                    selectedIndex = when {
-                        userPreferences.uiSettings.contrastLevel <= 0.1f -> 0
-                        userPreferences.uiSettings.contrastLevel <= 0.75f -> 1
-                        else -> 2
-                    },
-                    onSelect = { settingsCallbacks.setContrastLevel(when (it) { 1 -> 0.5f; 2 -> 1.0f; else -> 0.0f }) }
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                SwitchSettingItem(
-                    icon = Icons.Rounded.DarkMode,
-                    title = "Pure Black Dark Mode",
-                    checked = userPreferences.uiSettings.blackBackgroundForDarkTheme,
-                    onCheckedChange = { settingsCallbacks.toggleBlackBackgroundForDarkTheme() }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 NavigationSettingItem(
@@ -375,19 +450,19 @@ fun SettingsList(
                     onFolderDeleted = settingsCallbacks::onFolderDeleted,
                     onDismissRequest = { blacklistDialogVisible = false }
                 )
-                NavigationSettingItem(
-                    icon = Icons.Rounded.Block,
-                    title = "Blacklisted Folders",
-                    subtitle = "Music in these folders will not appear in the app",
-                    onClick = { blacklistDialogVisible = true }
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 SwitchSettingItem(
                     icon = Icons.Rounded.Cached,
                     title = "Cache Album Art",
                     subtitle = "Reuses album art to improve loading",
                     checked = userPreferences.librarySettings.cacheAlbumCoverArt,
                     onCheckedChange = { settingsCallbacks.onToggleCacheAlbumArt() }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                NavigationSettingItem(
+                    icon = Icons.Rounded.Block,
+                    title = "Blacklisted Folders",
+                    subtitle = "Music in these folders will not appear in the app",
+                    onClick = { blacklistDialogVisible = true }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 val context = LocalContext.current
@@ -458,16 +533,37 @@ fun SettingsList(
             }
         }
         
-        // ━━ Advanced ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        item { SettingsSectionHeader("Advanced") }
+        // ━━ About ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        item { SettingsSectionHeader("About") }
         item {
             SettingsSection {
-                ButtonSettingItem(
+                NavigationSettingItem(
+                    icon = Icons.Rounded.Info,
+                    title = "About Spicy Player",
+                    onClick = showAbout
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                NavigationSettingItem(
                     icon = Icons.Rounded.Update,
                     title = "Check for Updates",
-                    subtitle = "Verify latest GitHub release",
-                    buttonLabel = "Check",
+                    subtitle = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                     onClick = { settingsCallbacks.checkForUpdates(true) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                NavigationSettingItem(
+                    icon = Icons.Rounded.Policy,
+                    title = "Open Source Licenses",
+                    onClick = showLicenses
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                NavigationSettingItem(
+                    icon = Icons.Rounded.Code,
+                    title = "View on GitHub",
+                    subtitle = "TheX24/Spicy-Player",
+                    onClick = {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/thex24/Spicy-Player"))
+                        context.startActivity(intent)
+                    }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 NavigationSettingItem(

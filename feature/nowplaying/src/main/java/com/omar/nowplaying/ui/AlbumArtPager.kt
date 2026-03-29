@@ -52,10 +52,10 @@ fun AlbumArtPager(
 
 
     LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.targetPage }
+        snapshotFlow { pagerState.targetPage to pagerState.isScrollInProgress }
             .distinctUntilChanged()
-            .collect { page ->
-                if (lastReportedPage != page) {
+            .collect { (page, isScrolling) ->
+                if (!isScrolling && lastReportedPage != page) {
                     lastReportedPage = page
                     onSongSwitched(page)
                 }

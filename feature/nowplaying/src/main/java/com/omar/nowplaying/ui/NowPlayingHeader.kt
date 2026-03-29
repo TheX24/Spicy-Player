@@ -111,20 +111,6 @@ fun NowPlayingHeader(
                         repeatDelayMillis = 2000
                     )
                 )
-                if (metadata != null && metadata!!.bitrate.isNotEmpty()) {
-                    Text(
-                        text = "\${metadata!!.format} • \${metadata!!.bitrate}",
-                        color = Color.White.copy(alpha = 0.5f),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Visible,
-                        softWrap = false,
-                        modifier = Modifier.padding(top = 4.dp).basicMarquee(
-                            iterations = Int.MAX_VALUE,
-                            repeatDelayMillis = 2000
-                        )
-                    )
-                }
             }
         }
 

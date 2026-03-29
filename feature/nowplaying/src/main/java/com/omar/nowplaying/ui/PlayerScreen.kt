@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,7 +61,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.drawable.toBitmap
 import androidx.palette.graphics.Palette
@@ -183,12 +186,11 @@ fun CompactPlayerScreen(
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
                     IconButton(onClick = { controlsCollapsed = !controlsCollapsed }) {
                         Icon(
@@ -217,6 +219,7 @@ fun CompactPlayerScreen(
 
                 AnimatedVisibility(visible = !controlsCollapsed) {
                     Column(
+                        modifier = Modifier.padding(top = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -239,8 +242,8 @@ fun CompactPlayerScreen(
                         ) {
                             SuggestionChip(
                                 onClick = onOpenQueue,
-                                label = { Text("Queue", fontWeight = FontWeight.ExtraBold) },
-                                icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null) },
+                                label = { Text("Queue", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp) },
+                                icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                 shape = CircleShape,
                                 colors = SuggestionChipDefaults.suggestionChipColors(
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -404,9 +407,14 @@ fun PortraitPlayerScreen(
             Box(modifier = Modifier.weight(lyricsWeight)) {
                 if (isShowingLyrics) {
                     val context = LocalContext.current as Activity
+                    val keepScreenOn = com.omar.musica.ui.common.LocalUserPreferences.current.uiSettings.keepScreenOn
                     DisposableEffect(key1 = Unit) {
                         context.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                        onDispose { context.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+                        onDispose { 
+                            if (!keepScreenOn) {
+                                context.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) 
+                            }
+                        }
                     }
                     val fadeBrush = remember {
                         Brush.verticalGradient(
@@ -448,12 +456,11 @@ fun PortraitPlayerScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Top
                     ) {
                         IconButton(onClick = { controlsCollapsed = !controlsCollapsed }) {
                             Icon(
@@ -483,6 +490,7 @@ fun PortraitPlayerScreen(
 
                     AnimatedVisibility(visible = !controlsCollapsed) {
                         Column(
+                            modifier = Modifier.padding(top = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -506,8 +514,8 @@ fun PortraitPlayerScreen(
                             ) {
                                 SuggestionChip(
                                     onClick = onOpenQueue,
-                                    label = { Text("Queue", fontWeight = FontWeight.ExtraBold) },
-                                    icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null) },
+                                    label = { Text("Queue", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp) },
+                                    icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                     shape = CircleShape,
                                     colors = SuggestionChipDefaults.suggestionChipColors(
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -516,6 +524,8 @@ fun PortraitPlayerScreen(
                                     )
                                 )
 
+                                TechnicalMetadataChip(song = song)
+
                                 NowPlayingOverflowChip(options = rememberNowPlayingOptions(songUi = song))
                             }
                         }
@@ -523,6 +533,36 @@ fun PortraitPlayerScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun TechnicalMetadataChip(song: Song) {
+    var metadata by remember(song.filePath) { mutableStateOf<NowPlayingMetadata?>(null) }
+    LaunchedEffect(song.filePath) {
+        metadata = NowPlayingMetadataCache.getMetadata(song)
+    }
+
+    val currentFormat = metadata?.format ?: song.filePath.substringAfterLast('.', "").uppercase()
+    val bitrate = metadata?.bitrate ?: if (song.metadata.durationMillis > 0) {
+        "${(song.metadata.sizeBytes / song.metadata.durationMillis) * 8} kbps"
+    } else ""
+    val sampleRate = metadata?.sampleRate ?: ""
+
+    if (currentFormat.isNotEmpty() || bitrate.isNotEmpty() || sampleRate.isNotEmpty()) {
+        Text(
+            text = listOfNotNull(
+                currentFormat.takeIf { it.isNotEmpty() },
+                bitrate.replace(" kbps", "").takeIf { it.isNotEmpty() },
+                sampleRate.takeIf { it.isNotEmpty() }
+            ).joinToString(" • "),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
     }
 }
 
@@ -558,9 +598,14 @@ fun LandscapePlayerScreen(
         ) {
             if (it) {
                 val context = LocalContext.current as Activity
+                val keepScreenOn = com.omar.musica.ui.common.LocalUserPreferences.current.uiSettings.keepScreenOn
                 DisposableEffect(key1 = Unit) {
                     context.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                    onDispose { context.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+                    onDispose { 
+                        if (!keepScreenOn) {
+                            context.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        } 
+                    }
                 }
                 val fadeBrush = remember {
                     Brush.verticalGradient(
@@ -620,12 +665,11 @@ fun LandscapePlayerScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Top
                     ) {
                         IconButton(onClick = { controlsCollapsed = !controlsCollapsed }) {
                             Icon(
@@ -654,6 +698,7 @@ fun LandscapePlayerScreen(
 
                     AnimatedVisibility(visible = !controlsCollapsed) {
                         Column(
+                            modifier = Modifier.padding(top = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -676,8 +721,8 @@ fun LandscapePlayerScreen(
                             ) {
                                 SuggestionChip(
                                     onClick = onOpenQueue,
-                                    label = { Text("Queue", fontWeight = FontWeight.ExtraBold) },
-                                    icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null) },
+                                    label = { Text("Queue", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp) },
+                                    icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                     shape = CircleShape,
                                     colors = SuggestionChipDefaults.suggestionChipColors(
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,

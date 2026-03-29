@@ -81,6 +81,14 @@ class MainActivity : ComponentActivity() {
                     initial = initialUserPreferences
                 )
 
+            LaunchedEffect(userPreferences.uiSettings.keepScreenOn) {
+                if (userPreferences.uiSettings.keepScreenOn) {
+                    window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
+
             val navController = rememberNavController()
 
             MusicaTheme(

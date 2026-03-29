@@ -37,7 +37,7 @@ fun UpdateDialog(
                             .fillMaxWidth()
                     ) {
                         Text(
-                            text = "Version \${status.release.tagName} is now available!",
+                            text = "Version ${status.release.tagName} is now available!",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -70,7 +70,7 @@ fun UpdateDialog(
         is UpdateStatus.UpToDate -> {
             if (status.isManual) {
                 LaunchedEffect(Unit) {
-                    Toast.makeText(context, "Gramophone is up to date!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Spicy Player is up to date!", Toast.LENGTH_SHORT).show()
                     onClearStatus()
                 }
             } else {

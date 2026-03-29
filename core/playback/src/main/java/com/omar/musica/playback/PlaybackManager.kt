@@ -18,8 +18,10 @@ import com.omar.musica.model.playback.PlaybackState
 import com.omar.musica.model.playback.PlayerState
 import com.omar.musica.playback.extensions.EXTRA_SONG_ORIGINAL_INDEX
 import com.omar.musica.playback.state.MediaPlayerState
+import com.omar.musica.model.prefs.PlayerSettings
 import com.omar.musica.store.MediaRepository
 import com.omar.musica.store.PlaylistsRepository
+import com.omar.musica.store.preferences.UserPreferencesRepository
 import com.omar.musica.store.model.queue.Queue
 import com.omar.musica.store.model.queue.QueueItem
 import com.omar.musica.store.model.song.Song
@@ -27,9 +29,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -46,7 +50,8 @@ import javax.inject.Singleton
 class PlaybackManager @Inject constructor(
     @ApplicationContext context: Context,
     private val mediaRepository: MediaRepository,
-    private val playlistsRepository: PlaylistsRepository
+    private val playlistsRepository: PlaylistsRepository,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : PlaylistPlaybackActions {
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
@@ -54,6 +59,11 @@ class PlaybackManager @Inject constructor(
 
     /** If the [MediaController] is connected to the media service */
     private val isReady = MutableStateFlow(false)
+
+    /** Cached player settings — always readable synchronously for use in playPreviousSong, etc. */
+    private val playerSettings: StateFlow<PlayerSettings> =
+        userPreferencesRepository.playerSettingsFlow
+            .stateIn(coroutineScope, SharingStarted.Eagerly, PlayerSettings(pauseOnVolumeZero = false, resumeWhenVolumeIncreases = false))
 
     init {
         initMediaController(context)
@@ -124,10 +134,19 @@ class PlaybackManager @Inject constructor(
     }
 
     /**
-     * Jumps to the previous song in the queue
+     * Jumps to the previous song in the queue, or seeks to the beginning
+     * if the current position exceeds [PlayerSettings.previousSkipThreshold].
      */
     fun playPreviousSong() {
-        mediaController.seekToPrevious()
+        val thresholdMs = playerSettings.value.previousSkipThreshold * 1000L
+        if (mediaController.currentPosition > thresholdMs) {
+            mediaController.seekTo(0)
+        } else {
+            // Use seekToPreviousMediaItem() instead of seekToPrevious() to bypass
+            // Media3's own internal maxSeekToPreviousPositionMs threshold (default 3s),
+            // which would otherwise override our custom threshold setting.
+            mediaController.seekToPreviousMediaItem()
+        }
     }
 
     fun playSongAtIndex(index: Int) {
