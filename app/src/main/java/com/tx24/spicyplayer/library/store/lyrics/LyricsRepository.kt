@@ -18,6 +18,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.text.Normalizer
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,6 +30,31 @@ class LyricsRepository @Inject constructor(
     private val lyricsDao: LyricsDao,
     private val mediaRepository: MediaRepository
 ) {
+    
+    private fun robustNormalize(s: String): String = 
+        Normalizer.normalize(s, Normalizer.Form.NFC)
+            .lowercase().trim().replace(Regex("\\s+"), " ")
+
+    private fun fuzzyNormalize(s: String): String =
+        robustNormalize(s)
+            .replace(Regex("\\s*[\\[({].*?[\\])}]\\s*"), " ")
+            .replace(Regex("[^\\p{L}\\p{N}\\s]"), "") // Keep spaces
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            
+    private fun isArtistMatch(songArtist: String, fileName: String): Boolean {
+        val fArtist = fuzzyNormalize(songArtist)
+        val fFileName = fuzzyNormalize(fileName)
+        
+        if (fFileName.contains(fArtist)) return true
+        
+        // Split by common separators and check for individual artists
+        val individualArtists = songArtist.split(Regex("[,&;/]|\\b(?:feat|ft|with)\\b", RegexOption.IGNORE_CASE))
+            .map { it.trim() }
+            .filter { it.length > 2 }
+            
+        return individualArtists.any { fuzzyNormalize(it).let { fa -> fa.isNotBlank() && fFileName.contains(fa) } }
+    }
 
     /**
      * Gets lyrics of some song with specific URI.
@@ -65,6 +91,40 @@ class LyricsRepository @Inject constructor(
                     syncedLyrics,
                     LyricsFetchSource.FROM_LOCAL_FILE
                 )
+            }
+        }
+
+        // 3. Fuzzy directory match for TTML/LRC
+        run {
+            val parentDir = audioFile.parentFile ?: return@run
+            val files = parentDir.listFiles() ?: return@run
+            
+            val fuzzyAudioName = fuzzyNormalize(audioFile.nameWithoutExtension)
+            val fuzzyTitle = fuzzyNormalize(title)
+            
+            val candidate = files.find { file ->
+                val ext = file.extension.lowercase()
+                if (ext != "ttml" && ext != "lrc") return@find false
+                
+                val name = file.nameWithoutExtension
+                val fuzzyName = fuzzyNormalize(name)
+                
+                // Compare with filename or metadata title + artist
+                fuzzyName == fuzzyAudioName || 
+                (fuzzyName.contains(fuzzyTitle) && isArtistMatch(artist, name)) ||
+                (fuzzyTitle.length >= 4 && fuzzyName == fuzzyTitle) // Just the title if we're in the same folder
+            }
+            
+            if (candidate != null) {
+                val content = candidate.readText()
+                if (candidate.extension.lowercase() == "ttml") {
+                    return@withContext LyricsResult.FoundTtmlLyrics(content, LyricsFetchSource.FROM_LOCAL_FILE)
+                } else {
+                    val syncedLyrics = SynchronizedLyrics.fromString(content)
+                    if (syncedLyrics != null) {
+                        return@withContext LyricsResult.FoundSyncedLyrics(syncedLyrics, LyricsFetchSource.FROM_LOCAL_FILE)
+                    }
+                }
             }
         }
 

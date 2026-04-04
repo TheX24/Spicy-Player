@@ -9,6 +9,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
@@ -84,7 +86,7 @@ internal fun QueueScreen(
     BackHandler(true) {
         onClose()
     }
-    val color = Color(0x22000000)
+    val color = MaterialTheme.colorScheme.surfaceContainer
 
 
     var fabShown by remember {
@@ -177,7 +179,9 @@ internal fun QueueScreen(
                 .fillMaxSize()
                 .padding(it)
                 .nestedScroll(nestedScrollConnection),
-            state = lazyListState
+            state = lazyListState,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
         ) {
 
             itemsIndexed(queueItems, key = { _, item -> item.originalIndex }) { index, queueItem ->
@@ -186,20 +190,11 @@ internal fun QueueScreen(
                     key = queueItem.originalIndex,
                 ) { isDragging ->
 
-                    val disabledModifier = Modifier.alpha(0.5f)
-
                     val songModifier =
-                        if (queueItem.originalIndex == state.currentSongId)
-                            Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
-                        else if (index >= currentSongIndex)
-                            Modifier
-                                .fillMaxWidth()
+                        if (index < currentSongIndex)
+                            Modifier.alpha(0.5f)
                         else
-                            Modifier
-                                .fillMaxWidth()
-                                .then(disabledModifier)
+                            Modifier.fillMaxWidth()
 
                     val hapticFeedback = LocalHapticFeedback.current
                     QueueSongRow(
@@ -207,9 +202,10 @@ internal fun QueueScreen(
                             .clickable { onSongClicked(index) }
                             .zIndex(if (isDragging) 2.0f else 0.0f),
                         songUi = queueItem.song,
+                        isPlaying = queueItem.originalIndex == state.currentSongId,
                         swipeToDeleteDelay = 100,
                         isDragging = isDragging,
-                        this@ReorderableItem,
+                        reorderScope = this@ReorderableItem,
                         onDragStarted = {
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             reorderableList.onDragStarted(index)

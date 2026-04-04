@@ -26,4 +26,4 @@ sealed interface NowPlayingState {
 }
 
 val NowPlayingState.Playing.song: Song
-    get() = queue[songIndex]
+    get() = queue.getOrElse(songIndex) { queue.first() }

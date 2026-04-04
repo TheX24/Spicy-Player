@@ -205,7 +205,7 @@ fun SettingsScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "An offline Android music player with a port of Spicy Lyrics based on Spicy Player.",
+                                text = "An offline Android music player with a port of Spicy Lyrics based on Material 3 Music Player.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
@@ -340,14 +340,14 @@ fun SettingsList(
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 SwitchSettingItem(
-                    icon = Icons.Rounded.VolumeOff,
+                    icon = Icons.AutoMirrored.Rounded.VolumeOff,
                     title = "Pause on Volume Zero",
                     checked = userPreferences.playerSettings.pauseOnVolumeZero,
                     onCheckedChange = { settingsCallbacks.togglePauseVolumeZero() }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 SwitchSettingItem(
-                    icon = Icons.Rounded.VolumeUp,
+                    icon = Icons.AutoMirrored.Rounded.VolumeUp,
                     title = "Resume when gaining volume",
                     checked = userPreferences.playerSettings.resumeWhenVolumeIncreases,
                     onCheckedChange = { settingsCallbacks.toggleResumeVolumeNotZero() }

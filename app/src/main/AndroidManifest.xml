@@ -14,6 +14,7 @@
 
     <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <application
         android:allowBackup="true"
@@ -54,6 +55,16 @@
                 <data android:scheme="spicyplayer" android:host="playlists"/>
             </intent-filter>
         </activity>
+        <service
+            android:name=".playback.PlaybackService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
         <service
             android:name="com.tx24.spicyplayer.library.store.ScanService"
             android:foregroundServiceType="dataSync"

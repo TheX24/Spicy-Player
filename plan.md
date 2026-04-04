@@ -134,7 +134,7 @@
     - [ ] Pre-emptively trigger alpha fade-in 200ms prior to the absolute sung timestamp
   - [x] Fix cover art swipe gesture working half the time
   - [x] Fix animations/transistions between pages
-  - [ ] Organize the project folders
+  - [x] Organize the project folders
   - [x] Fix button alignment with seekbar
   - [x] Low quality cover art
   - [x] Fix TTML & song matching

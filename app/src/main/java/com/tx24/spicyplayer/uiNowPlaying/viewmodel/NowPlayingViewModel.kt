@@ -22,11 +22,17 @@ class NowPlayingViewModel @Inject constructor(
     private val _state: StateFlow<NowPlayingState> =
         playbackManager.state.combine(playbackManager.queue) {
             mediaPlayerState, queue ->
-            val song = mediaPlayerState.currentPlayingSong
+            val mediaPlayerSong = mediaPlayerState.currentPlayingSong
                 ?: return@combine NowPlayingState.NotPlaying
+            
+            val songs = queue.items.map { it.song }
+            // Clamp the index to the current queue size to handle intermediate states
+            // where the queue has been updated but the player state index hasn't caught up yet.
+            val safeIndex = mediaPlayerState.songIndex.coerceIn(0, (songs.size - 1).coerceAtLeast(0))
+            
             NowPlayingState.Playing(
-                queue = queue.items.map { it.song },
-                songIndex = mediaPlayerState.songIndex,
+                queue = songs,
+                songIndex = safeIndex,
                 mediaPlayerState.playbackState.playerState,
                 repeatMode = mediaPlayerState.playbackState.repeatMode,
                 isShuffleOn = mediaPlayerState.playbackState.isShuffleOn

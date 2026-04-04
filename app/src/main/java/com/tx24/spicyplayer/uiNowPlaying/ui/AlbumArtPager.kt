@@ -12,11 +12,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -45,18 +48,24 @@ fun AlbumArtPager(
     onSongSwitched: (Int) -> Unit
 ) {
     val pagerState = LocalPagerState.current
-    var lastReportedPage by remember { mutableIntStateOf(pagerState.targetPage) }
+    val updatedOnSongSwitched by rememberUpdatedState(onSongSwitched)
+    var lastReportedPage by remember { mutableIntStateOf(pagerState.currentPage) }
 
-
-
+    // Synchronize lastReportedPage with currentSongIndex to avoid triggering 
+    // a callback when the index changes programmatically.
+    SideEffect {
+        if (!pagerState.isScrollInProgress) {
+            lastReportedPage = currentSongIndex
+        }
+    }
 
     LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.targetPage to pagerState.isScrollInProgress }
+        snapshotFlow { pagerState.currentPage to pagerState.isScrollInProgress }
             .distinctUntilChanged()
             .collect { (page, isScrolling) ->
                 if (!isScrolling && lastReportedPage != page) {
                     lastReportedPage = page
-                    onSongSwitched(page)
+                    updatedOnSongSwitched(page)
                 }
             }
     }
@@ -64,12 +73,12 @@ fun AlbumArtPager(
     HorizontalPager(
         state = pagerState,
         modifier = modifier,
-        key = { songs[it].uri }, // optional, improves performance
+        key = { songs.getOrNull(it)?.uri ?: it }, // optional, improves performance
         contentPadding = PaddingValues(horizontal = 0.dp),
         pageSpacing = 24.dp,
         beyondViewportPageCount = 1,
     ) { index ->
-        val song = songs[index]
+        val song = songs.getOrNull(index) ?: return@HorizontalPager
         
         var highResMetadata by remember(song.filePath) { mutableStateOf<NowPlayingMetadata?>(null) }
         
@@ -77,24 +86,30 @@ fun AlbumArtPager(
             highResMetadata = NowPlayingMetadataCache.getMetadata(song)
         }
 
-        if (highResMetadata?.art != null) {
-            Image(
-                bitmap = highResMetadata!!.art!!.asImageBitmap(),
-                contentDescription = "Cover",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(12.dp))
-            )
-        } else {
-            NowPlayingSquareAlbumArt(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(12.dp)),
-                song = song.toSongAlbumArtModel()
-            )
+        androidx.compose.animation.Crossfade(
+            targetState = highResMetadata?.art,
+            label = "art_crossfade",
+            animationSpec = tween(500)
+        ) { art ->
+            if (art != null) {
+                Image(
+                    bitmap = art.asImageBitmap(),
+                    contentDescription = "Cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            } else {
+                NowPlayingSquareAlbumArt(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(12.dp)),
+                    song = song.toSongAlbumArtModel()
+                )
+            }
         }
     }
 }

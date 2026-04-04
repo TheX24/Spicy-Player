@@ -12,6 +12,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -44,6 +47,7 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.unit.IntOffset
 import com.tx24.spicyplayer.model.playback.RepeatMode
 import kotlin.math.abs
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
@@ -161,8 +165,12 @@ internal fun NowPlayingScreen(
     }
     val insetsController = remember(window) { window?.let { WindowCompat.getInsetsController(it, it.decorView) } }
 
-    SideEffect {
-        if (isExpanded) {
+    var isShowingQueue by remember {
+        mutableStateOf(false)
+    }
+
+    LaunchedEffect(isExpanded, isShowingQueue) {
+        if (isExpanded && !isShowingQueue) {
             insetsController?.hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
             insetsController?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         } else {
@@ -190,9 +198,6 @@ internal fun NowPlayingScreen(
 
         Box(modifier = Modifier.fillMaxSize()) {
 
-            var isShowingQueue by remember {
-                mutableStateOf(false)
-            }
             NowPlayingMaterialTheme(playerThemeUi = playerTheme) {
                 MiniPlayer(
                     modifier = Modifier
@@ -262,12 +267,15 @@ fun FullScreenNowPlaying(
 
     val currentSongIndex = uiState.songIndex
     LaunchedEffect(currentSongIndex) {
-        if (currentSongIndex == pagerState.targetPage || currentSongIndex == pagerState.currentPage) return@LaunchedEffect
-
-        if (abs(currentSongIndex - pagerState.targetPage) == 1)
-            pagerState.animateScrollToPage(currentSongIndex, animationSpec = spring(stiffness = Spring.StiffnessMedium))
-        else
+        if (currentSongIndex == pagerState.targetPage && currentSongIndex == pagerState.currentPage) return@LaunchedEffect
+        
+        // If we are currently showing the queue, or if the jump is large, skip the animation
+        // to prevent the pager from getting stuck during the screen transition.
+        if (isShowingQueue || abs(currentSongIndex - pagerState.currentPage) > 1) {
             pagerState.scrollToPage(currentSongIndex)
+        } else {
+            pagerState.animateScrollToPage(currentSongIndex, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+        }
     }
 
     Box(
@@ -328,20 +336,22 @@ fun FullScreenNowPlaying(
             modifier = Modifier.fillMaxSize(),
             targetState = isShowingQueue, label = "",
             transitionSpec = {
-                if (this.targetState)
-                    fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) togetherWith 
-                        fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow))
-                else
-                    scaleIn(initialScale = 1.1f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) + 
-                        fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) togetherWith 
-                        fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow))
+                val springSpec = spring<Float>(dampingRatio = 0.8f, stiffness = 300f)
+                val springSpecInt = spring<IntOffset>(dampingRatio = 0.8f, stiffness = 300f)
+                
+                if (targetState) {
+                    (slideInVertically(animationSpec = springSpecInt) { it / 2 } + fadeIn(animationSpec = springSpec) + scaleIn(initialScale = 0.95f, animationSpec = springSpec))
+                        .togetherWith(fadeOut(animationSpec = springSpec))
+                } else {
+                    (fadeIn(animationSpec = springSpec) + scaleIn(initialScale = 0.95f, animationSpec = springSpec))
+                        .togetherWith(slideOutVertically(animationSpec = springSpecInt) { it / 2 } + fadeOut(animationSpec = springSpec))
+                }
             }
         ) {
             if (it) {
                 QueueScreen(
                     modifier = Modifier
                         .fillMaxSize()
-                        .safeDrawingPadding()
                         .graphicsLayer { alpha = progressProvider() * 2 },
                     onClose = onCloseQueue
                 )
