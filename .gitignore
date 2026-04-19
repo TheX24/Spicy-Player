@@ -18,3 +18,4 @@ build_output.log
 gradle/
 !gradle/wrapper/
 !gradle/libs.versions.toml
+spicy-lyrics/
