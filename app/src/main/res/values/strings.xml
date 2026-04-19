@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Spicy Player</string>
     <string name="card_widget_name">Card Widget</string>
     <string name="circle_widget_name">Circle Widget</string>
 </resources>

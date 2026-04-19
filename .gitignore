@@ -1,5 +1,5 @@
 *.iml
-.gradle
+.gradle/
 *.properties
 .idea/
 .DS_Store
@@ -8,10 +8,13 @@ captures/
 .externalNativeBuild
 .cxx
 compose_compiler_reports/
-spicy-lyrics/
 .agents/
 .kotlin/
 .vscode/
 *.jks
 *.keystore
 *.keystore.jks
+build_output.log
+gradle/
+!gradle/wrapper/
+!gradle/libs.versions.toml
