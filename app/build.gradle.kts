@@ -84,6 +84,11 @@ android {
 }
 
 
+ksp {
+    // Export Room schemas so migrations can be reviewed and tested against history.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.core.ktx)
     implementation(libs.media3.session)

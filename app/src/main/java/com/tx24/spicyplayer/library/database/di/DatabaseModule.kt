@@ -24,7 +24,12 @@ object DatabaseModule {
     ): SpicyDatabase =
         Room.databaseBuilder(context, SpicyDatabase::class.java, name = DB_NAME)
             .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
-            .fallbackToDestructiveMigration()
+            // Schemas 1 and 2 predate the committed migration history and cannot be
+            // upgraded in place; only those may be wiped. Anything newer must have an
+            // explicit migration so a gap fails fast instead of silently deleting the
+            // user's playlists, queue, and listening history.
+            .fallbackToDestructiveMigrationFrom(1, 2)
+            .fallbackToDestructiveMigrationOnDowngrade()
             .build()
 
     @Singleton

@@ -24,7 +24,7 @@ import com.tx24.spicyplayer.library.database.entities.queue.QueueEntity
         ListeningSessionEntity::class,
         LyricsEntity::class
     ],
-    version = 5, exportSchema = false
+    version = 5, exportSchema = true
 )
 abstract class SpicyDatabase : RoomDatabase() {
 
