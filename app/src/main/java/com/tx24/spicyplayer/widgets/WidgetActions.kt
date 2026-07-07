@@ -18,12 +18,9 @@ class TogglePlaybackAction : ActionCallback {
         context: Context,
         glanceId: GlanceId,
         parameters: ActionParameters
-    ) = withContext(Dispatchers.IO) {
-        val mc = getMediaControllerFuture(context.applicationContext).get()
-        withContext(Dispatchers.Main) {
-            mc.prepare()
-            mc.playWhenReady = !mc.playWhenReady
-        }
+    ) = withConnectedController(context) {
+        prepare()
+        playWhenReady = !playWhenReady
     }
 }
 
@@ -32,11 +29,8 @@ class NextSongAction : ActionCallback {
         context: Context,
         glanceId: GlanceId,
         parameters: ActionParameters
-    ) = withContext(Dispatchers.IO) {
-        val mc = getMediaControllerFuture(context.applicationContext).get()
-        withContext(Dispatchers.Main) {
-            mc.seekToNext()
-        }
+    ) = withConnectedController(context) {
+        seekToNext()
     }
 }
 
@@ -45,10 +39,26 @@ class PreviousSongAction : ActionCallback {
         context: Context,
         glanceId: GlanceId,
         parameters: ActionParameters
-    ) = withContext(Dispatchers.IO) {
-        val mc = getMediaControllerFuture(context.applicationContext).get()
-        withContext(Dispatchers.Main) {
-            mc.seekToPrevious()
+    ) = withConnectedController(context) {
+        seekToPrevious()
+    }
+}
+
+/**
+ * Connects a [MediaController], runs [action] on the main thread, and always
+ * releases the controller — each widget press previously leaked a controller
+ * and its binder connection to the service.
+ */
+private suspend fun withConnectedController(
+    context: Context,
+    action: MediaController.() -> Unit
+) = withContext(Dispatchers.IO) {
+    val mc = getMediaControllerFuture(context.applicationContext).get()
+    withContext(Dispatchers.Main) {
+        try {
+            mc.action()
+        } finally {
+            mc.release()
         }
     }
 }

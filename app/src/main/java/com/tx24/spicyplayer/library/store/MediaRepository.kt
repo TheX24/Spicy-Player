@@ -67,7 +67,7 @@ class MediaRepository @Inject constructor(
     val songsFlow =
         callbackFlow {
 
-            Timber.d(TAG, "Initializing callback flow to get all songs")
+            Timber.d("Initializing callback flow to get all songs")
 
             var lastChangedUri: Uri? = null
             val observer = object : ContentObserver(null) {

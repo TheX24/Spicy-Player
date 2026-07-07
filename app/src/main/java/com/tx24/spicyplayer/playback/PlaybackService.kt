@@ -166,9 +166,7 @@ class PlaybackService :
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession {
-        Timber.i(TAG, "Controller request: ${controllerInfo.packageName}")
-
-        Log.d("PlaybackService", "Controller request: ${controllerInfo.packageName}")
+        Timber.i("Controller request: %s", controllerInfo.packageName)
         return mediaSession!!
     }
 
@@ -336,7 +334,6 @@ class PlaybackService :
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         Timber.d("PlaybackService started: %s", intent.toString())
-        Log.d("PlaybackService", "PlaybackService started: %s" + intent.toString())
         return START_NOT_STICKY
     }
 
