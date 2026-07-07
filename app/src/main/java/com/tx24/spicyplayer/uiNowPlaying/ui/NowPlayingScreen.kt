@@ -234,6 +234,7 @@ internal fun NowPlayingScreen(
                     onCollapseNowPlaying,
                     progressProvider,
                     uiState,
+                    isExpanded = isExpanded,
                     nowPlayingActions = nowPlayingActions
                 )
             }
@@ -254,6 +255,7 @@ fun FullScreenNowPlaying(
     onCollapse: () -> Unit,
     progressProvider: () -> Float,
     uiState: NowPlayingState.Playing,
+    isExpanded: Boolean,
     nowPlayingActions: INowPlayingViewModel,
 ) {
 
@@ -293,7 +295,9 @@ fun FullScreenNowPlaying(
 
                 SpicyDynamicBackground(
                     modifier = Modifier.fillMaxSize(),
-                    song = uiState.song
+                    song = uiState.song,
+                    // Suspend the per-frame rotation loop while collapsed to the mini player
+                    animate = isExpanded
                 )
 
 

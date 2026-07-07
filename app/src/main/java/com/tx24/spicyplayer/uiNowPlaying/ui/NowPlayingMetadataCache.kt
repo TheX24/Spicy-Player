@@ -3,11 +3,11 @@ package com.tx24.spicyplayer.uiNowPlaying.ui
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
-import android.util.Log
 import androidx.collection.LruCache
 import com.tx24.spicyplayer.library.store.model.song.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.File
 
 data class NowPlayingMetadata(
@@ -20,8 +20,7 @@ data class NowPlayingMetadata(
 )
 
 object NowPlayingMetadataCache {
-    private const val TAG = "NowPlayingMetadataCache"
-    
+
     val cache = LruCache<String, NowPlayingMetadata>(20) // Cache 20 songs metadata
 
     suspend fun getMetadata(song: Song): NowPlayingMetadata = withContext(Dispatchers.IO) {
@@ -70,7 +69,7 @@ object NowPlayingMetadataCache {
                 retriever.release()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to extract metadata for ${song.filePath}", e)
+            Timber.e(e, "Failed to extract metadata for %s", song.filePath)
             val format = File(song.filePath).extension.uppercase()
             val fallback = NowPlayingMetadata(
                 title = song.metadata.title,

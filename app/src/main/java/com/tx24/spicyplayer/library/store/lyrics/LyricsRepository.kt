@@ -3,7 +3,6 @@ package com.tx24.spicyplayer.library.store.lyrics
 import android.content.Context
 import android.net.Uri
 import android.os.Build
-import android.util.Log
 import com.tx24.spicyplayer.library.database.dao.LyricsDao
 import com.tx24.spicyplayer.library.database.entities.lyrics.LyricsEntity
 import com.tx24.spicyplayer.model.lyrics.LyricsFetchSource
@@ -17,6 +16,7 @@ import com.shabinder.jaudiotagger.tag.FieldKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.File
 import java.text.Normalizer
 import javax.inject.Inject
@@ -88,7 +88,7 @@ class LyricsRepository @Inject constructor(
                     )
                 }
             } catch (e: Exception) {
-                Log.e("lyrics", "Failed reading local TTML file", e)
+                Timber.e(e, "Failed reading local TTML file")
             }
 
             // 2. Check for local LRC file
@@ -104,7 +104,7 @@ class LyricsRepository @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                Log.e("lyrics", "Failed reading local LRC file", e)
+                Timber.e(e, "Failed reading local LRC file")
             }
 
             // 3. Fuzzy directory match for TTML/LRC
@@ -142,7 +142,7 @@ class LyricsRepository @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                Log.e("lyrics", "Fuzzy lyrics file match failed", e)
+                Timber.e(e, "Fuzzy lyrics file match failed")
             }
 
             // 4. Check for lyrics embedded in the audio file's tags
@@ -165,7 +165,7 @@ class LyricsRepository @Inject constructor(
                         )
                 }
             } catch (e: Exception) {
-                Log.e("lyrics", "Failed reading embedded lyrics tags", e)
+                Timber.e(e, "Failed reading embedded lyrics tags")
             }
         }
 
@@ -183,12 +183,12 @@ class LyricsRepository @Inject constructor(
         durationSeconds: Int
     ): LyricsResult = withContext(Dispatchers.IO) {
         // check in the DB
-        Log.d("lyrics", "Starting lyrics fetch")
+        Timber.d("Starting lyrics fetch")
         kotlin.run {
-            Log.d("lyrics", "Checking DB")
+            Timber.d("Checking DB")
             val lyricsEntity = lyricsDao.getSongLyrics(title, album, artist)
 
-            Log.d("lyrics", "DB result: $lyricsEntity")
+            Timber.d("DB result: %s", lyricsEntity)
             if (lyricsEntity != null && lyricsEntity.syncedLyrics.isNotBlank()) {
                 val synced = SynchronizedLyrics.fromString(lyricsEntity.syncedLyrics)
                 if (synced != null) {
@@ -205,12 +205,12 @@ class LyricsRepository @Inject constructor(
             }
         }
 
-        Log.d("lyrics", "Downloading Lyrics")
+        Timber.d("Downloading Lyrics")
         // finally check from the API
         return@withContext try {
             val lyricsNetwork =
                 lyricsDataSource.getSongLyrics(artist, title, album, durationSeconds)
-            Log.d("lyrics", "Downloaded: $lyricsNetwork")
+            Timber.d("Downloaded: %s", lyricsNetwork)
             val syncedLyrics = SynchronizedLyrics.fromString(lyricsNetwork.syncedLyrics)
             lyricsDao.saveSongLyrics(
                 LyricsEntity(
@@ -234,10 +234,10 @@ class LyricsRepository @Inject constructor(
                 LyricsFetchSource.FROM_INTERNET
             )
         } catch (e: NotFoundException) {
-            Log.d("lyrics", "Downloaded: Not found")
+            Timber.d("Downloaded: Not found")
             LyricsResult.NotFound
         } catch (e: Exception) {
-            Log.d("lyrics", "Downloaded: ${e.stackTraceToString()}")
+            Timber.e(e, "Lyrics download failed")
             LyricsResult.NetworkError
         }
     }

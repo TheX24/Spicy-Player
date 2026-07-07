@@ -1,9 +1,9 @@
 package com.tx24.spicyplayer.settings.components
 
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import timber.log.Timber
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -44,11 +44,11 @@ object GitHubUpdateChecker {
                     body = json.optString("body", "")
                 )
             } else {
-                Log.e("GitHubUpdateChecker", "Failed to fetch release: ${connection.responseCode}")
+                Timber.e("Failed to fetch release: %d", connection.responseCode)
                 null
             }
         } catch (e: Exception) {
-            Log.e("GitHubUpdateChecker", "Error fetching latest release", e)
+            Timber.e(e, "Error fetching latest release")
             null
         }
     }

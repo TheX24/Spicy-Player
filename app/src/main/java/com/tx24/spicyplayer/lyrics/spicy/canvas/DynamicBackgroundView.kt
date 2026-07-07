@@ -17,12 +17,16 @@ import kotlinx.coroutines.withContext
  *
  * @param coverArtBitmap The album cover art to derive the background from.
  * @param blurIntensity Background blur intensity 0–100 (default 60).
+ * @param animate When false the per-frame rotation loop is suspended, so the
+ *   background stops waking the CPU/GPU while it is not visible (e.g. the now
+ *   playing sheet is collapsed to the mini player).
  */
 @Composable
 fun DynamicBackgroundView(
     coverArtBitmap: Bitmap?,
     modifier: Modifier = Modifier,
     blurIntensity: Int = 60,
+    animate: Boolean = true,
 ) {
     val bgRenderer = remember { DynamicBackgroundRenderer() }
     
@@ -53,12 +57,20 @@ fun DynamicBackgroundView(
         onDispose { bgRenderer.release() }
     }
 
-    // Continuous animation loop for smooth, non-periodic rotation
-    LaunchedEffect(Unit) {
+    // Continuous animation loop for smooth, non-periodic rotation. Gated on
+    // [animate] so a collapsed/hidden background doesn't burn battery redrawing
+    // every frame, and driven by the real frame delta so the rotation runs at a
+    // constant ROTATION_SPEED rad/s regardless of the panel's refresh rate.
+    LaunchedEffect(animate) {
+        if (!animate) return@LaunchedEffect
+        var lastFrameNanos = 0L
         while (true) {
             withFrameNanos { frameTimeNanos ->
-                // Use a constant speed of 0.25 rad/s (approx 16ms per frame = 0.004 rad)
-                rotationAngle += 0.016f * DynamicBackgroundRenderer.ROTATION_SPEED
+                if (lastFrameNanos != 0L) {
+                    val deltaSeconds = (frameTimeNanos - lastFrameNanos) / 1_000_000_000f
+                    rotationAngle += deltaSeconds * DynamicBackgroundRenderer.ROTATION_SPEED
+                }
+                lastFrameNanos = frameTimeNanos
             }
         }
     }

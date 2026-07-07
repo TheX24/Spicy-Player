@@ -1,7 +1,6 @@
 package com.tx24.spicyplayer.tageditor.viewmodel
 
 import android.net.Uri
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -56,7 +55,7 @@ class TagEditorViewModel @Inject constructor(
                         TagEditorState.Loading
                 }
             } catch (e: Exception) {
-                Log.e("Tags", "Failed to save tags: ${e.stackTraceToString()}")
+                Timber.e(e, "Failed to save tags")
                 _state.getAndUpdate {
                     if (it is TagEditorState.Loaded)
                         it.copy(isSaved = false, isSaving = false, isFailed = true)
@@ -73,7 +72,7 @@ class TagEditorViewModel @Inject constructor(
         if (state !is TagEditorState.Loaded) return null
 
         val tags = state.tags
-        Log.d("lyrics", tags.toString())
+        Timber.d("%s", tags.toString())
         val lyrics = lyricsRepository.downloadLyricsFromInternet(
             tags.metadata.basicSongMetadata.title,
             tags.metadata.basicSongMetadata.albumName.orEmpty(),

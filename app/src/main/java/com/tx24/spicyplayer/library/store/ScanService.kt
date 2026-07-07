@@ -6,7 +6,6 @@ import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import com.tx24.spicyplayer.library.store.model.song.Song
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -14,6 +13,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import dagger.hilt.android.AndroidEntryPoint
+import timber.log.Timber
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -93,11 +93,11 @@ class ScanService : Service() {
                 }
                 
                 _resultFlow.emit(results)
-                Log.d("ScanService", "Scan completed: ${results.size} songs")
+                Timber.d("Scan completed: %d songs", results.size)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.e("ScanService", "Scan failed", e)
+                Timber.e(e, "Scan failed")
             } finally {
                 // A rescan cancels the running job; only the scan that is still
                 // current may tear down the foreground service, otherwise the

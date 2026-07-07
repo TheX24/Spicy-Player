@@ -3,12 +3,12 @@ package com.tx24.spicyplayer.library.store
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.util.Log
 import com.tx24.spicyplayer.library.store.model.song.Song
 import com.tx24.spicyplayer.model.song.BasicSongMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.File
 import java.text.Normalizer
 
@@ -74,10 +74,10 @@ suspend fun loadCachedScan(context: Context, scanPath: String): List<Song>? = wi
                 }
             }
         }
-        Log.d("ScanUtils", "Loaded ${results.size} songs from disk cache")
+        Timber.d("Loaded %d songs from disk cache", results.size)
         results.sortedBy { it.metadata.title.lowercase() }
     } catch (e: Exception) {
-        Log.e("ScanUtils", "Failed to load cached scan", e)
+        Timber.e(e, "Failed to load cached scan")
         null
     }
 }
@@ -107,9 +107,9 @@ suspend fun saveScanToCache(context: Context, scanPath: String, results: List<So
                 writer.newLine()
             }
         }
-        Log.d("ScanUtils", "Saved ${results.size} songs to disk cache")
+        Timber.d("Saved %d songs to disk cache", results.size)
     } catch (e: Exception) {
-        Log.e("ScanUtils", "Failed to save scan to cache", e)
+        Timber.e(e, "Failed to save scan to cache")
     }
 }
 
@@ -171,7 +171,7 @@ suspend fun performScan(
             duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
             trackNumber = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)?.toIntOrNull() ?: 0
         } catch (e: Exception) {
-            Log.e("ScanUtils", "Error reading metadata for ${audioFile.name}", e)
+            Timber.e(e, "Error reading metadata for %s", audioFile.name)
         }
 
         val baseName = robustNormalize(audioFile.nameWithoutExtension)

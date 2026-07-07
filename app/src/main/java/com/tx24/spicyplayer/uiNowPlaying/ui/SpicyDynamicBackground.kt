@@ -24,6 +24,7 @@ import com.tx24.spicyplayer.ui.common.LocalUserPreferences
 fun SpicyDynamicBackground(
     modifier: Modifier,
     song: Song?,
+    animate: Boolean = true,
 ) {
     val context = LocalContext.current
     val blurIntensity = LocalUserPreferences.current.uiSettings.backgroundBlur
@@ -59,6 +60,7 @@ fun SpicyDynamicBackground(
     DynamicBackgroundView(
         coverArtBitmap = bitmap,
         modifier = modifier,
-        blurIntensity = blurIntensity
+        blurIntensity = blurIntensity,
+        animate = animate
     )
 }

@@ -6,7 +6,6 @@ import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -89,7 +88,6 @@ class PlaybackService :
         super.onCreate()
 
         Timber.d("PlaybackService started")
-        Log.d("PlaybackService", "PlaybackService started")
 
         player = buildPlayer()
         player.addListener(this@PlaybackService)
@@ -360,7 +358,6 @@ class PlaybackService :
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
         Timber.d("onTaskRemoved called")
-        Log.d("PlaybackService", "onTaskRemoved Called")
         if (player.playWhenReady == false) {
             stopSelf()
         }
