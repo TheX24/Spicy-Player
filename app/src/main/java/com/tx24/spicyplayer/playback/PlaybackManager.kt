@@ -55,10 +55,26 @@ class PlaybackManager @Inject constructor(
 ) : PlaylistPlaybackActions {
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
-    private lateinit var mediaController: MediaController
+
+    /** Null until the async connection to [PlaybackService] completes. */
+    private var mediaController: MediaController? = null
 
     /** If the [MediaController] is connected to the media service */
     private val isReady = MutableStateFlow(false)
+
+    /**
+     * Runs [action] on the connected controller. Commands issued in the window
+     * before the async service connection completes are dropped instead of
+     * crashing with an uninitialized controller.
+     */
+    private inline fun withController(action: MediaController.() -> Unit) {
+        val controller = mediaController
+        if (controller == null) {
+            Timber.w("MediaController not connected yet; command dropped")
+            return
+        }
+        controller.action()
+    }
 
     /** Cached player settings — always readable synchronously for use in playPreviousSong, etc. */
     private val playerSettings: StateFlow<PlayerSettings> =
@@ -77,40 +93,46 @@ class PlaybackManager @Inject constructor(
     val queue = MutableStateFlow(Queue.EMPTY)
 
     val currentSongProgress: Float
-        get() = mediaController.currentPosition.toFloat() / mediaController.duration.toFloat()
+        get() {
+            val controller = mediaController ?: return 0f
+            // duration is 0 before prepare and C.TIME_UNSET (negative) while unknown
+            val duration = controller.duration
+            if (duration <= 0L) return 0f
+            return (controller.currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+        }
 
     val currentSongProgressMillis
-        get() = mediaController.currentPosition
+        get() = mediaController?.currentPosition ?: 0L
 
     val playbackParameters: Pair<Float, Float>
         get() {
-            val p = mediaController.playbackParameters
+            val p = mediaController?.playbackParameters ?: return 1f to 1f
             return p.speed to p.pitch
         }
 
     private val playbackState: PlayerState
         get() {
-            return if (mediaController.playWhenReady) PlayerState.PLAYING else PlayerState.PAUSED
+            return if (mediaController?.playWhenReady == true) PlayerState.PLAYING else PlayerState.PAUSED
         }
 
 
-    fun clearQueue() {
-        mediaController.clearMediaItems()
+    fun clearQueue() = withController {
+        clearMediaItems()
     }
 
     /**
      * Toggle the player state
      */
-    fun togglePlayback() {
-        mediaController.prepare()
-        mediaController.playWhenReady = !mediaController.playWhenReady
+    fun togglePlayback() = withController {
+        prepare()
+        playWhenReady = !playWhenReady
     }
 
     /**
      * Skip forward in currently playing song
      */
-    fun forward() {
-        mediaController.sendCustomCommand(
+    fun forward() = withController {
+        sendCustomCommand(
             SessionCommand(Commands.JUMP_FORWARD, bundleOf()),
             bundleOf()
         )
@@ -119,8 +141,8 @@ class PlaybackManager @Inject constructor(
     /**
      * Skip backward in currently playing song
      */
-    fun backward() {
-        mediaController.sendCustomCommand(
+    fun backward() = withController {
+        sendCustomCommand(
             SessionCommand(Commands.JUMP_BACKWARD, bundleOf()),
             bundleOf()
         )
@@ -129,94 +151,84 @@ class PlaybackManager @Inject constructor(
     /**
      * Jumps to the next song in the queue
      */
-    fun playNextSong() {
-        mediaController.seekToNext()
+    fun playNextSong() = withController {
+        seekToNext()
     }
 
     /**
      * Jumps to the previous song in the queue, or seeks to the beginning
      * if the current position exceeds [PlayerSettings.previousSkipThreshold].
      */
-    fun playPreviousSong() {
+    fun playPreviousSong() = withController {
         val thresholdMs = playerSettings.value.previousSkipThreshold * 1000L
-        if (mediaController.currentPosition > thresholdMs) {
-            mediaController.seekTo(0)
+        if (currentPosition > thresholdMs) {
+            seekTo(0)
         } else {
             // Use seekToPreviousMediaItem() instead of seekToPrevious() to bypass
             // Media3's own internal maxSeekToPreviousPositionMs threshold (default 3s),
             // which would otherwise override our custom threshold setting.
-            mediaController.seekToPreviousMediaItem()
+            seekToPreviousMediaItem()
         }
     }
 
-    fun playSongAtIndex(index: Int) {
-        mediaController.seekTo(index, 0)
+    fun playSongAtIndex(index: Int) = withController {
+        seekTo(index, 0)
     }
 
-    fun removeSongAtIndex(index: Int) {
-        mediaController.removeMediaItem(index)
+    fun removeSongAtIndex(index: Int) = withController {
+        removeMediaItem(index)
     }
 
-    fun reorderSong(from: Int, to: Int) {
-        mediaController.moveMediaItem(from, to)
+    fun reorderSong(from: Int, to: Int) = withController {
+        moveMediaItem(from, to)
     }
 
-    fun seekToPosition(progress: Float) {
-        val controller = mediaController
-        val songDuration = controller.duration
-        controller.seekTo((songDuration * progress).toLong())
+    fun seekToPosition(progress: Float) = withController {
+        val songDuration = duration
+        if (songDuration <= 0L) return@withController
+        seekTo((songDuration * progress).toLong())
     }
 
-    fun seekToPositionMillis(millis: Long) {
-        mediaController.seekTo(millis)
+    fun seekToPositionMillis(millis: Long) = withController {
+        seekTo(millis)
     }
 
     /**
      * Changes the current playlist of the player and starts playing the song at the specified index
      */
-    fun setPlaylistAndPlayAtIndex(playlist: List<Song>, index: Int = 0) {
-        if (playlist.isEmpty()) return
+    fun setPlaylistAndPlayAtIndex(playlist: List<Song>, index: Int = 0) = withController {
+        if (playlist.isEmpty()) return@withController
         val mediaItems = playlist.toMediaItems(0)
-        stopPlayback() // release everything
-        mediaController.apply {
-            setMediaItems(mediaItems, index, 0)
-            prepare()
-            play()
-        }
+        stop() // release everything
+        setMediaItems(mediaItems, index, 0)
+        prepare()
+        play()
     }
 
     /** Randomize the order of the list of songs and play */
-    fun shuffle(songs: List<Song>) {
-        if (songs.isEmpty()) return
+    fun shuffle(songs: List<Song>) = withController {
+        if (songs.isEmpty()) return@withController
         val shuffled = songs.shuffled()
-        stopPlayback()
-        mediaController.apply {
-            setMediaItems(shuffled.toMediaItems(0), 0, 0)
-            prepare()
-            play()
-        }
+        stop()
+        setMediaItems(shuffled.toMediaItems(0), 0, 0)
+        prepare()
+        play()
     }
 
-    fun shuffleNext(songs: List<Song>) {
+    fun shuffleNext(songs: List<Song>) = withController {
         val shuffled = songs.shuffled()
-        val currentIndex = mediaController.currentMediaItemIndex
-        mediaController.apply {
-            addMediaItems(currentIndex + 1, shuffled.toMediaItems(getMaximumOriginalId() + 1))
-        }
+        addMediaItems(currentMediaItemIndex + 1, shuffled.toMediaItems(getMaximumOriginalId() + 1))
     }
 
-    fun playNext(songs: List<Song>) {
-        if (songs.isEmpty()) return
-        val mediaItems = songs.toMediaItems(getMaximumOriginalId() + 1)
-        val currentIndex = mediaController.currentMediaItemIndex
-        mediaController.addMediaItems(currentIndex + 1, mediaItems)
-        mediaController.prepare()
+    fun playNext(songs: List<Song>) = withController {
+        if (songs.isEmpty()) return@withController
+        addMediaItems(currentMediaItemIndex + 1, songs.toMediaItems(getMaximumOriginalId() + 1))
+        prepare()
     }
 
-    fun addToQueue(songs: List<Song>) {
-        val mediaItems = songs.toMediaItems(getMaximumOriginalId() + 1)
-        mediaController.addMediaItems(mediaItems)
-        mediaController.prepare()
+    fun addToQueue(songs: List<Song>) = withController {
+        addMediaItems(songs.toMediaItems(getMaximumOriginalId() + 1))
+        prepare()
     }
 
     override fun playPlaylist(playlistId: Int) {
@@ -265,19 +277,20 @@ class PlaybackManager @Inject constructor(
         }
     }
 
-    private fun getMaximumOriginalId(): Int {
-        val count = mediaController.mediaItemCount
+    private fun MediaController.getMaximumOriginalId(): Int {
+        val count = mediaItemCount
         if (count == 0) return 0
         return (0 until count).maxOf {
-            val mediaItem = mediaController.getMediaItemAt(it)
-            mediaItem.requestMetadata.extras!!.getInt(EXTRA_SONG_ORIGINAL_INDEX)
+            val mediaItem = getMediaItemAt(it)
+            // Externally supplied media items (e.g. Android Auto) may carry no extras
+            mediaItem.requestMetadata.extras?.getInt(EXTRA_SONG_ORIGINAL_INDEX) ?: 0
         }
     }
 
-    fun getCurrentSongIndex() = mediaController.currentMediaItemIndex
+    fun getCurrentSongIndex() = mediaController?.currentMediaItemIndex ?: 0
 
-    fun setSleepTimer(minutes: Int, finishLastSong: Boolean) {
-        mediaController.sendCustomCommand(
+    fun setSleepTimer(minutes: Int, finishLastSong: Boolean) = withController {
+        sendCustomCommand(
             SessionCommand(Commands.SET_SLEEP_TIMER, bundleOf()),
             bundleOf(
                 "MINUTES" to minutes,
@@ -286,26 +299,26 @@ class PlaybackManager @Inject constructor(
         )
     }
 
-    fun setPlaybackParameters(speed: Float, pitch: Float) {
-        mediaController.playbackParameters = PlaybackParameters(speed, pitch)
+    fun setPlaybackParameters(speed: Float, pitch: Float) = withController {
+        playbackParameters = PlaybackParameters(speed, pitch)
     }
 
-    fun deleteSleepTimer() {
-        mediaController.sendCustomCommand(
+    fun deleteSleepTimer() = withController {
+        sendCustomCommand(
             SessionCommand(Commands.CANCEL_SLEEP_TIMER, Bundle.EMPTY), Bundle.EMPTY
         )
     }
 
-    fun toggleRepeatMode() {
-        mediaController.repeatMode =
-            getRepeatModeFromPlayer(mediaController.repeatMode).next().toPlayer()
+    fun toggleRepeatMode() = withController {
+        repeatMode = getRepeatModeFromPlayer(repeatMode).next().toPlayer()
     }
 
-    fun toggleShuffleMode() {
-        mediaController.shuffleModeEnabled = !mediaController.shuffleModeEnabled
+    fun toggleShuffleMode() = withController {
+        shuffleModeEnabled = !shuffleModeEnabled
     }
 
     private fun updateState() {
+        val mediaController = mediaController ?: return updateToEmptyState()
         updateQueue()
         val currentMediaItem = mediaController.currentMediaItem ?: return updateToEmptyState()
         val songUri = currentMediaItem.requestMetadata.mediaUri ?: return updateToEmptyState()
@@ -324,8 +337,8 @@ class PlaybackManager @Inject constructor(
         _state.value = MediaPlayerState.empty
     }
 
-    private fun stopPlayback() {
-        mediaController.stop()
+    private fun stopPlayback() = withController {
+        stop()
     }
 
     private fun initMediaController(context: Context) {
@@ -336,17 +349,18 @@ class PlaybackManager @Inject constructor(
             .buildAsync()
         mediaControllerFuture.addListener(
             {
-                mediaController = mediaControllerFuture.get()
+                val controller = mediaControllerFuture.get()
+                mediaController = controller
                 isReady.value = true
                 updateState()
                 updateQueue()
-                attachListeners()
+                attachListeners(controller)
             },
             MoreExecutors.directExecutor()
         )
     }
 
-    private fun attachListeners() {
+    private fun attachListeners(mediaController: MediaController) {
         mediaController.addListener(object : Player.Listener {
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
                 updateState()
@@ -385,6 +399,7 @@ class PlaybackManager @Inject constructor(
     }
 
     private fun updateQueue() {
+        val mediaController = mediaController ?: return
         val count = mediaController.mediaItemCount
 
         val songsLibrary = mediaRepository.songsFlow.value

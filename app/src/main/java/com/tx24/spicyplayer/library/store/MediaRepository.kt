@@ -242,11 +242,14 @@ class MediaRepository @Inject constructor(
 
     suspend fun getSongPath(uri: Uri): String = withContext(Dispatchers.IO) {
 
+        val songId = uri.lastPathSegment?.toLongOrNull()
+            ?: throw IllegalArgumentException("Not a MediaStore song uri: $uri")
+
         val projection =
             arrayOf(
                 MediaStore.Audio.Media.DATA,
             )
-        val selection = "${MediaStore.Audio.Media._ID} = ${uri.lastPathSegment!!}"
+        val selection = "${MediaStore.Audio.Media._ID} = $songId"
 
         val cursor = context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -258,8 +261,9 @@ class MediaRepository @Inject constructor(
         ) ?: throw Exception("Invalid cursor")
 
         cursor.use {
-            it.moveToFirst()
-            val pathColumn = it.getColumnIndex(MediaStore.Audio.Media.DATA)
+            // The song may have been deleted from MediaStore since it was queued
+            if (!it.moveToFirst()) throw NoSuchElementException("Song $uri not found in MediaStore")
+            val pathColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
             return@withContext it.getString(pathColumn)
         }
     }

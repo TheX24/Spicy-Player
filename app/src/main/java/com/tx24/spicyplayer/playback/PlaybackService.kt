@@ -250,7 +250,11 @@ class PlaybackService :
             player.replaceMediaItems(0, player.mediaItemCount, originalQueue)
             val currentMediaItemIndex = originalQueue.indexOf(currentMediaItem)
 
-            player.seekTo(currentMediaItemIndex, player.currentPosition)
+            // The current item may no longer exist in the original queue (queue was
+            // mutated while shuffled); seeking to -1 would throw IllegalSeekPosition.
+            if (currentMediaItemIndex >= 0) {
+                player.seekTo(currentMediaItemIndex, player.currentPosition)
+            }
         }
     }
 
