@@ -66,7 +66,7 @@ fun SpicyLyricsView(
         if (lineLayouts.isEmpty()) return@BoxWithConstraints
 
         var animStates by remember { mutableStateOf<List<LineAnimState>>(emptyList()) }
-        var dynamicYOffsets by remember { mutableStateOf<List<Float>>(emptyList()) }
+        var dynamicYOffsets by remember { mutableStateOf(FloatArray(0)) }
         var lastFrameTimeNanos by remember { mutableLongStateOf(0L) }
         
         // The high-frequency animation loop.
@@ -107,27 +107,42 @@ fun SpicyLyricsView(
                                 newDynamicYOffsets[i] = layout.yOffset + accumulatedY
                             }
                         }
-                        dynamicYOffsets = newDynamicYOffsets.toList()
+                        dynamicYOffsets = newDynamicYOffsets
 
-                        // 2. Identify all active lines and update the scroll target to center on them.
-                        val activeIndices = currentLayouts.indices
-                            .filter { !currentLayouts[it].isBackground && !currentLayouts[it].isSongwriter }
-                            .filter { currentLines[it].startMs <= currentTime && currentTime <= currentLines[it].endMs }
+                        // 2. Identify all active lines and update the scroll target to center on
+                        // them. Done with plain index loops to avoid allocating intermediate
+                        // lists on every frame.
+                        var minY = Float.MAX_VALUE
+                        var maxY = -Float.MAX_VALUE
+                        var hasActive = false
+                        for (i in currentLayouts.indices) {
+                            val layout = currentLayouts[i]
+                            if (layout.isBackground || layout.isSongwriter) continue
+                            val line = currentLines[i]
+                            if (line.startMs <= currentTime && currentTime <= line.endMs) {
+                                hasActive = true
+                                val top = newDynamicYOffsets[i]
+                                val bottom = top + layout.height
+                                if (top < minY) minY = top
+                                if (bottom > maxY) maxY = bottom
+                            }
+                        }
 
                         var targetY: Float? = null
-                        if (activeIndices.isNotEmpty()) {
-                            // Calculate the combined Y-range of all active lines.
-                            val minY = activeIndices.minOf { newDynamicYOffsets[it] }
-                            val maxY = activeIndices.maxOf { newDynamicYOffsets[it] + currentLayouts[it].height }
+                        if (hasActive) {
+                            // Center on the combined Y-range of all active lines.
                             val clusterCenterY = (minY + maxY) / 2f
                             targetY = -clusterCenterY
                         } else {
                             // Fallback: center on the latest line that has already started.
-                            val lastStartedIdx = currentLayouts.indices
-                                .filter { !currentLayouts[it].isBackground && !currentLayouts[it].isSongwriter }
-                                .lastOrNull { currentLines[it].startMs <= currentTime }
-                                ?: 0
-                            
+                            var lastStartedIdx = -1
+                            for (i in currentLayouts.indices) {
+                                val layout = currentLayouts[i]
+                                if (layout.isBackground || layout.isSongwriter) continue
+                                if (currentLines[i].startMs <= currentTime) lastStartedIdx = i
+                            }
+                            if (lastStartedIdx < 0) lastStartedIdx = 0
+
                             if (lastStartedIdx < currentLayouts.size) {
                                 val fallbackLayout = currentLayouts[lastStartedIdx]
                                 val fallbackDynamicY = newDynamicYOffsets[lastStartedIdx]

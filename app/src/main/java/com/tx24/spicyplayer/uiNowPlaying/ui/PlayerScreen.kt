@@ -68,6 +68,8 @@ import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.drawable.toBitmap
 import androidx.palette.graphics.Palette
 import coil.request.ImageRequest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.tx24.spicyplayer.model.playback.PlayerState
 import com.tx24.spicyplayer.model.playback.RepeatMode
 import com.tx24.spicyplayer.library.store.model.song.Song
@@ -285,7 +287,9 @@ fun nowPlayingScreenTint(songAlbumArtModel: SongAlbumArtModel): Color {
             return@LaunchedEffect
         }
 
-        val palette = Palette.from(bitmap).generate()
+        // Palette quantization is CPU-heavy; keep it off the main thread so a
+        // track change doesn't drop frames.
+        val palette = withContext(Dispatchers.Default) { Palette.from(bitmap).generate() }
 
         // Try better swatches with fallback order
         val swatch = palette.vibrantSwatch

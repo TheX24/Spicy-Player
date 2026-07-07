@@ -48,6 +48,15 @@ class SpringSimulation(
 
         val ω  = frequency * 2f * PI.toFloat()  // angular frequency
         val ζ  = damping                          // damping ratio
+
+        // With no angular frequency there is no restoring force; the analytic
+        // branches would divide by ωd == 0 and produce NaN. Snap to the goal.
+        if (ω <= 0f) {
+            x = goal
+            v = 0f
+            return goal
+        }
+
         val x0 = x - goal                         // displacement from goal
         val v0 = v
 

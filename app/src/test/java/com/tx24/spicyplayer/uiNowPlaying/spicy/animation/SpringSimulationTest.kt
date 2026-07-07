@@ -132,6 +132,15 @@ class SpringSimulationTest {
     }
 
     @Test
+    fun `zero frequency snaps to goal without producing NaN`() {
+        val spring = SpringSimulation(0f, frequency = 0f, damping = 0.4f)
+        spring.setGoal(GOAL)
+        val x = spring.step(FRAME_DT)
+        assertTrue(x.isFinite())
+        assertEquals(GOAL, x, 0f)
+    }
+
+    @Test
     fun `spring converges downward from above the goal`() {
         val spring = SpringSimulation(200f, frequency = 1.5f, damping = 1f)
         spring.setGoal(GOAL)

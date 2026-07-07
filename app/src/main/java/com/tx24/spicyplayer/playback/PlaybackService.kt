@@ -187,6 +187,9 @@ class PlaybackService :
                 true
             )
             .setHandleAudioBecomingNoisy(true)
+            // Symmetric 10s in-song seek used by the JUMP_FORWARD/JUMP_BACKWARD commands
+            .setSeekForwardIncrementMs(JUMP_INCREMENT_MS)
+            .setSeekBackIncrementMs(JUMP_INCREMENT_MS)
             .build().apply {
                 repeatMode = Player.REPEAT_MODE_ALL
             }
@@ -276,6 +279,8 @@ class PlaybackService :
                 val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
                     .add(SessionCommand(Commands.SET_SLEEP_TIMER, Bundle.EMPTY))
                     .add(SessionCommand(Commands.CANCEL_SLEEP_TIMER, Bundle.EMPTY))
+                    .add(SessionCommand(Commands.JUMP_FORWARD, Bundle.EMPTY))
+                    .add(SessionCommand(Commands.JUMP_BACKWARD, Bundle.EMPTY))
                 customCommands.forEach { commandButton ->
                     commandButton.sessionCommand?.let { availableSessionCommands.add(it) }
                 }
@@ -298,6 +303,12 @@ class PlaybackService :
                 }
                 if (Commands.CANCEL_SLEEP_TIMER == customCommand.customAction) {
                     sleepTimerManager.deleteTimer()
+                }
+                if (Commands.JUMP_FORWARD == customCommand.customAction) {
+                    player.seekForward()
+                }
+                if (Commands.JUMP_BACKWARD == customCommand.customAction) {
+                    player.seekBack()
                 }
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
@@ -372,6 +383,7 @@ class PlaybackService :
     companion object {
         const val TAG = "MEDIA_SESSION"
         const val VIEW_MEDIA_SCREEN_ACTION = "MEDIA_SCREEN_ACTION"
+        private const val JUMP_INCREMENT_MS = 10_000L
     }
 
 }
