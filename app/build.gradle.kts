@@ -120,6 +120,8 @@ dependencies {
     api(libs.accompanist.permissions)
 
     testImplementation(libs.junit)
+    // Real XmlPullParser implementation for JVM unit tests (Android ships kxml2 built in)
+    testImplementation(libs.kxml2)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
 }

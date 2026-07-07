@@ -23,6 +23,7 @@ hilt = "2.51"
 jaudio-tagger = "1.0"
 junit = "4.13.2"
 kotlin = "2.0.0"
+kxml2 = "2.3.0"
 kotlinxCoroutines = "1.7.1"
 ksp = "2.0.0-1.0.22"
 lifecycle-runtime-ktx = "2.6.1"
@@ -75,6 +76,7 @@ gson-converter = { group = "com.squareup.retrofit2", name = "converter-gson", ve
 jaudio-tagger = { module = "com.github.Shabinder:JAudioTagger-Android", version.ref = "jaudio-tagger" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+kxml2 = { group = "net.sf.kxml", name = "kxml2", version.ref = "kxml2" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 ksp-gradlePlugin = { group = "com.google.devtools.ksp", name = "com.google.devtools.ksp.gradle.plugin", version.ref = "ksp" }
 lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle-runtime-ktx" }

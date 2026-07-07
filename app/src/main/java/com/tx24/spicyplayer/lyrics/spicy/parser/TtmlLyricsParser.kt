@@ -1,11 +1,11 @@
 package com.tx24.spicyplayer.uiNowPlaying.spicy.parser
 
-import android.util.Xml
 import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Letter
 import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Line
 import com.tx24.spicyplayer.uiNowPlaying.spicy.models.ParsedLyrics
 import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Word
 import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
 import java.io.InputStreamReader
 
@@ -30,7 +30,9 @@ object TtmlLyricsParser {
      * @return A [ParsedLyrics] object containing the parsed lines and metadata.
      */
     fun parse(inputStream: InputStream): ParsedLyrics {
-        val parser = Xml.newPullParser()
+        // XmlPullParserFactory resolves to the same KXmlParser as android.util.Xml
+        // on device, but is also instantiable in plain JVM unit tests.
+        val parser = XmlPullParserFactory.newInstance().newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
         val reader = inputStream.reader(Charsets.UTF_8)
         parser.setInput(reader)
