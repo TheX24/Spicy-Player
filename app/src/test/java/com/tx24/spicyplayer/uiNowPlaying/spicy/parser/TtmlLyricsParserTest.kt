@@ -181,4 +181,30 @@ class TtmlLyricsParserTest {
         assertTrue(result.lines.isEmpty())
         assertTrue(result.songwriters.isEmpty())
     }
+
+    @Test
+    fun `truncated ttml returns empty lyrics instead of throwing`() {
+        val result = parse(
+            """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="0:01.000" end="0:02.000">Hel"""
+        )
+        assertTrue(result.lines.isEmpty())
+    }
+
+    @Test
+    fun `garbage input returns empty lyrics instead of throwing`() {
+        assertTrue(parse("this is not xml at all").lines.isEmpty())
+    }
+
+    @Test
+    fun `mismatched tags return empty lyrics instead of throwing`() {
+        val result = parse(
+            """<tt><body><div><p begin="1" end="2">X</span></p></div></body></tt>"""
+        )
+        assertTrue(result.lines.isEmpty())
+    }
+
+    @Test
+    fun `empty stream returns empty lyrics instead of throwing`() {
+        assertTrue(parse("").lines.isEmpty())
+    }
 }

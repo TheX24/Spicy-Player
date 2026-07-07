@@ -70,81 +70,103 @@ class LyricsRepository @Inject constructor(
         durationSeconds: Int
     ): LyricsResult = withContext(Dispatchers.IO) {
 
-        val songPath = mediaRepository.getSongPath(uri)
-        val audioFile = File(songPath)
+        // Any failure while probing local files (song deleted from MediaStore,
+        // unreadable file, container jaudiotagger can't parse) must not abort the
+        // lookup — the internet fallback below can still succeed.
+        val songPath = runCatching { mediaRepository.getSongPath(uri) }.getOrNull()
 
-        // 1. Check for local TTML file (rich spicy lyrics)
-        val ttmlFile = File(audioFile.parent, audioFile.nameWithoutExtension + ".ttml")
-        if (ttmlFile.exists()) {
-            return@withContext LyricsResult.FoundTtmlLyrics(
-                ttmlFile.readText(),
-                LyricsFetchSource.FROM_LOCAL_FILE
-            )
-        }
+        if (songPath != null) {
+            val audioFile = File(songPath)
 
-        // 2. Check for local LRC file
-        val lrcFile = File(audioFile.parent, audioFile.nameWithoutExtension + ".lrc")
-        if (lrcFile.exists()) {
-            val syncedLyrics = SynchronizedLyrics.fromString(lrcFile.readText())
-            if (syncedLyrics != null) {
-                return@withContext LyricsResult.FoundSyncedLyrics(
-                    syncedLyrics,
-                    LyricsFetchSource.FROM_LOCAL_FILE
-                )
+            // 1. Check for local TTML file (rich spicy lyrics)
+            try {
+                val ttmlFile = File(audioFile.parent, audioFile.nameWithoutExtension + ".ttml")
+                if (ttmlFile.exists()) {
+                    return@withContext LyricsResult.FoundTtmlLyrics(
+                        ttmlFile.readText(),
+                        LyricsFetchSource.FROM_LOCAL_FILE
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("lyrics", "Failed reading local TTML file", e)
             }
-        }
 
-        // 3. Fuzzy directory match for TTML/LRC
-        run {
-            val parentDir = audioFile.parentFile ?: return@run
-            val files = parentDir.listFiles() ?: return@run
-            
-            val fuzzyAudioName = fuzzyNormalize(audioFile.nameWithoutExtension)
-            val fuzzyTitle = fuzzyNormalize(title)
-            
-            val candidate = files.find { file ->
-                val ext = file.extension.lowercase()
-                if (ext != "ttml" && ext != "lrc") return@find false
-                
-                val name = file.nameWithoutExtension
-                val fuzzyName = fuzzyNormalize(name)
-                
-                // Compare with filename or metadata title + artist
-                fuzzyName == fuzzyAudioName || 
-                (fuzzyName.contains(fuzzyTitle) && isArtistMatch(artist, name)) ||
-                (fuzzyTitle.length >= 4 && fuzzyName == fuzzyTitle) // Just the title if we're in the same folder
-            }
-            
-            if (candidate != null) {
-                val content = candidate.readText()
-                if (candidate.extension.lowercase() == "ttml") {
-                    return@withContext LyricsResult.FoundTtmlLyrics(content, LyricsFetchSource.FROM_LOCAL_FILE)
-                } else {
-                    val syncedLyrics = SynchronizedLyrics.fromString(content)
+            // 2. Check for local LRC file
+            try {
+                val lrcFile = File(audioFile.parent, audioFile.nameWithoutExtension + ".lrc")
+                if (lrcFile.exists()) {
+                    val syncedLyrics = SynchronizedLyrics.fromString(lrcFile.readText())
                     if (syncedLyrics != null) {
-                        return@withContext LyricsResult.FoundSyncedLyrics(syncedLyrics, LyricsFetchSource.FROM_LOCAL_FILE)
+                        return@withContext LyricsResult.FoundSyncedLyrics(
+                            syncedLyrics,
+                            LyricsFetchSource.FROM_LOCAL_FILE
+                        )
                     }
                 }
+            } catch (e: Exception) {
+                Log.e("lyrics", "Failed reading local LRC file", e)
             }
-        }
 
-        val audioFileIO = AudioFileIO().readFile(audioFile)
-        val tags = audioFileIO.tagOrCreateAndSetDefault
+            // 3. Fuzzy directory match for TTML/LRC
+            try {
+                run {
+                    val parentDir = audioFile.parentFile ?: return@run
+                    val files = parentDir.listFiles() ?: return@run
 
-        // check for embedded lyrics first
-        kotlin.run {
-            val lyrics = tags.getFirst(FieldKey.LYRICS) ?: return@run
-            val syncedLyrics = SynchronizedLyrics.fromString(lyrics)
-            if (syncedLyrics != null)
-                return@withContext LyricsResult.FoundSyncedLyrics(
-                    syncedLyrics,
-                    LyricsFetchSource.FROM_SONG_METADATA
-                )
-            else if (lyrics.isNotBlank())
-                return@withContext LyricsResult.FoundPlainLyrics(
-                    PlainLyrics.fromString(lyrics),
-                    LyricsFetchSource.FROM_SONG_METADATA
-                )
+                    val fuzzyAudioName = fuzzyNormalize(audioFile.nameWithoutExtension)
+                    val fuzzyTitle = fuzzyNormalize(title)
+
+                    val candidate = files.find { file ->
+                        val ext = file.extension.lowercase()
+                        if (ext != "ttml" && ext != "lrc") return@find false
+
+                        val name = file.nameWithoutExtension
+                        val fuzzyName = fuzzyNormalize(name)
+
+                        // Compare with filename or metadata title + artist
+                        fuzzyName == fuzzyAudioName ||
+                        (fuzzyName.contains(fuzzyTitle) && isArtistMatch(artist, name)) ||
+                        (fuzzyTitle.length >= 4 && fuzzyName == fuzzyTitle) // Just the title if we're in the same folder
+                    }
+
+                    if (candidate != null) {
+                        val content = candidate.readText()
+                        if (candidate.extension.lowercase() == "ttml") {
+                            return@withContext LyricsResult.FoundTtmlLyrics(content, LyricsFetchSource.FROM_LOCAL_FILE)
+                        } else {
+                            val syncedLyrics = SynchronizedLyrics.fromString(content)
+                            if (syncedLyrics != null) {
+                                return@withContext LyricsResult.FoundSyncedLyrics(syncedLyrics, LyricsFetchSource.FROM_LOCAL_FILE)
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("lyrics", "Fuzzy lyrics file match failed", e)
+            }
+
+            // 4. Check for lyrics embedded in the audio file's tags
+            try {
+                val audioFileIO = AudioFileIO().readFile(audioFile)
+                val tags = audioFileIO.tagOrCreateAndSetDefault
+
+                val lyrics: String? = tags.getFirst(FieldKey.LYRICS)
+                if (lyrics != null) {
+                    val syncedLyrics = SynchronizedLyrics.fromString(lyrics)
+                    if (syncedLyrics != null)
+                        return@withContext LyricsResult.FoundSyncedLyrics(
+                            syncedLyrics,
+                            LyricsFetchSource.FROM_SONG_METADATA
+                        )
+                    else if (lyrics.isNotBlank())
+                        return@withContext LyricsResult.FoundPlainLyrics(
+                            PlainLyrics.fromString(lyrics),
+                            LyricsFetchSource.FROM_SONG_METADATA
+                        )
+                }
+            } catch (e: Exception) {
+                Log.e("lyrics", "Failed reading embedded lyrics tags", e)
+            }
         }
 
         return@withContext downloadLyricsFromInternet(title, album, artist, durationSeconds)

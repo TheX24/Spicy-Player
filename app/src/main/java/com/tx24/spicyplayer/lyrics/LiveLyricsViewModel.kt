@@ -9,6 +9,7 @@ import com.tx24.spicyplayer.library.store.lyrics.LyricsRepository
 import com.tx24.spicyplayer.library.store.lyrics.LyricsResult
 import com.tx24.spicyplayer.library.store.model.song.Song
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import javax.inject.Inject
 
 
@@ -67,34 +69,43 @@ class LiveLyricsViewModel @Inject constructor(
     private suspend fun loadLyrics(song: Song) = withContext(Dispatchers.Default) {
         _state.value = LyricsScreenState.SearchingLyrics
 
-        val lyricsResult = lyricsRepository
-            .getLyrics(
-                song.uri,
-                song.metadata.title,
-                song.metadata.albumName.orEmpty(),
-                song.metadata.artistName.orEmpty(),
-                song.metadata.durationMillis.toInt() / 1000
-            )
-
-        val newState = when (lyricsResult) {
-            is LyricsResult.NotFound ->
-                LyricsScreenState.NoLyrics(NoLyricsReason.NOT_FOUND)
-
-            is LyricsResult.NetworkError ->
-                LyricsScreenState.NoLyrics(NoLyricsReason.NETWORK_ERROR)
-
-            is LyricsResult.FoundPlainLyrics ->
-                LyricsScreenState.TextLyrics(lyricsResult.plainLyrics, lyricsResult.lyricsSource)
-
-            is LyricsResult.FoundSyncedLyrics ->
-                LyricsScreenState.SyncedLyrics(lyricsResult.syncedLyrics, lyricsResult.lyricsSource)
-
-            is LyricsResult.FoundTtmlLyrics -> {
-                val parsed = com.tx24.spicyplayer.uiNowPlaying.spicy.parser.TtmlLyricsParser.parse(
-                    lyricsResult.ttmlContent.byteInputStream()
+        // A throw here would cancel the song-change collector in init and stop
+        // lyrics from loading for every subsequent song, so fail into NoLyrics.
+        val newState = try {
+            val lyricsResult = lyricsRepository
+                .getLyrics(
+                    song.uri,
+                    song.metadata.title,
+                    song.metadata.albumName.orEmpty(),
+                    song.metadata.artistName.orEmpty(),
+                    song.metadata.durationMillis.toInt() / 1000
                 )
-                LyricsScreenState.TtmlLyrics(parsed, lyricsResult.lyricsSource)
+
+            when (lyricsResult) {
+                is LyricsResult.NotFound ->
+                    LyricsScreenState.NoLyrics(NoLyricsReason.NOT_FOUND)
+
+                is LyricsResult.NetworkError ->
+                    LyricsScreenState.NoLyrics(NoLyricsReason.NETWORK_ERROR)
+
+                is LyricsResult.FoundPlainLyrics ->
+                    LyricsScreenState.TextLyrics(lyricsResult.plainLyrics, lyricsResult.lyricsSource)
+
+                is LyricsResult.FoundSyncedLyrics ->
+                    LyricsScreenState.SyncedLyrics(lyricsResult.syncedLyrics, lyricsResult.lyricsSource)
+
+                is LyricsResult.FoundTtmlLyrics -> {
+                    val parsed = com.tx24.spicyplayer.uiNowPlaying.spicy.parser.TtmlLyricsParser.parse(
+                        lyricsResult.ttmlContent.byteInputStream()
+                    )
+                    LyricsScreenState.TtmlLyrics(parsed, lyricsResult.lyricsSource)
+                }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to load lyrics for %s", song.metadata.title)
+            LyricsScreenState.NoLyrics(NoLyricsReason.NOT_FOUND)
         }
 
         if (isActive)

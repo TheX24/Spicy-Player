@@ -5,6 +5,7 @@ import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Line
 import com.tx24.spicyplayer.uiNowPlaying.spicy.models.ParsedLyrics
 import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Word
 import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserException
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -26,10 +27,21 @@ object TtmlLyricsParser {
     /**
      * Parses a TTML input stream into a [ParsedLyrics] object.
      *
+     * Malformed or truncated TTML yields an empty [ParsedLyrics] instead of
+     * throwing: an uncaught parser exception would cancel the song-change
+     * collector and disable lyrics for the rest of the session.
+     *
      * @param inputStream The stream containing the TTML content.
      * @return A [ParsedLyrics] object containing the parsed lines and metadata.
      */
-    fun parse(inputStream: InputStream): ParsedLyrics {
+    fun parse(inputStream: InputStream): ParsedLyrics =
+        try {
+            parseInternal(inputStream)
+        } catch (e: Exception) {
+            ParsedLyrics(emptyList())
+        }
+
+    private fun parseInternal(inputStream: InputStream): ParsedLyrics {
         // XmlPullParserFactory resolves to the same KXmlParser as android.util.Xml
         // on device, but is also instantiable in plain JVM unit tests.
         val parser = XmlPullParserFactory.newInstance().newPullParser()
@@ -179,6 +191,11 @@ object TtmlLyricsParser {
 
         var eventType = parser.next()
         while (!(eventType == XmlPullParser.END_TAG && parser.name == "p")) {
+            // A document truncated inside <p> can yield END_DOCUMENT forever
+            // instead of throwing; without this check the loop never exits.
+            if (eventType == XmlPullParser.END_DOCUMENT) {
+                throw XmlPullParserException("Unexpected end of document inside <p>")
+            }
             when (eventType) {
                 XmlPullParser.START_TAG -> {
                     // Inherit timing from parent if not specified.
