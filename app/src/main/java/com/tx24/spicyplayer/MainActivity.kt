@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +21,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -44,9 +46,7 @@ import com.tx24.spicyplayer.ui.common.rememberCommonSongsActions
 import com.tx24.spicyplayer.ui.model.toUiModel
 import com.tx24.spicyplayer.ui.theme.SpicyTheme
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 
@@ -71,20 +71,28 @@ class MainActivity : ComponentActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        val initialUserPreferences =
-            runBlocking { userPreferencesRepository.userSettingsFlow.first().toUiModel() }
-
         val userPreferencesFlow = userPreferencesRepository.userSettingsFlow.map { it.toUiModel() }
 
         setContent {
 
+            // Preferences load asynchronously from DataStore instead of blocking the
+            // main thread during onCreate. While they load we draw a neutral surface
+            // keyed to the system dark-mode, so the common case (theme follows system)
+            // shows no flash and we never risk an ANR on slow storage.
             val userPreferences by userPreferencesFlow
-                .collectAsState(
-                    initial = initialUserPreferences
-                )
+                .collectAsState(initial = null)
 
-            LaunchedEffect(userPreferences.uiSettings.keepScreenOn) {
-                if (userPreferences.uiSettings.keepScreenOn) {
+            val prefs = userPreferences
+            if (prefs == null) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = if (isSystemInDarkTheme()) Color.Black else Color.White
+                ) {}
+                return@setContent
+            }
+
+            LaunchedEffect(prefs.uiSettings.keepScreenOn) {
+                if (prefs.uiSettings.keepScreenOn) {
                     window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 } else {
                     window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -94,7 +102,7 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
 
             SpicyTheme(
-                userPreferences = userPreferences,
+                userPreferences = prefs,
             ) {
                 val commonSongsActions =
                     rememberCommonSongsActions(
@@ -115,7 +123,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 CompositionLocalProvider(
-                    LocalUserPreferences provides userPreferences,
+                    LocalUserPreferences provides prefs,
                     LocalCommonSongsAction provides commonSongsActions
                 ) {
                     Surface(

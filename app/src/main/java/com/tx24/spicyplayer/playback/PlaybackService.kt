@@ -43,6 +43,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -342,10 +343,14 @@ class PlaybackService :
 
     override fun onDestroy() {
         Timber.d("onDestroy called")
-        scope.cancel()
+        // Persist the resume position before releasing the player. This must
+        // complete before teardown, but it is bounded so a slow DataStore write
+        // can never hold the main thread long enough to ANR — the save is
+        // best-effort at teardown.
         runBlocking {
-            saveCurrentPosition()
+            withTimeoutOrNull(2_000) { saveCurrentPosition() }
         }
+        scope.cancel()
         mediaSession?.run {
             player.release()
             release()
