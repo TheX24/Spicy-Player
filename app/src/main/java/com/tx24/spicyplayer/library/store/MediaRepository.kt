@@ -8,7 +8,6 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import com.tx24.spicyplayer.model.song.BasicSongMetadata
-import com.tx24.spicyplayer.library.store.MediaRepository.PermissionListener
 import com.tx24.spicyplayer.library.store.model.song.Song
 import com.tx24.spicyplayer.library.store.model.song.SongLibrary
 import com.tx24.spicyplayer.library.store.preferences.UserPreferencesRepository
@@ -18,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
@@ -54,7 +54,12 @@ class MediaRepository @Inject constructor(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)
 
 
-    private lateinit var permissionListener: PermissionListener
+    /**
+     * Permission grants are signalled through a replayed flow instead of a lateinit
+     * listener: MainActivity can report the grant on the first frame, before the
+     * [songsFlow] producer coroutine has started on its background scope.
+     */
+    private val permissionEvents = MutableSharedFlow<Unit>(replay = 1)
 
     /** A state flow that contains all the songs in the user's device
     Automatically updates when the MediaStore changes
@@ -89,13 +94,20 @@ class MediaRepository @Inject constructor(
                 }
             }
 
-            permissionListener = PermissionListener {
-
-                mediaSyncJob = launch {
-                    send(getAllSongs())
-                    mediaSyncJob = null
+            launch {
+                permissionEvents.collect {
+                    if (mediaSyncJob?.isActive != true) {
+                        mediaSyncJob = launch {
+                            try {
+                                send(getAllSongs())
+                            } catch (e: Exception) {
+                                Timber.e(e.message)
+                            } finally {
+                                mediaSyncJob = null
+                            }
+                        }
+                    }
                 }
-
             }
 
             context.contentResolver.registerContentObserver(
@@ -273,15 +285,7 @@ class MediaRepository @Inject constructor(
      * granted the READ permission, in order to refresh the music library
      */
     fun onPermissionAccepted() {
-        permissionListener.onPermissionGranted()
-    }
-
-    /**
-     * Interface implemented inside the callback flow of the [MediaRepository]
-     * to force refresh of the song library when the user grants the permission
-     */
-    private fun interface PermissionListener {
-        fun onPermissionGranted()
+        permissionEvents.tryEmit(Unit)
     }
 
 }

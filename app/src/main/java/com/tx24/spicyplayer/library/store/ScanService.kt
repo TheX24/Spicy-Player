@@ -71,7 +71,7 @@ class ScanService : Service() {
             try {
                 val excludedFolders = userPreferencesRepository.librarySettingsFlow.map { it.excludedFolders }.first()
                 val results = performScan(this@ScanService, scanPath, excludedFolders) { progress ->
-                    CoroutineScope(Dispatchers.Main).launch {
+                    serviceScope.launch(Dispatchers.Main) {
                         scanStateRepository.scanProgress.value = progress
                         val currentHistory = scanStateRepository.scanHistory.value.toMutableList()
                         val msg = if (progress.summary.isNotEmpty()) progress.summary else progress.phase
@@ -94,12 +94,19 @@ class ScanService : Service() {
                 
                 _resultFlow.emit(results)
                 Log.d("ScanService", "Scan completed: ${results.size} songs")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("ScanService", "Scan failed", e)
             } finally {
-                scanStateRepository.scanProgress.value = null
-                stopForeground(true)
-                stopSelf()
+                // A rescan cancels the running job; only the scan that is still
+                // current may tear down the foreground service, otherwise the
+                // superseding scan is left without its notification and dies.
+                if (scanJob == coroutineContext[Job]) {
+                    scanStateRepository.scanProgress.value = null
+                    stopForeground(true)
+                    stopSelf()
+                }
             }
         }
     }
