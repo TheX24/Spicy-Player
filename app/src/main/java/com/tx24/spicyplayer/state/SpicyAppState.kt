@@ -15,6 +15,7 @@ import com.tx24.spicyplayer.uiNowPlaying.viewmodel.NowPlayingViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
@@ -68,7 +69,7 @@ class SpicyAppState(
                         route.contains(ALBUM_DETAIL_ROUTE) ||
                         route.contains(SETTINGS_ROUTE)
                 )
-    }
+    }.distinctUntilChanged()
 
 
 }
