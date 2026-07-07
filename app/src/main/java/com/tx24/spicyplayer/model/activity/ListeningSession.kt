@@ -5,5 +5,8 @@ import java.util.Date
 
 data class ListeningSession(
     val startTime: Date,
-    val durationSeconds: Int
+    val durationSeconds: Int,
+    val songUri: String = "",
+    val songName: String = "",
+    val albumName: String = "",
 )

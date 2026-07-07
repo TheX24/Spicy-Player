@@ -249,10 +249,23 @@ class UserPreferencesRepository @Inject constructor(
         )
     }
 
+    /**
+     * Decodes a stored enum name, falling back to [default] when the stored value
+     * no longer matches any constant (renamed across versions, corrupted store).
+     * A plain valueOf here would throw inside the settings flow mapping and crash
+     * every collector (theme, playback service, widgets) with no recovery.
+     */
+    private inline fun <reified T : Enum<T>> safeEnumValueOf(value: String?, default: T): T =
+        try {
+            if (value == null) default else enumValueOf<T>(value)
+        } catch (e: IllegalArgumentException) {
+            default
+        }
+
     private fun Preferences.getUiSettings(): UiSettings {
-        val theme = AppTheme.valueOf(this[THEME_KEY] ?: "SYSTEM")
+        val theme = safeEnumValueOf(this[THEME_KEY], AppTheme.SYSTEM)
         val isUsingDynamicColor = this[DYNAMIC_COLOR_KEY] ?: true
-        val playerTheme = PlayerTheme.valueOf(this[PLAYER_THEME_KEY] ?: "BLUR")
+        val playerTheme = safeEnumValueOf(this[PLAYER_THEME_KEY], PlayerTheme.BLUR)
         val blackBackgroundForDarkTheme = this[BLACK_BACKGROUND_FOR_DARK_THEME_KEY] ?: false
         val accentColor = this[ACCENT_COLOR_KEY] ?: DEFAULT_ACCENT_COLOR
         val miniPlayerExtraControls = this[MINI_PLAYER_EXTRA_CONTROLS] ?: false
@@ -284,10 +297,16 @@ class UserPreferencesRepository @Inject constructor(
         val albumsGridSize = this[ALBUMS_GRID_SIZE_KEY] ?: 2
 
         val songsSortOrder = if (songSortOptionsParts == null)
-            SongSortOption.TITLE to true else SongSortOption.valueOf(songSortOptionsParts[0]) to songSortOptionsParts[1].toBoolean()
+            SongSortOption.TITLE to true
+        else
+            safeEnumValueOf(songSortOptionsParts.getOrNull(0), SongSortOption.TITLE) to
+                    (songSortOptionsParts.getOrNull(1)?.toBoolean() ?: true)
 
         val albumsSortOrder = if (albumsSortOptionsParts == null)
-            AlbumsSortOption.NAME to true else AlbumsSortOption.valueOf(albumsSortOptionsParts[0]) to albumsSortOptionsParts[1].toBoolean()
+            AlbumsSortOption.NAME to true
+        else
+            safeEnumValueOf(albumsSortOptionsParts.getOrNull(0), AlbumsSortOption.NAME) to
+                    (albumsSortOptionsParts.getOrNull(1)?.toBoolean() ?: true)
 
 
         val cacheAlbumCoverArt = this[CACHE_ALBUM_COVER_ART_KEY] ?: true

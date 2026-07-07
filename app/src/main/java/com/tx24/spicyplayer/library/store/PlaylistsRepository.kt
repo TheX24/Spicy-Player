@@ -6,14 +6,17 @@ import com.tx24.spicyplayer.library.database.model.PlaylistInfoWithNumberOfSongs
 import com.tx24.spicyplayer.model.playlist.PlaylistInfo
 import com.tx24.spicyplayer.library.store.model.playlist.Playlist
 import com.tx24.spicyplayer.library.store.model.song.Song
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,7 +27,13 @@ class PlaylistsRepository @Inject constructor(
     private val mediaRepository: MediaRepository,
 ) {
 
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    // Supervised with a handler so one failed write can't kill the singleton
+    // scope (which also backs playlistsWithInfoFlows) and silently disable
+    // every subsequent playlist operation.
+    private val coroutineScope: CoroutineScope = CoroutineScope(
+        Dispatchers.IO + SupervisorJob() +
+                CoroutineExceptionHandler { _, e -> Timber.e(e, "Playlist write failed") }
+    )
 
     val playlistsWithInfoFlows =
         playlistsDao.getPlaylistsInfoFlow()

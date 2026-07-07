@@ -28,7 +28,13 @@ class ListeningAnalytics @AssistedInject constructor(
 
     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
         if (playWhenReady) {
-            currentListeningSessionInfo = CurrentListeningSessionInfo(Date())
+            val item = player.currentMediaItem
+            currentListeningSessionInfo = CurrentListeningSessionInfo(
+                startDate = Date(),
+                songUri = item?.requestMetadata?.mediaUri?.toString().orEmpty(),
+                songName = item?.mediaMetadata?.title?.toString().orEmpty(),
+                albumName = item?.mediaMetadata?.albumTitle?.toString().orEmpty(),
+            )
         } else {
             val l = currentListeningSessionInfo ?: return
             flushSession(l)
@@ -49,7 +55,10 @@ class ListeningAnalytics @AssistedInject constructor(
     private fun flushSession(l: CurrentListeningSessionInfo) {
         val listeningSession = ListeningSession(
             l.startDate,
-            (currentTimeSeconds - l.startDate.timeSeconds).toInt()
+            (currentTimeSeconds - l.startDate.timeSeconds).toInt(),
+            songUri = l.songUri,
+            songName = l.songName,
+            albumName = l.albumName,
         )
         analyticsRepository.insertListeningSession(listeningSession)
     }
@@ -58,6 +67,9 @@ class ListeningAnalytics @AssistedInject constructor(
 
     private data class CurrentListeningSessionInfo(
         val startDate: Date,
+        val songUri: String,
+        val songName: String,
+        val albumName: String,
     )
 
     @AssistedFactory
