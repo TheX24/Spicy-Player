@@ -6,8 +6,6 @@ import com.tx24.spicyplayer.library.database.dao.QueueDao
 import com.tx24.spicyplayer.library.database.entities.queue.QueueEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,10 +21,6 @@ class QueueRepository @Inject constructor(
     suspend fun getQueue(): List<DBQueueItem> =
         queueDao.getQueue()
             .map { it.toDBQueueItem() }
-
-    fun observeQueueUris(): Flow<List<String>> =
-        queueDao.getQueueFlow()
-            .map { it.map { queueItem -> queueItem.songUri } }
 
     fun saveQueueFromDBQueueItems(songs: List<DBQueueItem>) {
         scope.launch {

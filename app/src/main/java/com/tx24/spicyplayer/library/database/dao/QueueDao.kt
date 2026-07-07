@@ -6,7 +6,6 @@ import androidx.room.Query
 import androidx.room.Transaction
 import com.tx24.spicyplayer.library.database.entities.queue.QUEUE_TABLE
 import com.tx24.spicyplayer.library.database.entities.queue.QueueEntity
-import kotlinx.coroutines.flow.Flow
 
 
 @Dao
@@ -20,9 +19,6 @@ interface QueueDao {
 
     @Insert
     suspend fun insertQueue(queue: List<QueueEntity>)
-
-    @Query("SELECT * FROM $QUEUE_TABLE")
-    fun getQueueFlow(): Flow<List<QueueEntity>>
 
     @Query("DELETE FROM $QUEUE_TABLE")
     suspend fun deleteQueue()

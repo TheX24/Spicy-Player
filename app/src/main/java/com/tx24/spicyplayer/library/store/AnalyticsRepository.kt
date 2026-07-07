@@ -34,6 +34,4 @@ class AnalyticsRepository @Inject constructor(
     private fun ListeningSessionEntity.toModel() =
         ListeningSession(Date(startTimeEpoch), durationSeconds)
 
-    private val Date.timeSeconds get() = time / 1000
-
 }

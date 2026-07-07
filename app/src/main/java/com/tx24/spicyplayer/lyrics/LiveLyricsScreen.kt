@@ -24,7 +24,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -382,27 +381,6 @@ fun TtmlLyricsState(
         )
 
 
-    }
-}
-
-@Composable
-fun LyricSynchronizerEffect(
-    synchronizedLyrics: SynchronizedLyrics,
-    songProgressMillis: () -> Long,
-    onLyricsIndexCalculated: suspend (Int) -> Unit,
-) {
-    val updateLambda by rememberUpdatedState(newValue = onLyricsIndexCalculated)
-    LaunchedEffect(synchronizedLyrics) {
-        while (isActive) {
-            val currentMillis = songProgressMillis()
-            var index =
-                synchronizedLyrics.segments.binarySearch { it.durationMillis - currentMillis.toInt() }
-            if (index < 0) {
-                index = (-(index + 1) - 1).coerceIn(0, synchronizedLyrics.segments.size - 1)
-            }
-            updateLambda.invoke(index)
-            delay(200)
-        }
     }
 }
 

@@ -27,7 +27,4 @@ interface LyricsDao {
         artist: String
     ): LyricsEntity?
 
-    @Query("DELETE FROM $LYRICS_TABLE")
-    suspend fun deleteAll()
-
 }
