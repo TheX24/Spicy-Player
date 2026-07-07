@@ -29,7 +29,7 @@ fun AlbumsList(
 ) {
     val listState = rememberLazyListState()
     LazyColumn(modifier, state = listState) {
-        items(albums, key = { it.albumInfo.name }) {
+        items(albums, key = { it.albumInfo.id }) {
             val isSelected = multiSelectState.selected.contains(it)
             AlbumRow(
                 modifier = Modifier

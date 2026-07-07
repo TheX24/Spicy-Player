@@ -121,7 +121,7 @@ fun PlaylistsScreen(
 
                 val list = (state as PlaylistsScreenState.Success).playlists
 
-                items(list) {
+                items(list, key = { it.id }) {
 
                     var currentRenameId by remember { mutableStateOf<Int?>(null) }
                     BackHandler(currentRenameId != null) {

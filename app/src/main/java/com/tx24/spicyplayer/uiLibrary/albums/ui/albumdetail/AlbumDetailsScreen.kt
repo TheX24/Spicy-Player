@@ -196,7 +196,7 @@ fun AlbumDetailsPortraitScreen(
                         fontWeight = FontWeight.Light
                     )
                 }
-                itemsIndexed(albumSongs) { num, song ->
+                itemsIndexed(albumSongs, key = { _, song -> song.song.uri.toString() }) { num, song ->
                     AlbumSongRow(
                         modifier = Modifier
                             .fillMaxWidth()

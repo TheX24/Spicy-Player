@@ -243,7 +243,7 @@ private fun AlbumsRow(
 ) {
     LazyRow(modifier) {
         item { Spacer(modifier = Modifier.width(6.dp)) }
-        items(albums) { album ->
+        items(albums, key = { it.albumInfo.id }) { album ->
             Album(modifier = Modifier
                 .width(IntrinsicSize.Min)
                 .clip(RoundedCornerShape(6.dp))

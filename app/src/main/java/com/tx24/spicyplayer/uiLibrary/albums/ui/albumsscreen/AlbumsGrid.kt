@@ -54,7 +54,7 @@ fun AlbumsGrid(
         columns = GridCells.Fixed(numOfColumns),
         state = listState
     ) {
-        items(albums, key = { it.albumInfo.name }) {
+        items(albums, key = { it.albumInfo.id }) {
             AlbumGridCard(
                 modifier = Modifier
                     .scale(0.95f)
