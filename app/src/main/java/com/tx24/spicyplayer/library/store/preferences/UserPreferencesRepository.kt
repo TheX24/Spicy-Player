@@ -23,13 +23,17 @@ import com.tx24.spicyplayer.model.prefs.PlayerTheme
 import com.tx24.spicyplayer.model.prefs.UiSettings
 import com.tx24.spicyplayer.model.prefs.UserPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,14 +45,18 @@ class UserPreferencesRepository @Inject constructor(
     private val blacklistDao: BlacklistedFoldersDao
 ) {
 
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
+    // Shared so the DataStore read + blacklist Room query run once for all
+    // collectors (PlaybackManager, PlaybackService, MainActivity, widgets)
+    // instead of re-running the combine per collector.
     val userSettingsFlow: Flow<UserPreferences> =
         combine(
             context.datastore.data.catch { emptyPreferences() },
             blacklistDao.getAllBlacklistedFoldersFlow()
         ) { settings, blacklistFolders ->
             mapPrefsToModel(settings, blacklistFolders)
-        }
+        }.shareIn(scope, SharingStarted.WhileSubscribed(5_000), replay = 1)
 
     val librarySettingsFlow = userSettingsFlow
         .map {

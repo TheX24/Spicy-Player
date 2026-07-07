@@ -116,16 +116,16 @@ class MediaRepository @Inject constructor(
                 observer
             )
 
-            // Initial Sync
+            // Initial Sync. A single launch: the previous nested launch had the
+            // outer coroutine immediately overwrite mediaSyncJob with the inner one
+            // and complete, which defeated the mediaSyncJob?.isActive de-dupe guard.
             mediaSyncJob = launch {
-                mediaSyncJob = launch {
-                    try {
-                        send(getAllSongs())
-                    } catch (e: Exception) {
-                        Timber.e(e.message)
-                    } finally {
-                        mediaSyncJob = null
-                    }
+                try {
+                    send(getAllSongs())
+                } catch (e: Exception) {
+                    Timber.e(e.message)
+                } finally {
+                    mediaSyncJob = null
                 }
             }
 

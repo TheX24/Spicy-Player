@@ -14,8 +14,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
+import javax.inject.Singleton
 
 
+@Singleton
 class AlbumsRepository @Inject constructor(
     val mediaRepository: MediaRepository
 ) {
