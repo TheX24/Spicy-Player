@@ -49,11 +49,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.tx24.spicyplayer.model.lyrics.LyricsFetchSource
 import com.tx24.spicyplayer.model.lyrics.PlainLyrics
 import com.tx24.spicyplayer.model.lyrics.SynchronizedLyrics
 import com.tx24.spicyplayer.uiNowPlaying.spicy.canvas.SpicyLyricsView
 import com.tx24.spicyplayer.lyrics.toSpicyLines
+import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Line
 import com.tx24.spicyplayer.uiNowPlaying.spicy.models.ParsedLyrics
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -102,7 +102,6 @@ fun LiveLyricsScreen(
             SyncedLyricsState(
                 modifier = modifier,
                 synchronizedLyrics = state.syncedLyrics,
-                lyricsFetchSource = state.lyricsSource,
                 onSeekToPositionMillis = onSeekToPositionMillis,
                 songProgressMillis = songProgressMillis
             )
@@ -111,7 +110,6 @@ fun LiveLyricsScreen(
             TtmlLyricsState(
                 modifier = modifier,
                 parsedLyrics = state.parsedLyrics,
-                lyricsFetchSource = state.lyricsSource,
                 onSeekToPositionMillis = onSeekToPositionMillis,
                 songProgressMillis = songProgressMillis
             )
@@ -264,71 +262,34 @@ fun PlainLyricsState(
 fun SyncedLyricsState(
     modifier: Modifier,
     synchronizedLyrics: SynchronizedLyrics,
-    lyricsFetchSource: LyricsFetchSource,
     onSeekToPositionMillis: (Long) -> Unit,
     songProgressMillis: () -> Long
 ) {
     val spicyLines = remember(synchronizedLyrics) {
         synchronizedLyrics.toSpicyLines()
     }
-
-    var currentTimeMs by remember { mutableLongStateOf(0L) }
-
-    val uiSettings = com.tx24.spicyplayer.ui.common.LocalUserPreferences.current.uiSettings
-    val lyricsOffsetMs = uiSettings.lyricsOffsetMs
-    val fontSizeScale = when (uiSettings.lyricsFontSize) {
-        "SMALL" -> 0.85f
-        "LARGE" -> 1.15f
-        else -> 1.0f
-    }
-
-    LaunchedEffect(synchronizedLyrics, lyricsOffsetMs) {
-        while (isActive) {
-            currentTimeMs = songProgressMillis() + lyricsOffsetMs
-            delay(16)
-        }
-    }
-
-    var actionsShown by remember {
-        mutableStateOf(true)
-    }
-
-    LaunchedEffect(key1 = actionsShown) {
-        if (actionsShown) {
-            delay(3000)
-            actionsShown = false
-        }
-    }
-
-    val clipboardManager = LocalClipboardManager.current
-
-    Box(
-        modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { actionsShown = !actionsShown })
-            }
-    ) {
-        SpicyLyricsView(
-            lines = spicyLines,
-            currentTimeMs = currentTimeMs,
-            onSeekWord = {
-                onSeekToPositionMillis(it - lyricsOffsetMs)
-                actionsShown = false
-            },
-            modifier = Modifier.fillMaxSize(),
-            fontSizeScale = fontSizeScale
-        )
-
-
-    }
+    SpicyLyricsPlayer(modifier, spicyLines, onSeekToPositionMillis, songProgressMillis)
 }
 
 @Composable
 fun TtmlLyricsState(
     modifier: Modifier,
     parsedLyrics: ParsedLyrics,
-    lyricsFetchSource: LyricsFetchSource,
+    onSeekToPositionMillis: (Long) -> Unit,
+    songProgressMillis: () -> Long
+) {
+    SpicyLyricsPlayer(modifier, parsedLyrics.lines, onSeekToPositionMillis, songProgressMillis)
+}
+
+/**
+ * Shared karaoke lyrics surface for both the TTML and synced (.lrc) sources —
+ * they differ only in how the [lines] are produced. Polls the playback position
+ * into the animated [SpicyLyricsView] and auto-hides the tap actions.
+ */
+@Composable
+private fun SpicyLyricsPlayer(
+    modifier: Modifier,
+    lines: List<Line>,
     onSeekToPositionMillis: (Long) -> Unit,
     songProgressMillis: () -> Long
 ) {
@@ -342,7 +303,7 @@ fun TtmlLyricsState(
         else -> 1.0f
     }
 
-    LaunchedEffect(parsedLyrics, lyricsOffsetMs) {
+    LaunchedEffect(lines, lyricsOffsetMs) {
         while (isActive) {
             currentTimeMs = songProgressMillis() + lyricsOffsetMs
             delay(16)
@@ -360,8 +321,6 @@ fun TtmlLyricsState(
         }
     }
 
-    val clipboardManager = LocalClipboardManager.current
-
     Box(
         modifier
             .fillMaxSize()
@@ -370,7 +329,7 @@ fun TtmlLyricsState(
             }
     ) {
         SpicyLyricsView(
-            lines = parsedLyrics.lines,
+            lines = lines,
             currentTimeMs = currentTimeMs,
             onSeekWord = {
                 onSeekToPositionMillis(it - lyricsOffsetMs)
@@ -379,8 +338,6 @@ fun TtmlLyricsState(
             modifier = Modifier.fillMaxSize(),
             fontSizeScale = fontSizeScale
         )
-
-
     }
 }
 
