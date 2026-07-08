@@ -179,6 +179,7 @@ class PlaybackService :
             .build()
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     private fun buildPlayer(): ExoPlayer {
         return ExoPlayer.Builder(applicationContext)
             .setAudioAttributes(
