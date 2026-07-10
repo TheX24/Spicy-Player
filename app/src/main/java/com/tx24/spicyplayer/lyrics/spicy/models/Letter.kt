@@ -1,4 +1,4 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.models
+package com.tx24.spicyplayer.lyrics.spicy.models
 
 /**
  * Represents a single character (letter) with its specific timing within a [Word].

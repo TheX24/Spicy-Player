@@ -95,7 +95,7 @@ class LiveLyricsViewModel @Inject constructor(
                     LyricsScreenState.SyncedLyrics(lyricsResult.syncedLyrics, lyricsResult.lyricsSource)
 
                 is LyricsResult.FoundTtmlLyrics -> {
-                    val parsed = com.tx24.spicyplayer.uiNowPlaying.spicy.parser.TtmlLyricsParser.parse(
+                    val parsed = com.tx24.spicyplayer.lyrics.spicy.parser.TtmlLyricsParser.parse(
                         lyricsResult.ttmlContent.byteInputStream()
                     )
                     LyricsScreenState.TtmlLyrics(parsed, lyricsResult.lyricsSource)
@@ -115,6 +115,8 @@ class LiveLyricsViewModel @Inject constructor(
     fun songProgressMillis(): Long {
         return playbackManager.currentSongProgressMillis
     }
+
+    fun isPlaying(): Boolean = playbackManager.isCurrentlyPlaying
 
     fun setSongProgressMillis(millis: Long) {
         return playbackManager.seekToPositionMillis(millis)

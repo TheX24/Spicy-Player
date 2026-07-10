@@ -1,4 +1,4 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.canvas
+package com.tx24.spicyplayer.lyrics.spicy.canvas
 
 import com.tx24.spicyplayer.R
 
@@ -13,8 +13,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.withStyle
-import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Line
-import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Word
+import com.tx24.spicyplayer.lyrics.spicy.models.Line
+import com.tx24.spicyplayer.lyrics.spicy.models.Word
+import com.tx24.spicyplayer.lyrics.spicy.parser.RtlDetector
 
 internal object LyricsLayoutCalculator {
 
@@ -37,11 +38,16 @@ internal object LyricsLayoutCalculator {
             block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO
     }
 
+    /** The string to render for a word: its romanization when [romanize] is on and available. */
+    private fun displayText(word: Word, romanize: Boolean): String =
+        if (romanize) (word.romanizedText ?: word.text) else word.text
+
     fun calculateLineLayouts(
         lines: List<Line>,
         canvasWidth: Float,
         textMeasurer: TextMeasurer,
         fontSizeScale: Float = 1.0f,
+        romanize: Boolean = false,
     ): List<LineLayout> {
 
         val layouts = mutableListOf<LineLayout>()
@@ -61,8 +67,8 @@ internal object LyricsLayoutCalculator {
         }
         
         val baseFontSize = (canvasWidth / 20f).coerceIn(16f, 32f).sp * fontSizeScale
-        val bgFontSize = baseFontSize * 0.7f
-        val songwriterFontSize = baseFontSize * 0.5f
+        val bgFontSize = baseFontSize * 0.75f
+        val songwriterFontSize = baseFontSize * 0.47f
 
         for (line in lines) {
             val isInterlude = line.isInterlude
@@ -108,8 +114,10 @@ internal object LyricsLayoutCalculator {
 
 
             // Standard lyric line layout.
-            val spaceWidth = textMeasurer.measure(
-                text = AnnotatedString(" "),
+            val lineIsRtl = RtlDetector.isRtl(line.words.joinToString(" ") { displayText(it, romanize) })
+            // Inter-word gap of 0.32ch (width of "0"), matching the reference's `margin-right: 0.32ch`.
+            val chWidth = textMeasurer.measure(
+                text = AnnotatedString("0"),
                 style = TextStyle(
                     fontFamily = spicyFontFamily,
                     fontSize = fontSize,
@@ -117,7 +125,7 @@ internal object LyricsLayoutCalculator {
                     color = Color.White,
                 )
             ).size.width.toFloat()
-            val wordGap = spaceWidth
+            val wordGap = chWidth * 0.32f
 
             data class Piece(
                 val word: Word,
@@ -145,13 +153,24 @@ internal object LyricsLayoutCalculator {
                     letterSpacing = (System.identityHashCode(word) % 1000 * 0.0000001f).sp
                 )
                 
-                val fullResult = textMeasurer.measure(word.text, style)
+                val text = displayText(word, romanize)
+                val fullResult = textMeasurer.measure(text, style)
                 val fullW = fullResult.size.width.toFloat()
-                
-                if (word.text.any { isCjk(it) } || word.isLetterGroup) {
+
+                // `word.isPartOfWord` records that the ORIGINAL text had no whitespace before this
+                // token — true both for real hyphen-continuations ("Hel-"+"lo") and, just as often,
+                // for CJK/Hangul syllable spans (which never have inter-word whitespace in the source
+                // TTML). That "glue" is correct when drawing the original script, but once the word is
+                // displayed as its Latin romanization each syllable becomes its own word and needs a
+                // space — so drop the glue in that case instead of gluing romanized syllables together.
+                val isRomanizedFromNoSpaceScript = romanize && word.romanizedText != null &&
+                    word.text.any { isCjk(it) }
+                val effectiveIsPartOfWord = if (isRomanizedFromNoSpaceScript) false else word.isPartOfWord
+
+                if (text.any { isCjk(it) } || word.isLetterGroup) {
                     var currentX = 0f
-                    for (charIdx in word.text.indices) {
-                        val charText = word.text[charIdx].toString()
+                    for (charIdx in text.indices) {
+                        val charText = text[charIdx].toString()
                         val charResult = textMeasurer.measure(charText, style)
                         pieces.add(Piece(
                             word = word,
@@ -161,22 +180,22 @@ internal object LyricsLayoutCalculator {
                             charIdx = charIdx,
                             fullWidth = fullW,
                             startX = currentX,
-                            isCjkPiece = isCjk(word.text[charIdx]),
-                            isPartOfWord = charIdx > 0 || word.isPartOfWord
+                            isCjkPiece = isCjk(text[charIdx]),
+                            isPartOfWord = charIdx > 0 || effectiveIsPartOfWord
                         ))
                         currentX += charResult.size.width
                     }
                 } else {
                     pieces.add(Piece(
                         word = word,
-                        text = word.text,
+                        text = text,
                         layout = fullResult,
                         sourceIdx = wIdx,
                         charIdx = 0,
                         fullWidth = fullW,
                         startX = 0f,
                         isCjkPiece = false,
-                        isPartOfWord = word.isPartOfWord
+                        isPartOfWord = effectiveIsPartOfWord
                     ))
                 }
             }
@@ -346,8 +365,8 @@ internal object LyricsLayoutCalculator {
             val totalHeight = currentRowY + lastRowHeight
             val totalWidth = maxRowWidth
 
-            // Apply alignment and flatten.
-            val isRightAligned = hasDuet && line.oppositeAligned && !line.isSongwriter
+            // Apply alignment and flatten. RTL lines are right-aligned like duet guest lines.
+            val isRightAligned = (hasDuet && line.oppositeAligned && !line.isSongwriter) || lineIsRtl
             val wordLayouts = mutableListOf<WordLayout>()
             for ((rWidth, rowPieces) in allRows) {
                 val alignmentShift = if (isRightAligned) maxRowWidth - rWidth else 0f
@@ -361,7 +380,7 @@ internal object LyricsLayoutCalculator {
             val prevIsInterlude = layouts.lastOrNull()?.isInterlude ?: false
             val drawY = if (isBg && !prevIsInterlude) currentY - 32f else if (line.isSongwriter) currentY + lineSpacing * 0.5f else currentY
 
-            layouts.add(LineLayout(line, wordLayouts, drawY, totalHeight, totalWidth, maxRowWidth, false, isBg, line.oppositeAligned, line.isSongwriter))
+            layouts.add(LineLayout(line, wordLayouts, drawY, totalHeight, totalWidth, maxRowWidth, false, isBg, line.oppositeAligned, line.isSongwriter, lineIsRtl))
             
             val bottomY = drawY + totalHeight
             currentY = maxOf(currentY, bottomY + (if (isBg) 32f else lineSpacing))

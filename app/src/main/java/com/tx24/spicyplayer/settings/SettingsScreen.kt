@@ -287,6 +287,33 @@ fun SettingsList(
                     selectedIndex = when (userPreferences.uiSettings.lyricsFontSize) { "SMALL" -> 0; "LARGE" -> 2; else -> 1 },
                     onSelect = { settingsCallbacks.setLyricsFontSize(when (it) { 0 -> "SMALL"; 2 -> "LARGE"; else -> "MEDIUM" }) }
                 )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SegmentedSettingItem(
+                    icon = Icons.Rounded.AutoAwesome,
+                    title = "Quality",
+                    subtitle = "Full has all effects; Minimal fades sung lines",
+                    options = listOf("Full", "Simple", "Minimal"),
+                    selectedIndex = when (userPreferences.uiSettings.lyricsQualityMode) { "SIMPLE" -> 1; "MINIMAL" -> 2; else -> 0 },
+                    onSelect = { settingsCallbacks.setLyricsQualityMode(when (it) { 1 -> "SIMPLE"; 2 -> "MINIMAL"; else -> "FULL" }) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SegmentedSettingItem(
+                    icon = Icons.Rounded.Wallpaper,
+                    title = "Dynamic Background",
+                    subtitle = if (android.os.Build.VERSION.SDK_INT >= 33) "Kawarp uses a live warp shader (Android 13+)"
+                        else "Kawarp requires Android 13+; Legacy is used below that",
+                    options = listOf("Auto", "Kawarp", "Legacy"),
+                    selectedIndex = when (userPreferences.uiSettings.lyricsBackgroundEngine) { "KAWARP" -> 1; "LEGACY" -> 2; else -> 0 },
+                    onSelect = { settingsCallbacks.setLyricsBackgroundEngine(when (it) { 1 -> "KAWARP"; 2 -> "LEGACY"; else -> "AUTO" }) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SwitchSettingItem(
+                    icon = Icons.Rounded.Translate,
+                    title = "Romanize by Default",
+                    subtitle = "Show romanized lyrics when available",
+                    checked = userPreferences.uiSettings.lyricsRomanize,
+                    onCheckedChange = { settingsCallbacks.setLyricsRomanize(it) }
+                )
             }
         }
 

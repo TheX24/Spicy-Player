@@ -104,6 +104,14 @@ class PlaybackManager @Inject constructor(
     val currentSongProgressMillis
         get() = mediaController?.currentPosition ?: 0L
 
+    /**
+     * Live playing state straight from the controller (playWhenReady && READY && not
+     * suppressed) — unlike [state], which is an event-driven snapshot that can lag.
+     * Used by the lyrics clock, where a stale PAUSED reading would reset the predictor.
+     */
+    val isCurrentlyPlaying: Boolean
+        get() = mediaController?.isPlaying == true
+
     val playbackParameters: Pair<Float, Float>
         get() {
             val p = mediaController?.playbackParameters ?: return 1f to 1f

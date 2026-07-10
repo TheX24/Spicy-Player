@@ -1,4 +1,4 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.canvas
+package com.tx24.spicyplayer.lyrics.spicy.canvas
 
 import android.graphics.Bitmap
 

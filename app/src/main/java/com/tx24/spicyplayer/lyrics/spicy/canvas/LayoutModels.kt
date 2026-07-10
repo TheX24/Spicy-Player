@@ -1,9 +1,9 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.canvas
+package com.tx24.spicyplayer.lyrics.spicy.canvas
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.TextLayoutResult
-import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Line
-import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Word
+import com.tx24.spicyplayer.lyrics.spicy.models.Line
+import com.tx24.spicyplayer.lyrics.spicy.models.Word
 
 /**
  * Internal data class representing the layout and position of a single word.
@@ -38,4 +38,6 @@ internal data class LineLayout(
     val isBackground: Boolean,
     val oppositeAligned: Boolean,
     val isSongwriter: Boolean,
+    /** True if the line is right-to-left (Arabic/Hebrew/…); right-aligned with a flipped wipe. */
+    val isRtl: Boolean = false,
 )

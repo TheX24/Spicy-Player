@@ -24,6 +24,8 @@ jaudio-tagger = "1.0"
 junit = "4.13.2"
 kotlin = "2.0.0"
 kxml2 = "2.3.0"
+kuromoji = "0.9.0"
+pinyin4j = "2.5.1"
 kotlinxCoroutines = "1.7.1"
 ksp = "2.0.0-1.0.22"
 lifecycle-runtime-ktx = "2.6.1"
@@ -77,6 +79,8 @@ jaudio-tagger = { module = "com.github.Shabinder:JAudioTagger-Android", version.
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 kxml2 = { group = "net.sf.kxml", name = "kxml2", version.ref = "kxml2" }
+kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", version.ref = "kuromoji" }
+pinyin4j = { group = "com.belerweb", name = "pinyin4j", version.ref = "pinyin4j" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 ksp-gradlePlugin = { group = "com.google.devtools.ksp", name = "com.google.devtools.ksp.gradle.plugin", version.ref = "ksp" }
 lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle-runtime-ktx" }

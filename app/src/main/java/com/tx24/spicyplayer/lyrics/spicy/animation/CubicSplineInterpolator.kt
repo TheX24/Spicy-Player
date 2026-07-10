@@ -1,4 +1,4 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.animation
+package com.tx24.spicyplayer.lyrics.spicy.animation
 
 /**
  * Natural cubic spline interpolation over (time, value) control points.

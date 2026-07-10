@@ -1,4 +1,4 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.canvas
+package com.tx24.spicyplayer.lyrics.spicy.canvas
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -9,14 +9,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.rememberTextMeasurer
-import com.tx24.spicyplayer.uiNowPlaying.spicy.animation.LineAnimState
-import com.tx24.spicyplayer.uiNowPlaying.spicy.animation.LyricsAnimator
-import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Line
+import com.tx24.spicyplayer.lyrics.fadingEdge
+import com.tx24.spicyplayer.lyrics.spicy.RenderConfig
+import com.tx24.spicyplayer.lyrics.spicy.animation.LineAnimState
+import com.tx24.spicyplayer.lyrics.spicy.animation.LyricsAnimator
+import com.tx24.spicyplayer.lyrics.spicy.models.Line
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
+import com.tx24.spicyplayer.lyrics.spicy.parser.LetterSynthesizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.math.abs
 
 /**
  * The main lyrics display component representing the split architecture.
@@ -35,16 +39,27 @@ fun SpicyLyricsView(
     onSeekWord: (Long) -> Unit,
     modifier: Modifier = Modifier,
     fontSizeScale: Float = 1.0f,
+    config: RenderConfig = RenderConfig.FULL,
+    lyricsType: LyricsType = LyricsType.Syllable,
+    romanize: Boolean = false,
 ) {
     val textMeasurer = rememberTextMeasurer()
     var lineLayouts by remember { mutableStateOf<List<LineLayout>>(emptyList()) }
     val coroutineScope = rememberCoroutineScope()
 
-    val animator = remember { LyricsAnimator(coroutineScope) }
+    // Synthesize per-letter emphasis for held words using the active config (mode-dependent
+    // thresholds, romanized display). Syllable mode only; Line/Static never letter-split.
+    val displayLines = remember(lines, config, romanize, lyricsType) {
+        if (lyricsType == LyricsType.Syllable) LetterSynthesizer.apply(lines, config, romanize) else lines
+    }
+
+    val animator = remember { LyricsAnimator(coroutineScope, config) }
+    LaunchedEffect(config) { animator.config = config }
     LaunchedEffect(lines) { animator.reset() }
+    val isStatic = lyricsType == LyricsType.Static
 
     val currentTimeMsUpdated by rememberUpdatedState(currentTimeMs)
-    val linesUpdated by rememberUpdatedState(lines)
+    val linesUpdated by rememberUpdatedState(displayLines)
     val lineLayoutsUpdated by rememberUpdatedState(lineLayouts)
 
     val scrollManager = remember { ScrollManager() }
@@ -52,14 +67,15 @@ fun SpicyLyricsView(
     BoxWithConstraints(modifier = modifier.fillMaxSize().clipToBounds()) {
         val canvasWidth = constraints.maxWidth.toFloat()
         val canvasHeight = constraints.maxHeight.toFloat()
-        val centerY = canvasHeight * 0.20f
+        // Anchor the active line ~25% from the top (reference: margin-top 25cqh).
+        val centerY = canvasHeight * 0.25f
         val horizontalPadding = 40f
-        val hasDuet = remember(lines) { lines.any { it.oppositeAligned } }
+        val hasDuet = remember(displayLines) { displayLines.any { it.oppositeAligned } }
 
         // Recalculate layouts whenever the lyrics, dimensions, or font size change.
-        LaunchedEffect(lines, canvasWidth, fontSizeScale) {
+        LaunchedEffect(displayLines, canvasWidth, fontSizeScale, romanize) {
             withContext(Dispatchers.Default) {
-                lineLayouts = LyricsLayoutCalculator.calculateLineLayouts(lines, canvasWidth, textMeasurer, fontSizeScale)
+                lineLayouts = LyricsLayoutCalculator.calculateLineLayouts(displayLines, canvasWidth, textMeasurer, fontSizeScale, romanize)
             }
         }
 
@@ -77,16 +93,17 @@ fun SpicyLyricsView(
                     val currentLines = linesUpdated
                     val currentTime = currentTimeMsUpdated
 
+                    // Unclamped like the reference: springs integrate analytically over any dt.
                     val deltaTime = if (lastFrameTimeNanos == 0L) {
                         0.016f
                     } else {
-                        ((frameTimeNanos - lastFrameTimeNanos) / 1_000_000_000f).coerceIn(0f, 0.1f)
+                        ((frameTimeNanos - lastFrameTimeNanos) / 1_000_000_000f).coerceAtLeast(0f)
                     }
                     lastFrameTimeNanos = frameTimeNanos
 
                     if (currentLayouts.size == currentLines.size && currentLines.isNotEmpty()) {
                         // 1. Step the animator for visual properties (scale, opacity, glow).
-                        animStates = animator.animate(currentLines, currentTime, deltaTime)
+                        animStates = animator.animate(currentLines, currentTime, deltaTime, scrollManager.isUserScrolling, lyricsType)
 
                         // 1.5 Calculate dynamic Y offsets based on interlude scales.
                         var accumulatedY = 0f
@@ -153,16 +170,30 @@ fun SpicyLyricsView(
                         // 3. Step the scroll spring and handle user overrides.
                         val lastLayout = currentLayouts.lastOrNull()
                         val totalContentHeight = (lastLayout?.yOffset ?: 0f) + (lastLayout?.height ?: 0f) + accumulatedY
-                        
+
+                        // Static lyrics have no timing to follow: leave scrolling entirely to the user.
+                        if (isStatic) targetY = null
                         scrollManager.updateScroll(currentTime, deltaTime, totalContentHeight, targetY)
                     }
                 }
             }
         }
 
+        // Top/bottom fade mask (reference: 64px --ImageMask fade on the lyrics content).
+        val fadeFraction = if (canvasHeight > 0f) (64f / canvasHeight).coerceIn(0f, 0.45f) else 0f
+        val fadeBrush = remember(fadeFraction) {
+            Brush.verticalGradient(
+                0f to Color.Transparent,
+                fadeFraction to Color.Black,
+                1f - fadeFraction to Color.Black,
+                1f to Color.Transparent,
+            )
+        }
+
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                .fadingEdge(fadeBrush)
                 .pointerInput(Unit) {
                     // Interaction: Dragging.
                     detectDragGestures(
@@ -175,8 +206,9 @@ fun SpicyLyricsView(
                         }
                     )
                 }
-                .pointerInput(Unit) {
-                    // Interaction: Tapping to seek.
+                .pointerInput(isStatic) {
+                    // Interaction: Tapping to seek. Static lyrics are not seekable.
+                    if (isStatic) return@pointerInput
                     detectTapGestures { tapOffset ->
                         val currentScrollY = scrollManager.animScrollY
                         val adjustedTapY = tapOffset.y - (centerY + currentScrollY)
@@ -213,10 +245,11 @@ fun SpicyLyricsView(
 
                 val lineStartX = getLineStartX(layout, size.width, horizontalPadding, hasDuet)
 
-                if (layout.isInterlude) {
-                    drawInterludeGroup(layout, lineAnim, lineStartX, scrollOffset, dynamicY)
-                } else {
-                    drawStandardLine(layout, lineAnim, lineStartX, scrollOffset, dynamicY)
+                when {
+                    layout.isInterlude -> drawInterludeGroup(layout, lineAnim, lineStartX, scrollOffset, dynamicY)
+                    lyricsType == LyricsType.Static -> drawStaticLine(layout, lineAnim, lineStartX, scrollOffset, dynamicY)
+                    lyricsType == LyricsType.Line -> drawLineModeLine(layout, lineAnim, lineStartX, scrollOffset, dynamicY, config)
+                    else -> drawStandardLine(layout, lineAnim, lineStartX, scrollOffset, dynamicY, config)
                 }
             }
         }
@@ -235,7 +268,7 @@ private fun getLineStartX(
     if (layout.isSongwriter) {
         return horizontalPadding
     }
-    return if (layout.oppositeAligned) {
+    return if (layout.oppositeAligned || layout.isRtl) {
         canvasWidth - horizontalPadding - layout.totalWidth
     } else {
         horizontalPadding

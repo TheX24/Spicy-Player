@@ -176,6 +176,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { userPreferencesRepository.setBackgroundBlur(blur) }
     }
 
+    override fun setLyricsQualityMode(mode: String) {
+        viewModelScope.launch { userPreferencesRepository.setLyricsQualityMode(mode) }
+    }
+
+    override fun setLyricsBackgroundEngine(engine: String) {
+        viewModelScope.launch { userPreferencesRepository.setLyricsBackgroundEngine(engine) }
+    }
+
+    override fun setLyricsRomanize(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesRepository.setLyricsRomanize(enabled) }
+    }
+
 
     override fun resetAll() {
         viewModelScope.launch {
@@ -187,6 +199,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferencesRepository.setLyricsOffsetMs(0)
             userPreferencesRepository.setLyricsFontSize("MEDIUM")
+            userPreferencesRepository.setLyricsQualityMode("FULL")
+            userPreferencesRepository.setLyricsBackgroundEngine("AUTO")
+            userPreferencesRepository.setLyricsRomanize(false)
         }
     }
 
@@ -280,6 +295,9 @@ interface ISettingsViewModel {
     fun setLyricsOffsetMs(offset: Int)
     fun setLyricsFontSize(size: String)
     fun setBackgroundBlur(blur: Int)
+    fun setLyricsQualityMode(mode: String)
+    fun setLyricsBackgroundEngine(engine: String)
+    fun setLyricsRomanize(enabled: Boolean)
     fun resetAll()
     fun resetLyrics()
     fun resetAudio()

@@ -51,10 +51,21 @@ import androidx.compose.ui.window.Popup
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.tx24.spicyplayer.model.lyrics.PlainLyrics
 import com.tx24.spicyplayer.model.lyrics.SynchronizedLyrics
-import com.tx24.spicyplayer.uiNowPlaying.spicy.canvas.SpicyLyricsView
+import com.tx24.spicyplayer.lyrics.spicy.RenderConfig
+import com.tx24.spicyplayer.lyrics.spicy.canvas.SpicyLyricsView
+import com.tx24.spicyplayer.lyrics.spicy.romanization.RomanizationService
 import com.tx24.spicyplayer.lyrics.toSpicyLines
-import com.tx24.spicyplayer.uiNowPlaying.spicy.models.Line
-import com.tx24.spicyplayer.uiNowPlaying.spicy.models.ParsedLyrics
+import com.tx24.spicyplayer.lyrics.toSpicyStaticParsed
+import com.tx24.spicyplayer.lyrics.spicy.models.Line
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
+import com.tx24.spicyplayer.lyrics.spicy.models.ParsedLyrics
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.unit.dp
+import com.tx24.spicyplayer.lyrics.spicy.PlaybackClock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -73,7 +84,8 @@ fun LiveLyricsScreen(
         state,
         lyricsViewModel::songProgressMillis,
         lyricsViewModel::setSongProgressMillis,
-        lyricsViewModel::onRetry
+        lyricsViewModel::onRetry,
+        lyricsViewModel::isPlaying
     )
 }
 
@@ -83,7 +95,8 @@ fun LiveLyricsScreen(
     state: LyricsScreenState,
     songProgressMillis: () -> Long,
     onSeekToPositionMillis: (Long) -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    isPlaying: () -> Boolean = { true },
 ) {
     when (state) {
         is LyricsScreenState.NoLyrics ->
@@ -96,14 +109,21 @@ fun LiveLyricsScreen(
             NotPlayingState(modifier = modifier)
 
         is LyricsScreenState.TextLyrics ->
-            PlainLyricsState(modifier = modifier, plainLyrics = state.plainLyrics)
+            StaticLyricsState(
+                modifier = modifier,
+                plainLyrics = state.plainLyrics,
+                onSeekToPositionMillis = onSeekToPositionMillis,
+                songProgressMillis = songProgressMillis,
+                isPlaying = isPlaying
+            )
 
         is LyricsScreenState.SyncedLyrics ->
             SyncedLyricsState(
                 modifier = modifier,
                 synchronizedLyrics = state.syncedLyrics,
                 onSeekToPositionMillis = onSeekToPositionMillis,
-                songProgressMillis = songProgressMillis
+                songProgressMillis = songProgressMillis,
+                isPlaying = isPlaying
             )
 
         is LyricsScreenState.TtmlLyrics ->
@@ -111,7 +131,8 @@ fun LiveLyricsScreen(
                 modifier = modifier,
                 parsedLyrics = state.parsedLyrics,
                 onSeekToPositionMillis = onSeekToPositionMillis,
-                songProgressMillis = songProgressMillis
+                songProgressMillis = songProgressMillis,
+                isPlaying = isPlaying
             )
     }
 }
@@ -263,12 +284,25 @@ fun SyncedLyricsState(
     modifier: Modifier,
     synchronizedLyrics: SynchronizedLyrics,
     onSeekToPositionMillis: (Long) -> Unit,
-    songProgressMillis: () -> Long
+    songProgressMillis: () -> Long,
+    isPlaying: () -> Boolean = { true },
 ) {
     val spicyLines = remember(synchronizedLyrics) {
         synchronizedLyrics.toSpicyLines()
     }
-    SpicyLyricsPlayer(modifier, spicyLines, onSeekToPositionMillis, songProgressMillis)
+    SpicyLyricsPlayer(modifier, spicyLines, LyricsType.Line, onSeekToPositionMillis, songProgressMillis, isPlaying)
+}
+
+@Composable
+fun StaticLyricsState(
+    modifier: Modifier,
+    plainLyrics: PlainLyrics,
+    onSeekToPositionMillis: (Long) -> Unit,
+    songProgressMillis: () -> Long,
+    isPlaying: () -> Boolean = { true },
+) {
+    val staticLines = remember(plainLyrics) { plainLyrics.toSpicyStaticParsed().lines }
+    SpicyLyricsPlayer(modifier, staticLines, LyricsType.Static, onSeekToPositionMillis, songProgressMillis, isPlaying)
 }
 
 @Composable
@@ -276,9 +310,10 @@ fun TtmlLyricsState(
     modifier: Modifier,
     parsedLyrics: ParsedLyrics,
     onSeekToPositionMillis: (Long) -> Unit,
-    songProgressMillis: () -> Long
+    songProgressMillis: () -> Long,
+    isPlaying: () -> Boolean = { true },
 ) {
-    SpicyLyricsPlayer(modifier, parsedLyrics.lines, onSeekToPositionMillis, songProgressMillis)
+    SpicyLyricsPlayer(modifier, parsedLyrics.lines, parsedLyrics.type, onSeekToPositionMillis, songProgressMillis, isPlaying)
 }
 
 /**
@@ -290,8 +325,10 @@ fun TtmlLyricsState(
 private fun SpicyLyricsPlayer(
     modifier: Modifier,
     lines: List<Line>,
+    lyricsType: LyricsType,
     onSeekToPositionMillis: (Long) -> Unit,
-    songProgressMillis: () -> Long
+    songProgressMillis: () -> Long,
+    isPlaying: () -> Boolean = { true },
 ) {
     var currentTimeMs by remember { mutableLongStateOf(0L) }
 
@@ -302,11 +339,51 @@ private fun SpicyLyricsPlayer(
         "LARGE" -> 1.15f
         else -> 1.0f
     }
+    val renderConfig = remember(uiSettings.lyricsQualityMode) {
+        RenderConfig.forModeName(uiSettings.lyricsQualityMode)
+    }
 
+    // Populate romanization off the main thread; TTML-supplied romanization is preserved.
+    val romanizedLines by produceState(initialValue = lines, lines) {
+        value = RomanizationService.romanize(lines)
+    }
+    val hasRomanization = remember(romanizedLines) {
+        romanizedLines.any { line -> line.words.any { it.romanizedText != null } }
+    }
+    // In-view toggle, seeded from the default setting.
+    var romanizeEnabled by remember(lines) { mutableStateOf(uiSettings.lyricsRomanize) }
+    val romanize = romanizeEnabled && hasRomanization
+
+    // Frame-synced predicted playback clock (port of the reference's GetProgress pipeline):
+    // the player position is sampled every frame, extrapolated on wall-clock time, and
+    // jitter-smoothed, so the karaoke sweep advances continuously instead of stepping with
+    // the controller's coarse position updates. The +100ms forward lead lives in the clock.
+    val playbackClock = remember { PlaybackClock() }
     LaunchedEffect(lines, lyricsOffsetMs) {
+        playbackClock.reset()
+        var lastOut = Long.MIN_VALUE
+        var lastPlaying = false
         while (isActive) {
-            currentTimeMs = songProgressMillis() + lyricsOffsetMs
-            delay(16)
+            withFrameNanos { frameNanos ->
+                val measured = songProgressMillis()
+                val playing = isPlaying()
+                val smoothed = playbackClock.positionMs(
+                    measuredMs = measured,
+                    isPlaying = playing,
+                    nowMs = frameNanos / 1_000_000L,
+                )
+                // Diagnostic: any frame-to-frame jump beyond ~4 frames means the sweep teleports.
+                if (lastOut != Long.MIN_VALUE && playing && lastPlaying &&
+                    kotlin.math.abs(smoothed - lastOut) > 64L
+                ) {
+                    timber.log.Timber.tag("SpicyClock").d(
+                        "JUMP out %d -> %d (Δ%d) measured=%d", lastOut, smoothed, smoothed - lastOut, measured,
+                    )
+                }
+                lastOut = smoothed
+                lastPlaying = playing
+                currentTimeMs = smoothed + lyricsOffsetMs
+            }
         }
     }
 
@@ -329,15 +406,41 @@ private fun SpicyLyricsPlayer(
             }
     ) {
         SpicyLyricsView(
-            lines = lines,
+            lines = romanizedLines,
             currentTimeMs = currentTimeMs,
             onSeekWord = {
-                onSeekToPositionMillis(it - lyricsOffsetMs)
+                onSeekToPositionMillis(it - lyricsOffsetMs - 100L)
                 actionsShown = false
             },
             modifier = Modifier.fillMaxSize(),
-            fontSizeScale = fontSizeScale
+            fontSizeScale = fontSizeScale,
+            config = renderConfig,
+            lyricsType = lyricsType,
+            romanize = romanize,
         )
+
+        // In-view romanization toggle: a persistent view control (unlike the tap-actions,
+        // it does not auto-hide — the user needs it reachable throughout playback).
+        AnimatedVisibility(
+            visible = hasRomanization,
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
+            Surface(
+                onClick = { romanizeEnabled = !romanizeEnabled },
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                color = if (romanize) androidx.compose.material3.MaterialTheme.colorScheme.primary
+                    else androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.padding(12.dp)
+            ) {
+                Text(
+                    text = "あ→A",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = if (romanize) androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
+                        else androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 

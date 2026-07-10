@@ -1,4 +1,4 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.animation
+package com.tx24.spicyplayer.lyrics.spicy.animation
 
 /**
  * Represents the animation state of a single letter within a word.
@@ -19,7 +19,8 @@ data class WordAnimState(
     val glow: Float,
     val gradientPosition: Float,
     val state: ElementState,
-    val activeAnimFactor: Float,
+    /** For interlude dots only: the animated glow level (blur/opacity of the dot's halo). */
+    val dotGlow: Float = 0f,
     val isLetterGroup: Boolean = false,
     val letterStates: List<LetterAnimState> = emptyList(),
 )
@@ -35,6 +36,10 @@ data class LineAnimState(
     val wordStates: List<WordAnimState>,
     val isBackground: Boolean,
     val isSongwriter: Boolean,
+    /** Line-mode only: the raw gradient position percent for the whole-line wipe (-20..100). */
+    val lineGradientPercent: Float = -20f,
+    /** Line-mode only: the whole-line glow spring value (shadow blur 4+8·glow, alpha glow·0.5). */
+    val lineGlow: Float = 0f,
 )
 
 /**

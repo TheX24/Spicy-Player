@@ -2,6 +2,7 @@ package com.tx24.spicyplayer.library.store
 
 import android.content.Context
 import android.media.MediaMetadataRetriever
+import android.media.MediaScannerConnection
 import android.net.Uri
 import com.tx24.spicyplayer.library.store.model.song.Song
 import com.tx24.spicyplayer.model.song.BasicSongMetadata
@@ -143,6 +144,20 @@ suspend fun performScan(
 
     onProgress(ScanProgress(phase = "Discovered", currentCount = audioFiles.size, summary = "Discovered ${audioFiles.size} audio files"))
     delay(300)
+
+    // The library UI (MediaRepository.songsFlow) is backed entirely by MediaStore, not by this
+    // file-system walk's own results. Files this scan finds that MediaStore hasn't indexed yet
+    // (freshly copied/downloaded music) would otherwise never appear, since nothing else tells
+    // MediaStore to look at them. Requesting a scan makes MediaStore index them, which fires the
+    // ContentObserver songsFlow already listens on, so the UI updates on its own.
+    if (audioFiles.isNotEmpty()) {
+        MediaScannerConnection.scanFile(
+            context,
+            audioFiles.map { it.absolutePath }.toTypedArray(),
+            null,
+            null,
+        )
+    }
 
     val totalAudio = audioFiles.size
     var matchedLyricsCount = 0

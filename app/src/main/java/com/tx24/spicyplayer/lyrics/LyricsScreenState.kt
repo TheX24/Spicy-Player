@@ -25,7 +25,7 @@ sealed interface LyricsScreenState {
     ): LyricsScreenState
 
     data class TtmlLyrics(
-        val parsedLyrics: com.tx24.spicyplayer.uiNowPlaying.spicy.models.ParsedLyrics,
+        val parsedLyrics: com.tx24.spicyplayer.lyrics.spicy.models.ParsedLyrics,
         val lyricsSource: LyricsFetchSource
     ): LyricsScreenState
 

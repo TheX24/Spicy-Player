@@ -1,11 +1,11 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.canvas
+package com.tx24.spicyplayer.lyrics.spicy.canvas
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.tx24.spicyplayer.uiNowPlaying.spicy.animation.SpringSimulation
+import com.tx24.spicyplayer.lyrics.spicy.animation.SpringSimulation
 import kotlin.math.abs
 
 internal class ScrollManager(
@@ -33,7 +33,7 @@ internal class ScrollManager(
     ) {
         val timeJump = abs(currentTimeMs - lastFrameSongTime)
         val isFirstFrame = lastFrameSongTime == 0L
-        val isSeek = timeJump > 800L
+        val isSeek = timeJump > 1000L
 
         if (targetY != null) {
             // Clamp the target goal to valid scroll boundaries to prevent 'fighting' 
@@ -58,7 +58,8 @@ internal class ScrollManager(
         val springDelta = actualSpringY - springPosBefore
 
         val timeSinceInteraction = System.currentTimeMillis() - lastInteractionTimeMs
-        val isInManualMode = isUserScrolling || (timeSinceInteraction < 4000L && lastInteractionTimeMs > 0L)
+        // Resume auto-scroll 750ms after the user stops interacting (reference: USER_SCROLL_COOLDOWN).
+        val isInManualMode = isUserScrolling || (timeSinceInteraction < 750L && lastInteractionTimeMs > 0L)
 
         if (isInManualMode) {
             // Cancel out the auto-scroll movement to keep the view static where the user left it.

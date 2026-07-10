@@ -140,7 +140,7 @@ class MediaRepository @Inject constructor(
             val scanPath = librarySettings.scanDirectory.ifBlank { "/sdcard/Music/" }
             
             val cachedScan = loadCachedScan(context, scanPath) ?: emptyList()
-            
+
             val filteredSongs = songs.filter { song ->
                 !excludedFolders.any { folder ->
                     song.filePath.startsWith(folder)
@@ -154,7 +154,18 @@ class MediaRepository @Inject constructor(
                 }
             }
 
-            SongLibrary(filteredSongs)
+            // The folder scan requests a MediaStore re-index for anything it finds (see
+            // ScanUtils.performScan), but that request is async and MediaStore may not have
+            // caught up by the time this flow re-combines. Union in any scanned file MediaStore
+            // still doesn't know about so newly added songs show up immediately rather than only
+            // after the next MediaStore-driven re-query.
+            val knownPaths = filteredSongs.mapTo(mutableSetOf()) { it.filePath }
+            val unindexedSongs = cachedScan.filter { cached ->
+                cached.filePath !in knownPaths &&
+                    !excludedFolders.any { folder -> cached.filePath.startsWith(folder) }
+            }
+
+            SongLibrary(filteredSongs + unindexedSongs)
         }.flowOn(Dispatchers.IO).stateIn(
             scope = scope,
             started = SharingStarted.Eagerly,

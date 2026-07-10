@@ -13,10 +13,12 @@ import androidx.compose.ui.platform.LocalContext
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import coil.size.Size
+import android.os.Build
 import com.tx24.spicyplayer.library.store.model.song.Song
 import com.tx24.spicyplayer.ui.albumart.LocalInefficientThumbnailImageLoader
 import com.tx24.spicyplayer.ui.albumart.toSongAlbumArtModel
-import com.tx24.spicyplayer.uiNowPlaying.spicy.canvas.DynamicBackgroundView
+import com.tx24.spicyplayer.lyrics.spicy.canvas.DynamicBackgroundView
+import com.tx24.spicyplayer.lyrics.spicy.canvas.kawarp.KawarpBackground
 
 import com.tx24.spicyplayer.ui.common.LocalUserPreferences
 
@@ -27,7 +29,12 @@ fun SpicyDynamicBackground(
     animate: Boolean = true,
 ) {
     val context = LocalContext.current
-    val blurIntensity = LocalUserPreferences.current.uiSettings.backgroundBlur
+    val uiSettings = LocalUserPreferences.current.uiSettings
+    val blurIntensity = uiSettings.backgroundBlur
+    // Kawarp (AGSL warp shader) is available on API 33+; AUTO uses it there, LEGACY forces the
+    // rotating-texture renderer, KAWARP requests it explicitly (still gated by API level).
+    val useKawarp = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        uiSettings.lyricsBackgroundEngine != "LEGACY"
     val songModel = remember(song?.uri) { song?.toSongAlbumArtModel() }
     
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -57,10 +64,19 @@ fun SpicyDynamicBackground(
         }
     }
 
-    DynamicBackgroundView(
-        coverArtBitmap = bitmap,
-        modifier = modifier,
-        blurIntensity = blurIntensity,
-        animate = animate
-    )
+    if (useKawarp) {
+        KawarpBackground(
+            coverArtBitmap = bitmap,
+            modifier = modifier,
+            blurIntensity = blurIntensity,
+            animate = animate
+        )
+    } else {
+        DynamicBackgroundView(
+            coverArtBitmap = bitmap,
+            modifier = modifier,
+            blurIntensity = blurIntensity,
+            animate = animate
+        )
+    }
 }

@@ -268,6 +268,7 @@ fun SegmentedSettingItem(
     options: List<String>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
+    subtitle: String? = null,
 ) {
     Column(
         modifier = Modifier
@@ -284,11 +285,20 @@ fun SegmentedSettingItem(
                     modifier = Modifier.size(24.dp)
                 )
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
         SingleChoiceSegmentedButtonRow(
             modifier = Modifier

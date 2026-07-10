@@ -20,6 +20,9 @@ data class UiSettingsUi(
     val lyricsFontSize: String = "MEDIUM",
     val backgroundBlur: Int = 60,
     val keepScreenOn: Boolean = false,
+    val lyricsQualityMode: String = "FULL",
+    val lyricsBackgroundEngine: String = "AUTO",
+    val lyricsRomanize: Boolean = false,
 )
 
 @Stable
@@ -57,5 +60,8 @@ fun UiSettings.toUiSettingsUi() =
         lyricsOffsetMs,
         lyricsFontSize,
         backgroundBlur,
-        keepScreenOn
+        keepScreenOn,
+        lyricsQualityMode,
+        lyricsBackgroundEngine,
+        lyricsRomanize
     )

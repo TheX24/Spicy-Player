@@ -44,6 +44,13 @@ data class UiSettings(
     val lyricsFontSize: String = "MEDIUM",
     val backgroundBlur: Int = 60,
     val keepScreenOn: Boolean = false,
+
+    /** Rendering-quality track for the lyrics engine: "FULL", "SIMPLE", or "MINIMAL". */
+    val lyricsQualityMode: String = "FULL",
+    /** Dynamic background engine: "AUTO", "KAWARP", or "LEGACY". */
+    val lyricsBackgroundEngine: String = "AUTO",
+    /** Whether romanization is shown by default when available. */
+    val lyricsRomanize: Boolean = false,
 )
 
 enum class PlayerTheme {

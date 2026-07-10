@@ -70,6 +70,8 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // Kuromoji's core/ipadic jars ship duplicate doc/metadata files.
+            excludes += "/META-INF/{CONTRIBUTORS.md,LICENSE.md,NOTICE.md,README.md}"
         }
     }
 
@@ -121,6 +123,9 @@ dependencies {
     implementation(libs.jaudio.tagger)
     implementation(libs.glance)
     implementation(libs.glance.material)
+    // On-device romanization: Kuromoji (Japanese, dictionary bundled) + pinyin4j (Chinese).
+    implementation(libs.kuromoji.ipadic)
+    implementation(libs.pinyin4j)
 
     api(libs.accompanist.permissions)
 

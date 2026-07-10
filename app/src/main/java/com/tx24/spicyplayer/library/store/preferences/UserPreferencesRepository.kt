@@ -201,6 +201,18 @@ class UserPreferencesRepository @Inject constructor(
         context.datastore.edit { it[BACKGROUND_BLUR_KEY] = blur }
     }
 
+    suspend fun setLyricsQualityMode(mode: String) {
+        context.datastore.edit { it[LYRICS_QUALITY_MODE_KEY] = mode }
+    }
+
+    suspend fun setLyricsBackgroundEngine(engine: String) {
+        context.datastore.edit { it[LYRICS_BG_ENGINE_KEY] = engine }
+    }
+
+    suspend fun setLyricsRomanize(enabled: Boolean) {
+        context.datastore.edit { it[LYRICS_ROMANIZE_KEY] = enabled }
+    }
+
 
     suspend fun clear() {
         context.datastore.edit { it.clear() }
@@ -282,6 +294,9 @@ class UserPreferencesRepository @Inject constructor(
         val lyricsFontSize = this[LYRICS_FONT_SIZE_KEY] ?: "MEDIUM"
         val backgroundBlur = this[BACKGROUND_BLUR_KEY] ?: 60
         val keepScreenOn = this[KEEP_SCREEN_ON_KEY] ?: false
+        val lyricsQualityMode = this[LYRICS_QUALITY_MODE_KEY] ?: "FULL"
+        val lyricsBackgroundEngine = this[LYRICS_BG_ENGINE_KEY] ?: "AUTO"
+        val lyricsRomanize = this[LYRICS_ROMANIZE_KEY] ?: false
 
         return UiSettings(
             theme,
@@ -294,7 +309,10 @@ class UserPreferencesRepository @Inject constructor(
             lyricsOffsetMs,
             lyricsFontSize,
             backgroundBlur,
-            keepScreenOn
+            keepScreenOn,
+            lyricsQualityMode,
+            lyricsBackgroundEngine,
+            lyricsRomanize
         )
     }
 
@@ -362,6 +380,9 @@ class UserPreferencesRepository @Inject constructor(
         val LYRICS_FONT_SIZE_KEY = stringPreferencesKey("LYRICS_FONT_SIZE")
         val BACKGROUND_BLUR_KEY = intPreferencesKey("BACKGROUND_BLUR")
         val KEEP_SCREEN_ON_KEY = booleanPreferencesKey("KEEP_SCREEN_ON")
+        val LYRICS_QUALITY_MODE_KEY = stringPreferencesKey("LYRICS_QUALITY_MODE")
+        val LYRICS_BG_ENGINE_KEY = stringPreferencesKey("LYRICS_BG_ENGINE")
+        val LYRICS_ROMANIZE_KEY = booleanPreferencesKey("LYRICS_ROMANIZE")
 
         val CROSSFADE_DURATION_KEY = intPreferencesKey("CROSSFADE_DURATION")
         val GAPLESS_PLAYBACK_KEY = booleanPreferencesKey("GAPLESS_PLAYBACK")

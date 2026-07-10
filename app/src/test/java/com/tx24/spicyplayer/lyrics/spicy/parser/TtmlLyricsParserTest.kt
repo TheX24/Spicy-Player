@@ -1,6 +1,7 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.parser
+package com.tx24.spicyplayer.lyrics.spicy.parser
 
-import com.tx24.spicyplayer.uiNowPlaying.spicy.models.ParsedLyrics
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
+import com.tx24.spicyplayer.lyrics.spicy.models.ParsedLyrics
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -68,21 +69,98 @@ class TtmlLyricsParserTest {
     }
 
     @Test
-    fun `words held one second or longer become letter groups`() {
+    fun `parser emits plain words - letter synthesis is deferred to render time`() {
         val vocalLines = parse(duetTtml).lines.filter { !it.isInterlude && !it.isSongwriter }
-        // "Yeah" is held 1500ms -> letter-by-letter timing, evenly split at 375ms.
-        val yeah = vocalLines.first { it.agent == "v2" }.words.single()
-        assertTrue(yeah.isLetterGroup)
-        assertEquals(4, yeah.letters.size)
-        assertEquals("Y", yeah.letters[0].char)
-        assertEquals(16_000L, yeah.letters[0].startMs)
-        assertEquals(16_375L, yeah.letters[0].endMs)
-        assertEquals(17_500L, yeah.letters[3].endMs)
+        // The parser no longer synthesizes letter groups; that is done by LetterSynthesizer
+        // using the active RenderConfig. Every word should be plain here.
+        vocalLines.flatMap { it.words }.forEach {
+            assertFalse(it.isLetterGroup)
+            assertTrue(it.letters.isEmpty())
+        }
+    }
 
-        // "world" is held only 800ms -> plain word.
-        val world = vocalLines.first { it.agent == "v1" }.words[2]
-        assertFalse(world.isLetterGroup)
-        assertTrue(world.letters.isEmpty())
+    @Test
+    fun `word-timed ttml is detected as syllable type`() {
+        assertEquals(LyricsType.Syllable, parse(duetTtml).type)
+    }
+
+    @Test
+    fun `ttml without span timing is detected as line type`() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml">
+              <body><div>
+                <p begin="0:01.000" end="0:03.000">Just a whole line</p>
+                <p begin="0:03.000" end="0:05.000">And another line</p>
+              </div></body>
+            </tt>
+        """.trimIndent()
+        assertEquals(LyricsType.Line, parse(ttml).type)
+    }
+
+    @Test
+    fun `apple-style translation with a Latn language tag is treated as romanization`() {
+        // Apple's real lyric TTML has no dedicated transliteration element — both actual
+        // translations and romanizations arrive as <translation xml:lang="…">, disambiguated
+        // only by whether the language tag targets a Latin script (e.g. "ja-Latn").
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal">
+              <head><metadata>
+                <itunes:translations>
+                  <itunes:translation type="replacement" xml:lang="ja-Latn">
+                    <itunes:text for="L1">
+                      <itunes:span begin="0:01.000" end="0:01.500">Hito</itunes:span>
+                      <itunes:span begin="0:01.500" end="0:02.000">ni</itunes:span>
+                    </itunes:text>
+                  </itunes:translation>
+                  <itunes:translation type="replacement" xml:lang="en">
+                    <itunes:text for="L1">There are people</itunes:text>
+                  </itunes:translation>
+                </itunes:translations>
+              </metadata></head>
+              <body><div begin="0:01.000" end="0:02.000">
+                <p begin="0:01.000" end="0:02.000" itunes:key="L1"><span begin="0:01.000" end="0:01.500">人</span> <span begin="0:01.500" end="0:02.000">に</span></p>
+              </div></body>
+            </tt>
+        """.trimIndent()
+
+        val line = parse(ttml).lines.first { !it.isInterlude && !it.isSongwriter }
+        assertEquals("Hito", line.words[0].romanizedText)
+        assertEquals("ni", line.words[1].romanizedText)
+        // The real ("en") translation is parsed separately and must not leak into romanizedText.
+        assertEquals("There are people", line.translatedText)
+    }
+
+    @Test
+    fun `inline x-roman span is not appended as extra lyric words`() {
+        // Real-world Apple lyric TTML (confirmed against an actual file) appends a whole-line
+        // romanization as an extra untimed <span ttm:role="x-roman"> inside the SAME <p> as the
+        // original lyrics — distinct from the <transliterations> metadata block, which times
+        // romanization per-syllable. Left unhandled, this span's text gets tokenized and appended
+        // to leadWords, showing the original words immediately followed by their own romanization
+        // concatenated into the same line.
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="Word">
+              <body><div begin="0:04.363" end="0:05.141">
+                <p begin="0:04.363" end="0:05.141" ttm:agent="v2" itunes:key="L1"><span begin="0:04.363" end="0:04.642">ねぇ、</span><span begin="0:04.642" end="0:04.768">知</span><span begin="0:04.642" end="0:04.885">って</span><span begin="0:04.885" end="0:05.141">る?</span><span ttm:role="x-roman">Ne~e, shitteru?</span></p>
+              </div></body>
+            </tt>
+        """.trimIndent()
+
+        val line = parse(ttml).lines.first { !it.isInterlude && !it.isSongwriter }
+        assertEquals(listOf("ねぇ、", "知", "って", "る?"), line.words.map { it.text })
+        assertEquals("Ne~e, shitteru?", line.romanizedFull)
+    }
+
+    @Test
+    fun `explicit itunes timing overrides the heuristic`() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="Line">
+              <body><div>
+                <p begin="0:01.000" end="0:03.000"><span begin="0:01.000" end="0:02.000">Word</span> <span begin="0:02.000" end="0:03.000">timed</span></p>
+              </div></body>
+            </tt>
+        """.trimIndent()
+        assertEquals(LyricsType.Line, parse(ttml).type)
     }
 
     @Test

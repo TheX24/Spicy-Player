@@ -1,4 +1,4 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.models
+package com.tx24.spicyplayer.lyrics.spicy.models
 
 /**
  * Represents a full line of lyrics composed of multiple [Word]s.
@@ -20,6 +20,15 @@ data class Line(
     val isInterlude: Boolean = false,
     /** Explicit end time for interludes, as they might not have words. */
     val interludeEndMs: Long = -1L,
+    /** Reserved for a future translation feature; not yet displayed. */
+    val translatedText: String? = null,
+    /**
+     * Whole-line romanization fallback (e.g. from an inline `<span ttm:role="x-roman">`),
+     * captured when the per-word transliteration metadata doesn't cover this line. Not
+     * currently rendered — per-word [Word.romanizedText] (metadata-derived or on-device) is
+     * used for display; this is reserved for a future line-level fallback path.
+     */
+    val romanizedFull: String? = null,
 ) {
     /** 
      * The end time of the line. 

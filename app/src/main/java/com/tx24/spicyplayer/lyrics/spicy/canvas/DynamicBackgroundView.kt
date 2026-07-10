@@ -1,4 +1,4 @@
-package com.tx24.spicyplayer.uiNowPlaying.spicy.canvas
+package com.tx24.spicyplayer.lyrics.spicy.canvas
 
 import android.graphics.Bitmap
 import androidx.compose.animation.core.*
@@ -46,7 +46,7 @@ fun DynamicBackgroundView(
                 transitionProgress.snapTo(0.0f)
                 transitionProgress.animateTo(
                     targetValue = 1.0f,
-                    animationSpec = tween(1500, easing = LinearEasing)
+                    animationSpec = tween(1000, easing = LinearEasing)
                 )
                 textureUpdateTrigger++
             }
