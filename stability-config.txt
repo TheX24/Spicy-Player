@@ -1,0 +1,6 @@
+kotlin.collections.*
+com.tx24.spicyplayer.model.**
+com.tx24.spicyplayer.ui.model.**
+com.tx24.spicyplayer.store.model.song.*
+com.tx24.spicyplayer.store.model.playlist.*
+com.tx24.spicyplayer.store.model.lyrics.*

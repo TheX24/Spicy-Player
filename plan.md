@@ -7,17 +7,34 @@
     - [x] Tap to seek
     - [x] 3 Dots Interlude indicator
     - [x] Dynamic Background
+      - [ ] Port Kawarp (?)
+        - [ ] Use RenderEffect or AGSL (Android Graphics Shading Language) for fluid mesh gradients
+        - [ ] Provide simple Canvas fallback for Android 12 and below
     - [ ] Update word-wrapping to match Spicy Lyrics
+      - [ ] Write a custom TextMeasurer to linebreak between whole words instead of splitting syllables inappropriately
     - [ ] Romanization
+      - [ ] Integrate local Kuromoji/WanaKana equivalent to convert Kanji/Hangul to Latin script offline
     - [ ] Translation (?)
-    - [ ] Line synced lyrics
-    - [ ] Static lyrics
+      - [ ] Leverage ML Kit Translate API for on-device fallback translation
+    - [ ] Line synced lyrics (.lrc)
+      - [ ] Implement robust .lrc parser mapping [mm:ss.xx] tags
+      - [ ] Configure rendering engine to highlight whole line blocks simultaneously
+    - [ ] Static lyrics (.txt)
+      - [ ] Fallback parser and static scrollable view without gradient sweeps
     - [ ] Spicy Lyrics-like settings
+      - [ ] Dedicated BottomSheet settings for blur radii, font scale, and alignment
     - [ ] Landscape view
       - [ ] Split screen layout with cover art/controls on the left and scrolling lyrics on the right
+        - [ ] Read windowSizeClass natively to trigger 50/50 dual-weight Row layout
     - [ ] Fixes
       - [ ] Resolve overlapping text issues during fast sections or duets
+        - [ ] Parse <agent> tags to separate voices and render them as stacked, dual-colored rows
       - [ ] Improve parser resilience for malformed `.ttml` files to prevent crashes
+        - [ ] Add try-catch bounds and gracefully drop nodes with impossible/negative timings
+    - [ ] API's
+      - [x] LRCLIB
+      - [ ] Paxsenix
+        - [ ] Integrate REST endpoints to expand metadata search pool
   - Audio player aspect
     - [x] ExoPlayer
     - [x] Folder scanner + auto-pairing
@@ -25,24 +42,42 @@
         - [x] Use Android Storage Access Framework (SAF) for scoped storage compliance
         - [x] Background service for scanning with a progress notification
       - [x] Auto-pair `.flac` and `.ttml` files based on name
+      - [ ] Multiple folder support
+        - [ ] Save List<Uri> in DataStore, iterate through URIs during SAF background scan
     - [x] Implement MediaSession for song info broadcasting
+    - [ ] Last.fm
+      - [ ] Implement ExoPlayer PlaybackListener to track 50% or 4-min rule for scrobbling
+      - [ ] Handle secure auth via Last.fm API
     - [ ] UI
       - [ ] Introduction screen
         - [ ] Greeting
         - [ ] Tutorial
-        - [ ] Select folder to scan
+        - [ ] Select folder to scan (Triggers SAF picker)
         - [x] Show progress of scanning
-      - [ ] Library
-        - [ ] Categorized tabs: Albums, Artists, Songs, Folders, and Playlists
-        - [ ] Grid view for Albums/Artists with fast-scroll alphabet indexer on the right edge
-      - [ ] Queue
-        - [ ] Drag-and-drop to reorder tracks
-        - [ ] Swipe left/right to remove a track from the queue
-        - [ ] Sleep timer
+      - [x] Library
+        - [x] Categorized tabs: Albums, Artists, Songs, Folders, and Playlists
+          - [ ] Artists
+            - [ ] Map Room DB grouping by Artist ID
+          - [ ] Folders
+            - [ ] Display nested File system tree reflecting SAF structures
+          - [x] Playlist
+            - [ ] Add .m3u support
+              - [ ] Parse .m3u paths against local DB entities to auto-generate playlists
+        - [x] Grid view for Albums/Artists with fast-scroll alphabet indexer on the right edge
+        - [x] Playlists
+        - [ ] Update to M3E
+          - [ ] Apply Expressive rounded cards, list physics, and standard spring animations
+      - [x] Queue
+        - [x] Drag-and-drop to reorder tracks
+        - [x] Swipe left/right to remove a track from the queue
+        - [x] Sleep timer
+        - [ ] Update to M3E
+          - [ ] Unify item styling and ensure drag-and-drop shadows use Expressive elevation
       - [x] Now Playing
         - [ ] Fully hide controls
-        - [ ] Swipe horizontally to skip to previous/next track
-        - [ ] Tap album cover to show/hide lyrics overlay or toggle full-screen cover
+          - [ ] Detect tap on background/cover to AnimatedVisibility fade-out all UI Chrome
+        - [x] Swipe horizontally to skip to previous/next track
+        - [x] Show/hide lyrics overlay
         - [x] Controls
           - [ ] Advanced controls
         - [x] Progress bar
@@ -53,42 +88,54 @@
       - [ ] Spectrum visualization
         - [ ] Fetch audio session ID from ExoPlayer to drive visualizer data
         - [ ] Multiple visualizer styles (e.g., bar graph, waveform, circular aura around cover art)
+          - [ ] Capture FFT byte arrays and map to Canvas coordinate graphs and splines
   - Settings
+    - [x] Update to M3E
     - [x] Lyrics settings
       - [x] Global offset/delay adjustment (e.g., ±500ms) for out-of-sync lyrics
       - [x] Custom font size
-    - [x] Audio player settings
-      - [x] Equalizer (EQ) preset selection and Bass Boost toggle
-        - [ ] *TODO* Musicolet-like EQ
-      - [x] Crossfade duration slider (0-10 seconds) and gapless playback toggle
+    - [ ] Audio player settings
+      - [ ] Musicolet-like EQ
+        - [ ] Hook into android.media.audiofx.Equalizer via ExoSessionId
+        - [ ] Build draggable spline-curve node UI for frequency bands
+      - [ ] Crossfade duration slider (0-10 seconds)
+        - [ ] Dual-ExoPlayer instance architecture to ramp volumes inversely over time gap
+      - [x] Gapless playback toggle
     - [x] General settings
       - [x] App theme selector (Light, Dark, System Default, Material You)
-      - [ ] Cache management (clear cached images/lyrics to free up space)
+      - [x] Cache management (clear cached images/lyrics to free up space)
       - [x] Keep screen on
       - [x] Scan directory
       - [x] Audio focus mode
       - [x] Rescan library
         - [x] Cache scanned and matched
     - [x] Reset to defaults
+    - [ ] Add more settings
   - General
     - [x] Update checking
 - Bugs
   - [ ] RTL Languages
     - [ ] Ensure the Word renderer calculates layout widths properly from right to left
     - [ ] Mirror the scroll direction metrics for RTL text in the lyrics list
-    - [ ] Flip gradient scan direction
-    - [ ] Turn off held word animation
+    - [ ] Flip gradient scan direction (x = size.width to 0)
+    - [ ] Turn off held word animation (or fix to mirror sweep direction)
   - [ ] Held word animation
     - [ ] Slower anims look fine but faster anims look weird
-  - [x] Audio focus handling
+      - [ ] Replace tweened sweep with bounded spring() layout forecasting to prevent exact-sync frame drops
+    - [ ] Don't animate punctuation
+      - [ ] Exclude (, . ! ?) bounding characters from interpolation highlight logic
+    - [ ] Same letters in the word highlight
+      - [ ] Switch tracking metric from String.indexOf interpolation to exact index metrics (startIndex, endIndex)
   - [ ] Bluetooth/general audio delay fix
-  - [x] 3 Dots interlude BG line spacings
-  - [x] Previous song
-  - [x] Seeking doesn't move lyrics view
-  - [x] BG Blur and timing offset have too many steps/circles in slider
-  - [x] Fix scan directory setting
-  - [x] Custom EQ doesn't work
-  - [x] Transition/animation between settings pages
   - [ ] Performance improvements
-  - [x] Fix logo sizing
-  - [x] Shuffle not shuffling?
+  - [ ] Fix unrestrict battery usage setting
+    - [ ] Fire Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) to bypass OEM killers
+  - [ ] Fast word fade-in
+    - [ ] Pre-emptively trigger alpha fade-in 200ms prior to the absolute sung timestamp
+  - [x] Fix cover art swipe gesture working half the time
+  - [x] Fix animations/transistions between pages
+  - [x] Organize the project folders
+  - [x] Fix button alignment with seekbar
+  - [x] Low quality cover art
+  - [x] Fix TTML & song matching
+  - [x] Overflow menu shadow fades too slow

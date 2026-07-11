@@ -1,0 +1,312 @@
+package com.tx24.spicyplayer.ui
+
+import android.app.Activity
+import android.content.Intent
+import androidx.activity.ComponentActivity
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.core.util.Consumer
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.tx24.spicyplayer.uiLibrary.albums.navigation.albumsGraph
+import com.tx24.spicyplayer.uiLibrary.albums.navigation.navigateToAlbumDetail
+import com.tx24.spicyplayer.navigation.TopLevelDestination
+import com.tx24.spicyplayer.navigation.navigateToTopLevelDestination
+import com.tx24.spicyplayer.playback.PlaybackService
+import com.tx24.spicyplayer.uiLibrary.playlists.navigation.playlistsGraph
+import com.tx24.spicyplayer.settings.navigation.settingsGraph
+import com.tx24.spicyplayer.uiLibrary.songs.navigation.SONGS_NAVIGATION_GRAPH
+import com.tx24.spicyplayer.uiLibrary.songs.navigation.songsGraph
+import com.tx24.spicyplayer.state.rememberSpicyAppState
+import com.tx24.spicyplayer.tageditor.navigation.tagEditorGraph
+import com.tx24.spicyplayer.ui.compact.CompactAppScaffold
+import com.tx24.spicyplayer.uiNowPlaying.ui.BarState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
+import android.os.Build
+
+
+val topLevelDestinations =
+    listOf(
+        TopLevelDestination.SONGS,
+        TopLevelDestination.PLAYLISTS,
+        TopLevelDestination.ALBUMS,
+        //TopLevelDestination.SETTINGS
+    )
+
+
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class, ExperimentalFoundationApi::class)
+@Composable
+fun SpicyApp2(
+    modifier: Modifier,
+    navController: NavHostController
+) {
+
+
+    val widthClass = calculateWindowSizeClass(activity = LocalContext.current as Activity)
+
+    val density = LocalDensity.current
+    val nowPlayingScreenAnchors = remember {
+        AnchoredDraggableState(
+            BarState.COLLAPSED,
+            positionalThreshold = { distance: Float -> 0.5f * distance },
+            velocityThreshold = { with(density) { 70.dp.toPx() } },
+            snapAnimationSpec = tween(),
+            decayAnimationSpec = exponentialDecay()
+        )
+    }
+
+    val appState = rememberSpicyAppState(
+        navHostController = navController,
+        isNowPlayingExpanded = nowPlayingScreenAnchors.settledValue == BarState.EXPANDED,
+        nowPlayingViewModel = hiltViewModel(),
+        nowPlayingScreenOffset = {
+            nowPlayingScreenAnchors.offset
+        },
+    )
+
+
+    val navHost = remember {
+        movableContentOf<Modifier, MutableState<Modifier>> { navHostModifier, contentModifier ->
+            NavHost(
+                modifier = navHostModifier,
+                navController = appState.navHostController,
+                startDestination = SONGS_NAVIGATION_GRAPH
+            ) {
+                songsGraph(
+                    contentModifier = contentModifier,
+                    navController,
+                    enableBackPress = mutableStateOf(false),
+                    onNavigateToAlbum = {
+                        navController.navigateToAlbumDetail(it.albumInfo.id)
+                    },
+                    onNavigateToSettings = {
+                        navController.navigateToTopLevelDestination(
+                            TopLevelDestination.SETTINGS
+                        )
+                    },
+                    enterAnimationFactory = ::getEnterAnimationForRoute,
+                    exitAnimationFactory = ::getExitAnimationForRoute,
+                    popEnterAnimationFactory = ::getPopEnterAnimationForRoute,
+                    popExitAnimationFactory = ::getPopExitAnimationForRoute
+                )
+                playlistsGraph(
+                    contentModifier = contentModifier,
+                    navController,
+                    enterAnimationFactory = ::getEnterAnimationForRoute,
+                    exitAnimationFactory = ::getExitAnimationForRoute,
+                    popEnterAnimationFactory = ::getPopEnterAnimationForRoute,
+                    popExitAnimationFactory = ::getPopExitAnimationForRoute
+                )
+                albumsGraph(
+                    contentModifier = contentModifier,
+                    navController,
+                    enableBackPress = mutableStateOf(false),
+                    enterAnimationFactory = ::getEnterAnimationForRoute,
+                    exitAnimationFactory = ::getExitAnimationForRoute,
+                    popEnterAnimationFactory = ::getPopEnterAnimationForRoute,
+                    popExitAnimationFactory = ::getPopExitAnimationForRoute
+                )
+                settingsGraph(
+                    contentModifier = contentModifier,
+                    navController = navController,
+                    onBackPressed = { navController.popBackStack() },
+                    enterAnimationFactory = ::getEnterAnimationForRoute,
+                    exitAnimationFactory = ::getExitAnimationForRoute,
+                    popEnterAnimationFactory = ::getPopEnterAnimationForRoute,
+                    popExitAnimationFactory = ::getPopExitAnimationForRoute
+                )
+                tagEditorGraph(
+                    contentModifier =
+                    contentModifier,
+                    navController,
+                    enterAnimationFactory = ::getEnterAnimationForRoute,
+                    exitAnimationFactory = ::getExitAnimationForRoute,
+                    popEnterAnimationFactory = ::getPopEnterAnimationForRoute,
+                    popExitAnimationFactory = ::getPopExitAnimationForRoute
+                )
+            }
+        }
+    }
+
+    val settingsViewModel: com.tx24.spicyplayer.settings.ISettingsViewModel = hiltViewModel<com.tx24.spicyplayer.settings.SettingsViewModel>()
+    val scanProgress by settingsViewModel.scanProgress.collectAsState()
+    val scanHistory by settingsViewModel.scanHistory.collectAsState()
+    val userPreferencesRepository = (LocalContext.current as com.tx24.spicyplayer.MainActivity).userPreferencesRepository
+    
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        val prefs = userPreferencesRepository.userSettingsFlow.first()
+        val librarySettings = userPreferencesRepository.librarySettingsFlow.first()
+        val scanPath = librarySettings.scanDirectory.ifBlank { "/sdcard/Music/" }
+        
+        val cachedSongs = com.tx24.spicyplayer.library.store.loadCachedScan(context, scanPath)
+        if (cachedSongs.isNullOrEmpty()) {
+            val intent = Intent(context, com.tx24.spicyplayer.library.store.ScanService::class.java).apply {
+                putExtra("scan_path", scanPath)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+    }
+
+    if (scanProgress != null) {
+        com.tx24.spicyplayer.ui.dialogs.ScanProgressDialog(
+            isScanning = true,
+            scanProgress = scanProgress!!,
+            scanHistory = scanHistory
+        )
+    }
+
+    if (widthClass.widthSizeClass > WindowWidthSizeClass.Compact) {
+        ExpandedAppScaffold(
+            modifier = modifier,
+            appState = appState,
+            nowPlayingScreenAnchors = nowPlayingScreenAnchors,
+            topLevelDestinations = topLevelDestinations,
+            currentDestination = navController.currentBackStackEntryAsState().value?.destination,
+            onDestinationSelected = { navController.navigateToTopLevelDestination(it) }
+        ) { navHostModifier, contentModifier ->
+            navHost(navHostModifier, contentModifier)
+        }
+    } else {
+        CompactAppScaffold(
+            modifier = modifier,
+            appState = appState,
+            nowPlayingScreenAnchors = nowPlayingScreenAnchors,
+            topLevelDestinations = topLevelDestinations,
+            currentDestination = navController.currentBackStackEntryAsState().value?.destination,
+            onDestinationSelected = { navController.navigateToTopLevelDestination(it) }
+        ) { navHostModifier, contentModifier ->
+            navHost(navHostModifier, contentModifier)
+        }
+    }
+
+    ViewNowPlayingScreenListenerEffect(
+        navController = navController,
+        onViewNowPlayingScreen = {
+            appState.coroutineScope.launch {
+                nowPlayingScreenAnchors.animateTo(
+                    BarState.EXPANDED
+                )
+            }
+        }
+    )
+
+    NowPlayingCollapser(navController = navController) {
+        if (nowPlayingScreenAnchors.settledValue == BarState.EXPANDED) {
+            nowPlayingScreenAnchors.animateTo(BarState.COLLAPSED)
+        }
+    }
+
+}
+
+/**
+ * This is responsible to collapse the NowPlayingScreen
+ * when a navigation event happens
+ */
+@Composable
+fun NowPlayingCollapser(
+    navController: NavHostController,
+    onCollapse: suspend () -> Unit
+) {
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    LaunchedEffect(key1 = currentBackStackEntry) {
+        onCollapse()
+    }
+}
+
+
+/**
+ * Responsible to expand the NowPlayingScreen when an intent is received
+ * or when the app is launched from the media notification
+ */
+@Composable
+fun ViewNowPlayingScreenListenerEffect(
+    navController: NavController,
+    onViewNowPlayingScreen: () -> Unit
+) {
+    val context = LocalContext.current
+    var handledIntent by rememberSaveable {
+        mutableStateOf(false)
+    }
+    LaunchedEffect(key1 = Unit) {
+        delay(500)
+        val activity = (context as? Activity) ?: return@LaunchedEffect
+        val action = activity.intent.action
+        if (action == PlaybackService.VIEW_MEDIA_SCREEN_ACTION && !handledIntent) {
+            onViewNowPlayingScreen()
+            handledIntent = true
+        }
+    }
+
+    DisposableEffect(navController) {
+        val listener = Consumer<Intent> {
+            if (it.action == PlaybackService.VIEW_MEDIA_SCREEN_ACTION) {
+                onViewNowPlayingScreen()
+            }
+        }
+        val activity = (context as? ComponentActivity) ?: return@DisposableEffect onDispose { }
+        activity.addOnNewIntentListener(listener)
+        onDispose { activity.removeOnNewIntentListener(listener) }
+    }
+}
+
+
+@OptIn(ExperimentalFoundationApi::class)
+fun AnchoredDraggableState<BarState>.update(
+    layoutHeightPx: Int,
+    barHeightPx: Int,
+    bottomBarHeightPx: Int
+): Int {
+    var offset = 0
+    updateAnchors(
+        DraggableAnchors {
+            offset =
+                (-barHeightPx + layoutHeightPx - bottomBarHeightPx)
+            BarState.COLLAPSED at offset.toFloat()
+            BarState.EXPANDED at 0.0f
+        },
+        this.settledValue
+    )
+    return offset
+}
+
+fun calculateBottomPaddingForContent(
+    shouldShowNowPlayingBar: Boolean,
+    bottomBarHeight: Dp,
+    nowPlayingBarHeight: Dp
+): Dp {
+    return bottomBarHeight + (if (shouldShowNowPlayingBar) nowPlayingBarHeight else 0.dp)
+}

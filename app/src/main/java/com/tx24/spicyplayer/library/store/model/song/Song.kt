@@ -1,0 +1,18 @@
+package com.tx24.spicyplayer.library.store.model.song
+
+import android.net.Uri
+import com.tx24.spicyplayer.model.song.BasicSongMetadata
+
+
+/**
+ * Represents a song from the point of view of Android.
+ * A song contains a [Uri] to identify it in the MediaStore
+ * and a file path to find it on disk, album id, as well as the metadata of the song
+ */
+data class Song(
+    val uri: Uri,
+    val filePath: String,
+    val albumId: Long?,
+    val metadata: BasicSongMetadata,
+    val lyricsPath: String? = null
+)
