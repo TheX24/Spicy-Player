@@ -40,6 +40,8 @@ data class LineAnimState(
     val lineGradientPercent: Float = -20f,
     /** Line-mode only: the whole-line glow spring value (shadow blur 4+8·glow, alpha glow·0.5). */
     val lineGlow: Float = 0f,
+    /** True while the user is manually scrolling — every shadow/glow halo is suppressed, not just distance blur. */
+    val suppressShadows: Boolean = false,
 )
 
 /**

@@ -217,6 +217,14 @@ class LyricsAnimator(
                 blurringLastLine = lineIdx
             }
 
+            // A line whose own words just finished can still be mid-settle (checkNextLine) while
+            // a concurrent bg line — or the array-adjacency check — keeps it from freezing yet;
+            // this only governs how long the scale/glow springs keep relaxing smoothly instead of
+            // freezing abruptly. It must NOT keep the line's fill brighter than any other inactive
+            // line — the renderer treats every non-active line's words identically regardless of
+            // Sung/NotSung, so line opacity can go back to tracking lineState alone.
+            val stillFinalizing = lineState == ElementState.Sung &&
+                (shouldFinalize(lines, lineIdx, processedPosition) || !isSettled(cachedWordStates[lineIdx]))
             val opacity = animateLineOpacity(lineIdx, line, lineState, isActive)
             val lineScale = when {
                 line.isInterlude -> animateInterludeScale(lineIdx, line, processedPosition, isActive)
@@ -264,7 +272,7 @@ class LyricsAnimator(
                         cachedWordStates[lineIdx] = states
                         states
                     }
-                    lineState == ElementState.Sung && shouldFinalize(lines, lineIdx, processedPosition) -> {
+                    stillFinalizing -> {
                         // checkNextLine: keep settling toward final targets until the next line is Sung.
                         val states = if (line.isInterlude) {
                             animateInterludeDots(line, processedPosition, deltaTime, lineIdx, finalize = true)
@@ -296,6 +304,7 @@ class LyricsAnimator(
                 isSongwriter = line.isSongwriter,
                 lineGradientPercent = lineGradient,
                 lineGlow = lineGlow,
+                suppressShadows = suppressBlur,
             )
         }
     }
@@ -375,6 +384,20 @@ class LyricsAnimator(
     private fun shouldFinalize(lines: List<Line>, lineIdx: Int, processedPosition: Long): Boolean {
         val next = lines.getOrNull(lineIdx + 1) ?: return true
         return elementState(processedPosition, next.startMs, next.endMs) != ElementState.Sung
+    }
+
+    /**
+     * True once a settled line's springs have actually reached their final (fully-sung) values.
+     * The array-adjacency check in [shouldFinalize] can flip false before that happens — e.g. a
+     * background line's "next line" in list order may already be Sung from a much earlier point
+     * in the song — which would otherwise freeze the line mid-transition, never fully lighting up.
+     */
+    private fun isSettled(states: List<WordAnimState>?): Boolean {
+        if (states == null) return false
+        return states.all { w ->
+            w.gradientPosition >= 99.5f && w.glow < 0.02f &&
+                (!w.isLetterGroup || w.letterStates.all { it.gradientPosition >= 99.5f && it.glow < 0.02f })
+        }
     }
 
     // ── Word processing (Active line) ───────────────────────────────────────────────
