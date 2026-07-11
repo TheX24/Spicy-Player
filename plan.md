@@ -10,7 +10,7 @@
       - [x] Legacy Background
       - [x] Kawarp
       - [x] Option to keep current legacy background
-    - [ ] Update word-wrapping to match Spicy Lyrics
+    - [x] Update word-wrapping to match Spicy Lyrics
     - [x] Romanization
     - [ ] Translation (?)
       - [ ] Leverage ML Kit Translate API for on-device fallback translation
@@ -87,17 +87,7 @@
 - Bugs
   - [~] RTL Languages (right-align + gradient flip; full bidi word-reorder still pending)
   - [ ] Held word animation
-    - [x] Slower anims look fine but faster anims look weird (single-pass gradient wipe, no overlay fade-in)
-    - [x] Don't animate punctuation
-    - [x] Same letters in the word highlight (index-based letter mapping)
+    - [ ] Animation on shorter words look fine, longer words don't match 1:1 and are weird
+    - [ ] Don't animate punctuation
   - [ ] Bluetooth/general audio delay fix
-  - [ ] Performance improvements
-  - [ ] Fix unrestrict battery usage setting
-  - [x] Word fade-in when fast
-  - [x] Fix cover art swipe gesture working half the time
-  - [x] Fix animations/transistions between pages
-  - [x] Organize the project folders
-  - [x] Fix button alignment with seekbar
-  - [x] Low quality cover art
-  - [x] Fix TTML & song matching
-  - [x] Overflow menu shadow fades too slow
+  - [ ] Performance improvements?

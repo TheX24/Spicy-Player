@@ -19,18 +19,29 @@ enum class LyricsQualityMode { FULL, SIMPLE, MINIMAL }
 data class RenderConfig(
     val mode: LyricsQualityMode,
 
-    // Gradient text alphas (Mixed.css: --gradient-alpha / --gradient-alpha-end !important).
-    // Fixed for every word/letter/line state — only --gradient-position moves between
-    // NotSung(-20)/Active(animated)/Sung(100). Multiplied by line opacity at draw time.
+    // Gradient text alphas (Mixed.css: --gradient-alpha / --gradient-alpha-end). Fixed per
+    // element — only --gradient-position moves between NotSung(-20)/Active(animated)/Sung(100),
+    // multiplied by line opacity at draw time. CSS cascade trap: the `.line`-level
+    // `--gradient-alpha-end: 0.35 !important` never reaches words/letters, because they carry
+    // their own DIRECT 0.5 declaration (a direct custom property beats an inherited !important).
+    // So words/letters sweep bright→0.5 while Line-mode text (living on the .line element
+    // itself) sweeps bright→0.35.
     val gradientAlphaBright: Float,
     val gradientAlphaDim: Float,
+    val lineGradientAlphaDim: Float,
 
     // Line opacity states (CSS --Vocal-*-opacity).
     val opacityActive: Float,
     val opacityNotSung: Float,
     val opacitySung: Float,
 
-    /** Line opacity/scale transition duration (CSS transition: 0.2s; Minimal 0.4s). */
+    /**
+     * Line opacity/scale transition duration. Reference CSS is 0.2s/0.4s(Minimal), but that value
+     * is tuned for a GPU-composited CSS transition; run through our cubic-bezier(0.61,1,0.88,1)
+     * easing (front-loaded — most of the motion happens in the first half) on a per-frame Compose
+     * canvas, 200ms reads as a near-instant snap rather than a visible fade. Widened so the
+     * active→inactive dim is actually perceptible.
+     */
     val lineTransitionMs: Int,
 
     /** Distance-based blur halo on inactive lines (FULL only). */
@@ -50,11 +61,12 @@ data class RenderConfig(
         val FULL = RenderConfig(
             mode = LyricsQualityMode.FULL,
             gradientAlphaBright = 0.85f,
-            gradientAlphaDim = 0.35f,
+            gradientAlphaDim = 0.5f,
+            lineGradientAlphaDim = 0.35f,
             opacityActive = 1.0f,
             opacityNotSung = 0.51f,
             opacitySung = 0.497f,
-            lineTransitionMs = 200,
+            lineTransitionMs = 350,
             distanceBlurEnabled = true,
             lettersEnabled = true,
             letterDurationThresholdMs = 1000L,
@@ -66,6 +78,7 @@ data class RenderConfig(
             mode = LyricsQualityMode.SIMPLE,
             gradientAlphaBright = 1.0f,
             gradientAlphaDim = 0.3f,
+            lineGradientAlphaDim = 0.3f,
             opacityNotSung = 0.45f,
             opacitySung = 0.35f,
             distanceBlurEnabled = false,
@@ -77,7 +90,7 @@ data class RenderConfig(
             mode = LyricsQualityMode.MINIMAL,
             opacityNotSung = 0.5f,
             opacitySung = 0.0f,            // sung lines fade out entirely
-            lineTransitionMs = 400,
+            lineTransitionMs = 550,
             distanceBlurEnabled = false,
             lettersEnabled = false,
             interludeGapThresholdMs = 5000L,

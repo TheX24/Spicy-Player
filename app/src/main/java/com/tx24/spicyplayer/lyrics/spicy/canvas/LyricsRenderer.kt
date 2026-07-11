@@ -381,7 +381,7 @@ internal fun DrawScope.drawLineModeLine(
     config: RenderConfig,
 ) {
     // Reference gradient stops are fixed for every state; only lineGradientPercent moves.
-    val dim = config.gradientAlphaDim * lineAnim.opacity
+    val dim = config.lineGradientAlphaDim * lineAnim.opacity
     val bright = config.gradientAlphaBright * lineAnim.opacity
 
     // Whole-line glow spring (reference Line-mode: shadow blur 4 + 8·glow, alpha glow·0.5),
@@ -392,7 +392,7 @@ internal fun DrawScope.drawLineModeLine(
             color = Color.White.copy(alpha = glowAlpha * lineAnim.opacity),
             blurRadius = 4f + 8f * lineAnim.lineGlow,
         )
-        else -> blurShadow(lineAnim, config.gradientAlphaDim)
+        else -> blurShadow(lineAnim, config.lineGradientAlphaDim)
     }
     val lineWidth = layout.maxRowWidth.coerceAtLeast(1f)
 
