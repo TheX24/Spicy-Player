@@ -61,17 +61,11 @@ fun NavGraphBuilder.settingsGraph(
         ) {
             val viewModel: SettingsViewModel = hiltViewModel()
             val state by viewModel.state.collectAsState()
-            val scanDirectory by viewModel.scanDirectory.collectAsState()
-            val scanProgress by viewModel.scanProgress.collectAsState()
-            val scanHistory by viewModel.scanHistory.collectAsState()
             val updateStatus by viewModel.updateStatus.collectAsState()
 
             SettingsScreen(
                 modifier = contentModifier.value,
                 state = state,
-                scanDirectory = scanDirectory,
-                scanProgress = scanProgress,
-                scanHistory = scanHistory,
                 updateStatus = updateStatus,
                 settingsCallbacks = viewModel,
                 onBackPressed = onBackPressed,

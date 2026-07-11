@@ -6,8 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.tx24.spicyplayer.BuildConfig
 import com.tx24.spicyplayer.settings.components.GitHubUpdateChecker
 import com.tx24.spicyplayer.settings.components.UpdateStatus
-import com.tx24.spicyplayer.library.store.ScanProgress
-import com.tx24.spicyplayer.library.store.ScanStateRepository
+import com.tx24.spicyplayer.library.store.FolderInfo
+import com.tx24.spicyplayer.library.store.MediaRepository
 import com.tx24.spicyplayer.library.store.preferences.UserPreferencesRepository
 import com.tx24.spicyplayer.ui.model.AppThemeUi
 import com.tx24.spicyplayer.model.prefs.AppTheme
@@ -30,8 +30,17 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val scanStateRepository: ScanStateRepository
+    private val mediaRepository: MediaRepository
 ) : ViewModel(), ISettingsViewModel {
+
+    private val _discoveredFolders = MutableStateFlow<List<FolderInfo>>(emptyList())
+    override val discoveredFolders: StateFlow<List<FolderInfo>> = _discoveredFolders.asStateFlow()
+
+    override fun refreshDiscoveredFolders() {
+        viewModelScope.launch { _discoveredFolders.value = mediaRepository.getAudioFolders() }
+    }
+
+    init { refreshDiscoveredFolders() }
 
     override val state = userPreferencesRepository.userSettingsFlow
         .map { SettingsState.Loaded(it.toUiModel()) }
@@ -40,16 +49,6 @@ class SettingsViewModel @Inject constructor(
     override val cacheAlbumArt =
         userPreferencesRepository.librarySettingsFlow.map { it.cacheAlbumCoverArt }
             .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    override val scanDirectory =
-        userPreferencesRepository.librarySettingsFlow.map { it.scanDirectory }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, "/sdcard/Music/")
-
-    override val scanProgress = scanStateRepository.scanProgress
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
-
-    override val scanHistory = scanStateRepository.scanHistory
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
     override val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
@@ -86,10 +85,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferencesRepository.toggleCacheAlbumArt()
         }
-    }
-
-    override fun setScanDirectory(dir: String) {
-        viewModelScope.launch { userPreferencesRepository.setScanDirectory(dir) }
     }
 
     override fun onFolderAdded(folder: String) {
@@ -231,7 +226,6 @@ class SettingsViewModel @Inject constructor(
             userPreferencesRepository.setMiniPlayerExtraControls(false)
             userPreferencesRepository.setVisualizerEnabled(false)
             userPreferencesRepository.setKeepScreenOn(false)
-            userPreferencesRepository.setScanDirectory("/sdcard/Music/")
         }
     }
 
@@ -256,9 +250,7 @@ class SettingsViewModel @Inject constructor(
 interface ISettingsViewModel {
     val state: StateFlow<SettingsState>
     val cacheAlbumArt: StateFlow<Boolean>
-    val scanDirectory: StateFlow<String>
-    val scanProgress: StateFlow<ScanProgress?>
-    val scanHistory: StateFlow<List<String>>
+    val discoveredFolders: StateFlow<List<FolderInfo>>
     val updateStatus: StateFlow<UpdateStatus>
 
     fun checkForUpdates(isManual: Boolean)
@@ -270,13 +262,14 @@ interface ISettingsViewModel {
 
     fun onFolderAdded(folder: String)
 
+    fun refreshDiscoveredFolders()
+
     fun onThemeSelected(appTheme: AppThemeUi)
 
     fun setPreviousSkipThreshold(durationMillis: Int)
     fun setShowTranslation(show: Boolean)
     fun setReplayGain(gain: Boolean)
     fun setVisualizerEnabled(enabled: Boolean)
-    fun setScanDirectory(dir: String)
 
     fun toggleDynamicColorScheme()
 

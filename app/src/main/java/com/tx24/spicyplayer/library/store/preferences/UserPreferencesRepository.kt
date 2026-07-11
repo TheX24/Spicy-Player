@@ -336,10 +336,9 @@ class UserPreferencesRepository @Inject constructor(
 
 
         val cacheAlbumCoverArt = this[CACHE_ALBUM_COVER_ART_KEY] ?: true
-        val scanDirectory = this[SCAN_DIRECTORY_KEY] ?: "/sdcard/Music/"
 
         return LibrarySettings(
-            songsSortOrder, albumsSortOrder, albumsGridSize, cacheAlbumCoverArt, excludedFolders, scanDirectory
+            songsSortOrder, albumsSortOrder, albumsGridSize, cacheAlbumCoverArt, excludedFolders
         )
     }
 
@@ -351,12 +350,6 @@ class UserPreferencesRepository @Inject constructor(
         prefs.getUiSettings(),
         prefs.getPlayerSettings()
     )
-
-    suspend fun setScanDirectory(dir: String) {
-        context.datastore.edit { preferences ->
-            preferences[SCAN_DIRECTORY_KEY] = dir
-        }
-    }
 
     companion object {
         val SONGS_SORT_ORDER_KEY = stringPreferencesKey("SONGS_SORT")
@@ -390,7 +383,6 @@ class UserPreferencesRepository @Inject constructor(
         val SHOW_TRANSLATION_KEY = booleanPreferencesKey("SHOW_TRANSLATION")
         val REPLAY_GAIN_KEY = booleanPreferencesKey("REPLAY_GAIN")
         val VISUALIZER_ENABLED_KEY = booleanPreferencesKey("VISUALIZER_ENABLED")
-        val SCAN_DIRECTORY_KEY = stringPreferencesKey("SCAN_DIRECTORY")
     }
 
 }

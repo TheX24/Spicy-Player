@@ -174,7 +174,6 @@ fun ResetSettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     ResetOptionItem("Keep Screen On", "${userPreferences.uiSettings.keepScreenOn} (Default: false)") { settingsCallbacks.setKeepScreenOn(false) }
-                    ResetOptionItem("Scan Directory", "${userPreferences.librarySettings.scanDirectory} (Default: /sdcard/Music/)") { settingsCallbacks.setScanDirectory("/sdcard/Music/") }
                 }
             }
 

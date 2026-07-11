@@ -19,12 +19,11 @@ enum class LyricsQualityMode { FULL, SIMPLE, MINIMAL }
 data class RenderConfig(
     val mode: LyricsQualityMode,
 
-    // Gradient text alphas (Mixed.css: --gradient-alpha / --gradient-alpha-end).
-    // Words/letters carry their own alpha-end (0.5); the .line element's 0.35 !important
-    // only applies to Line-mode lines, whose text lives directly on the line element.
+    // Gradient text alphas (Mixed.css: --gradient-alpha / --gradient-alpha-end !important).
+    // Fixed for every word/letter/line state — only --gradient-position moves between
+    // NotSung(-20)/Active(animated)/Sung(100). Multiplied by line opacity at draw time.
     val gradientAlphaBright: Float,
     val gradientAlphaDim: Float,
-    val lineGradientAlphaDim: Float,
 
     // Line opacity states (CSS --Vocal-*-opacity).
     val opacityActive: Float,
@@ -51,8 +50,7 @@ data class RenderConfig(
         val FULL = RenderConfig(
             mode = LyricsQualityMode.FULL,
             gradientAlphaBright = 0.85f,
-            gradientAlphaDim = 0.5f,
-            lineGradientAlphaDim = 0.35f,
+            gradientAlphaDim = 0.35f,
             opacityActive = 1.0f,
             opacityNotSung = 0.51f,
             opacitySung = 0.497f,
@@ -68,7 +66,6 @@ data class RenderConfig(
             mode = LyricsQualityMode.SIMPLE,
             gradientAlphaBright = 1.0f,
             gradientAlphaDim = 0.3f,
-            lineGradientAlphaDim = 0.3f,
             opacityNotSung = 0.45f,
             opacitySung = 0.35f,
             distanceBlurEnabled = false,

@@ -36,6 +36,9 @@ import javax.inject.Singleton
 
 private const val TAG = "MediaRepository"
 
+/** A folder containing audio, for the library's auto-discovered folder toggles. */
+data class FolderInfo(val path: String, val songCount: Int)
+
 
 /**
  * A class that is responsible for manipulating songs on the Android device.
@@ -137,40 +140,37 @@ class MediaRepository @Inject constructor(
             userPreferencesRepository.librarySettingsFlow
         ) { songs: List<Song>, librarySettings ->
             val excludedFolders = librarySettings.excludedFolders
-            val scanPath = librarySettings.scanDirectory.ifBlank { "/sdcard/Music/" }
-            
-            val cachedScan = loadCachedScan(context, scanPath) ?: emptyList()
-
             val filteredSongs = songs.filter { song ->
-                !excludedFolders.any { folder ->
-                    song.filePath.startsWith(folder)
-                }
-            }.map { msSong ->
-                val cached = cachedScan.find { it.filePath == msSong.filePath }
-                if (cached?.lyricsPath != null) {
-                    msSong.copy(lyricsPath = cached.lyricsPath)
-                } else {
-                    msSong
-                }
+                !excludedFolders.any { folder -> song.filePath.startsWith(folder) }
             }
-
-            // The folder scan requests a MediaStore re-index for anything it finds (see
-            // ScanUtils.performScan), but that request is async and MediaStore may not have
-            // caught up by the time this flow re-combines. Union in any scanned file MediaStore
-            // still doesn't know about so newly added songs show up immediately rather than only
-            // after the next MediaStore-driven re-query.
-            val knownPaths = filteredSongs.mapTo(mutableSetOf()) { it.filePath }
-            val unindexedSongs = cachedScan.filter { cached ->
-                cached.filePath !in knownPaths &&
-                    !excludedFolders.any { folder -> cached.filePath.startsWith(folder) }
-            }
-
-            SongLibrary(filteredSongs + unindexedSongs)
+            SongLibrary(filteredSongs)
         }.flowOn(Dispatchers.IO).stateIn(
             scope = scope,
             started = SharingStarted.Eagerly,
             initialValue = SongLibrary(listOf())
         )
+
+    /**
+     * Every folder that actually contains audio, with its track count — the source for the
+     * library's auto-discovered folder toggles. Derived from MediaStore (so it needs no manual
+     * scan path), grouped by each file's parent directory, most-populated first.
+     */
+    suspend fun getAudioFolders(): List<FolderInfo> = withContext(Dispatchers.IO) {
+        val projection = arrayOf(MediaStore.Audio.Media.DATA)
+        val counts = HashMap<String, Int>()
+        context.contentResolver.query(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, projection, null, null, null
+        )?.use { c ->
+            val dataCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+            while (c.moveToNext() && isActive) {
+                val parent = File(c.getString(dataCol) ?: continue).parent ?: continue
+                counts[parent] = (counts[parent] ?: 0) + 1
+            }
+        }
+        counts.entries
+            .map { FolderInfo(it.key, it.value) }
+            .sortedWith(compareByDescending<FolderInfo> { it.songCount }.thenBy { it.path })
+    }
 
     /**
      * Retrieves all the user's songs on the device along with their [BasicSongMetadata]

@@ -120,6 +120,9 @@ class LyricsAnimator(
 
         val OPACITY_EASING = CubicBezierEasing(0.61f, 1f, 0.88f, 1f)
         val SCALE_EASING = CubicBezierEasing(0.37f, 0f, 0.63f, 1f)
+        /** Reference dot-group collapse (Mixed.css .pre-hidden .dotGroup): 0.4s w/ dip-then-overshoot. */
+        val DOT_GROUP_COLLAPSE_EASING = CubicBezierEasing(0.68f, -0.6f, 0.32f, 1.6f)
+        const val DOT_GROUP_COLLAPSE_MS = 400
 
         fun spline(vararg points: Pair<Float, Float>) =
             CubicSplineInterpolator(points.map { AnimationPoint(it.first, it.second) })
@@ -353,8 +356,12 @@ class LyricsAnimator(
         val target = if (isActive && !preHidden) 1f else 0f
         val animatable = lineScaleAnims.getOrPut(lineIdx) { Animatable(target) }
         if (animatable.targetValue != target) {
+            // The collapse (1→0, at pre-hidden) uses the reference's slower 0.4s dip-then-overshoot
+            // curve; expansion (0→1, on activation) keeps the default line-transition tween.
+            val duration = if (target == 0f) DOT_GROUP_COLLAPSE_MS else config.lineTransitionMs
+            val easing = if (target == 0f) DOT_GROUP_COLLAPSE_EASING else SCALE_EASING
             coroutineScope.launch {
-                animatable.animateTo(target, tween(config.lineTransitionMs, easing = SCALE_EASING))
+                animatable.animateTo(target, tween(duration, easing = easing))
             }
         }
         return animatable.value

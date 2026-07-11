@@ -9,17 +9,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import com.tx24.spicyplayer.lyrics.spicy.RenderConfig
-import com.tx24.spicyplayer.lyrics.spicy.animation.ElementState
 import com.tx24.spicyplayer.lyrics.spicy.animation.LineAnimState
 import com.tx24.spicyplayer.lyrics.spicy.animation.WordAnimState
-
-/**
- * Workaround nudge on top of `opacityNotSung`: the mid-sweep word's own dim tail still reads
- * slightly darker than an untouched to-be-sung word at the identical nominal alpha (a Skia
- * gradient-shader-vs-solid-color rendering difference we couldn't eliminate structurally), so
- * bump the dim baseline up a touch to compensate visually.
- */
-private const val DIM_BRIGHTNESS_BOOST = 0.1f
 
 /**
  * Draws a text fragment with a moving left-to-right gradient "wipe" (the karaoke fill), in a
@@ -50,6 +41,7 @@ private fun DrawScope.drawWipeText(
     dimAlpha: Float,
     shadow: Shadow?,
     rtl: Boolean = false,
+    gradientOffsetPercent: Float = 0f,
 ) {
     val bright = Color.White.copy(alpha = brightAlpha.coerceIn(0f, 1f))
     val dim = Color.White.copy(alpha = dimAlpha.coerceIn(0f, 1f))
@@ -57,9 +49,12 @@ private fun DrawScope.drawWipeText(
 
     val fw = fullWidth.coerceAtLeast(1f)
     val w = fragmentWidth.coerceAtLeast(1f)
-    // Reference: stop2 = stop1 + 20% (+ --gradient-offset, 0 outside Simple mode).
+    // Reference (Mixed.css): stop2 = stop1 + 20% + --gradient-offset. The offset is 0 in Full
+    // mode but 30% for Simple-mode words/letters, which widens the fade band from 20% to 50% so
+    // the sweep reaches the word's trailing edge smoothly instead of snapping the last ~30% from
+    // dim straight to bright at the Active→Sung flip.
     val stop1Frac = gradientPositionPercent / 100f
-    val stop2Frac = (gradientPositionPercent + 20f) / 100f
+    val stop2Frac = (gradientPositionPercent + 20f + gradientOffsetPercent) / 100f
     // RTL mirrors the whole sweep: bright grows from the right instead of the left, so both the
     // band's position and its colour order flip.
     val loFrac = if (rtl) 1f - stop2Frac else stop1Frac
@@ -67,19 +62,13 @@ private fun DrawScope.drawWipeText(
     val leftColor = if (rtl) dim else bright
     val rightColor = if (rtl) bright else dim
 
-    val fragStartFrac = startXOffset / fw
-    val fragEndFrac = (startXOffset + w) / fw
-
-    // Fast paths: the whole fragment lies entirely before or after the transition band.
-    if (fragEndFrac <= loFrac) {
-        drawText(layoutResult, color = leftColor, shadow = shadow, topLeft = topLeft); return
-    }
-    if (fragStartFrac >= hiFrac) {
-        drawText(layoutResult, color = rightColor, shadow = shadow, topLeft = topLeft); return
-    }
-
-    // The band intersects this fragment: map the (possibly off-fragment) stop positions into
-    // the fragment's own 0..1 local space.
+    // NO solid-color fast path for off-band fragments: Skia renders the same nominal alpha
+    // slightly darker through a gradient shader than through solid color paint, so a NotSung
+    // word drawn solid next to an active word's shader-drawn dim tail visibly mismatches even
+    // at identical alpha values (the artifact the old dimBoostFor workaround papered over).
+    // Every word goes through the same brush path; the clamped stops below degenerate to a
+    // uniform color when the band lies entirely off this fragment.
+    // Map the (possibly off-fragment) stop positions into the fragment's own 0..1 local space.
     val localLo = ((loFrac * fw) - startXOffset) / w
     val localHi = ((hiFrac * fw) - startXOffset) / w
 
@@ -137,16 +126,8 @@ private fun DrawScope.drawVerticalWipeText(
     val loFrac = gradientPositionPercent / 100f
     val hiFrac = (gradientPositionPercent + 20f) / 100f
 
-    val fragStartFrac = startYOffset / fh
-    val fragEndFrac = (startYOffset + h) / fh
-
-    if (fragEndFrac <= loFrac) {
-        drawText(layoutResult, color = bright, shadow = shadow, topLeft = topLeft); return
-    }
-    if (fragStartFrac >= hiFrac) {
-        drawText(layoutResult, color = dim, shadow = shadow, topLeft = topLeft); return
-    }
-
+    // Always the brush path — see drawWipeText: solid-color vs shader paint renders the same
+    // alpha differently, so all fragments must share one paint path.
     val localLo = ((loFrac * fh) - startYOffset) / h
     val localHi = ((hiFrac * fh) - startYOffset) / h
     val bandW = (localHi - localLo).coerceAtLeast(1e-4f)
@@ -186,7 +167,9 @@ internal fun DrawScope.drawInterludeGroup(
     scrollOffset: Float,
     dynamicY: Float,
 ) {
-    val groupScale = lineAnim.scale.coerceIn(0f, 1f)
+    // Widened past 1 (but not below 0 — a negative scale would mirror-flip the dots) so the
+    // reference's overshoot collapse curve (DOT_GROUP_COLLAPSE_EASING) stays visible.
+    val groupScale = lineAnim.scale.coerceIn(0f, 1.3f)
     if (groupScale < 0.01f) return
 
     val firstDot = layout.words.firstOrNull() ?: return
@@ -252,9 +235,8 @@ internal fun DrawScope.drawStandardLine(
         val textHeight = wLayout.textLayoutResult.size.height.toFloat()
 
         // Non-active lines (blur-shadowed) render uniformly dim regardless of Sung/NotSung —
-        // the reference shows the same color for every unsung/inactive word, distance blur aside.
-        // The brightness-boost workaround only applies within the active line (see drawStandardWord).
-        val baseShadow = blurShadow(lineAnim, config.opacityNotSung)
+        // the reference shows the same gradient dim stop for every unsung/inactive word.
+        val baseShadow = blurShadow(lineAnim, config.gradientAlphaDim)
 
         if (wordAnim.isLetterGroup) {
             drawSyllabicLetterFragment(wLayout, wordAnim, lineAnim, xPos, yPos, textWidth, textHeight, scrollOffset, config, baseShadow, rtl)
@@ -286,6 +268,9 @@ private fun DrawScope.drawSyllabicLetterFragment(
     val lYShift = lState.yOffset * textHeight * 2f
     val containerYShift = wordAnim.yOffset * textHeight
 
+    // Glow shadow tracks the spring in every state (not gated to Active): the reference keeps
+    // stepping scale/glow/yOffset toward their Sung targets after EndTime (checkNextLine), so a
+    // held word's settle tail must stay visible instead of being amputated the instant it's Sung.
     val lGlowBlur = 4f + 12f * lState.glow
     val lGlowOpacity = (lState.glow * 1.85f).coerceIn(0f, 1f)  // LetterGlowMultiplier_Opacity = 185%
     val lShadow = when {
@@ -294,16 +279,15 @@ private fun DrawScope.drawSyllabicLetterFragment(
         else -> baseShadow
     }
 
-    // Non-active lines render every word at the same dim alpha, regardless of gradientPosition
-    // (Sung vs NotSung) — only the currently active line differentiates sung/unsung brightness.
-    // dim IS opacityNotSung directly, not gradientAlphaDim × opacityNotSung: layering the word's
-    // own 0.5 gradient-end alpha on top of the line's own opacity double-dims the unsung look.
-    // The brightness-boost workaround applies ONLY to the dim tail of the word currently being
-    // sung (mid-sweep) — a to-be-sung word that hasn't started yet, even in the active line,
-    // stays at the unboosted baseline so it still matches every other inactive/unsung word.
-    val baselineDim = config.opacityNotSung
-    val dim = if (wordAnim.state == ElementState.Active) (baselineDim + DIM_BRIGHTNESS_BOOST).coerceAtMost(1f) else baselineDim
-    val bright = if (lineAnim.isActive) config.gradientAlphaBright * lineAnim.opacity else baselineDim
+    // Reference gradient stops are fixed for every state (bright 0.85 / dim 0.35; bg-line
+    // 0.6/0.3 — letters inherit the .bg-line override too); only --gradient-position moves.
+    // Multiplying by line opacity is the only "fade" layer — a NotSung word (position -20) and
+    // an active word's unsung tail land on the identical dim stop, and a Sung line's bright
+    // side (0.85×0.497≈0.42) can never render darker than an inactive line's dim stop
+    // (0.35×0.51≈0.18).
+    val isBg = lineAnim.isBackground
+    val dim = (if (isBg) 0.3f else config.gradientAlphaDim) * lineAnim.opacity
+    val bright = (if (isBg) 0.6f else config.gradientAlphaBright) * lineAnim.opacity
 
     withTransform({
         // The reference nests letter spans inside the word element: the word's own
@@ -325,6 +309,7 @@ private fun DrawScope.drawSyllabicLetterFragment(
             dimAlpha = dim,
             shadow = lShadow,
             rtl = rtl,
+            gradientOffsetPercent = if (config.isSimple) 30f else 0f,
         )
     }
 }
@@ -342,6 +327,9 @@ private fun DrawScope.drawStandardWord(
     baseShadow: Shadow?,
     rtl: Boolean,
 ) {
+    // Glow shadow tracks the spring in every state (not gated to Active): the reference keeps
+    // stepping scale/glow/yOffset toward their Sung targets after EndTime (checkNextLine), so a
+    // held word's settle tail must stay visible instead of being amputated the instant it's Sung.
     val glowBlur = 4f + 2f * wordAnim.glow
     val glowOpacity = (wordAnim.glow * 0.35f).coerceIn(0f, 1f)
     val shadow = when {
@@ -355,18 +343,11 @@ private fun DrawScope.drawStandardWord(
     val pivotX = xPos + textWidth / 2f
     val pivotY = yPos + textHeight / 2f
 
-    // Non-active lines render every word at the same dim alpha, regardless of gradientPosition
-    // (Sung vs NotSung) — only the currently active line differentiates sung/unsung brightness.
-    // dim IS opacityNotSung directly, not gradientAlphaDim × opacityNotSung: layering the word's
-    // own 0.5 gradient-end alpha on top of the line's own opacity double-dims the unsung look.
-    // The brightness-boost workaround applies ONLY to the dim tail of the word currently being
-    // sung (mid-sweep) — a to-be-sung word that hasn't started yet, even in the active line,
-    // stays at the unboosted baseline so it still matches every other inactive/unsung word.
+    // Reference gradient stops are fixed for every state (bright 0.85/0.6bg, dim 0.35/0.3bg);
+    // only --gradient-position moves. Multiplying by line opacity is the only "fade" layer.
     val isBg = lineAnim.isBackground
-    val baselineDim = if (isBg) 0.3f else config.opacityNotSung
-    val dim = if (wordAnim.state == ElementState.Active && !isBg)
-        (baselineDim + DIM_BRIGHTNESS_BOOST).coerceAtMost(1f) else baselineDim
-    val bright = if (lineAnim.isActive) (if (isBg) 0.6f else config.gradientAlphaBright) * lineAnim.opacity else baselineDim
+    val dim = (if (isBg) 0.3f else config.gradientAlphaDim) * lineAnim.opacity
+    val bright = (if (isBg) 0.6f else config.gradientAlphaBright) * lineAnim.opacity
 
     withTransform({
         translate(top = scrollOffset)
@@ -385,6 +366,7 @@ private fun DrawScope.drawStandardWord(
             dimAlpha = dim,
             shadow = shadow,
             rtl = rtl,
+            gradientOffsetPercent = if (config.isSimple) 30f else 0f,
         )
     }
 }
@@ -398,12 +380,9 @@ internal fun DrawScope.drawLineModeLine(
     dynamicY: Float,
     config: RenderConfig,
 ) {
-    // Non-active Line-mode lines render uniformly dim regardless of Sung/NotSung. dim IS
-    // opacityNotSung directly, matching drawStandardWord — no extra alpha layered on top. The
-    // brightness-boost workaround only applies to the active line's own dim tail.
-    val inactiveDim = config.opacityNotSung
-    val dim = if (lineAnim.isActive) (config.opacityNotSung + DIM_BRIGHTNESS_BOOST).coerceAtMost(1f) else inactiveDim
-    val bright = if (lineAnim.isActive) config.gradientAlphaBright * lineAnim.opacity else inactiveDim
+    // Reference gradient stops are fixed for every state; only lineGradientPercent moves.
+    val dim = config.gradientAlphaDim * lineAnim.opacity
+    val bright = config.gradientAlphaBright * lineAnim.opacity
 
     // Whole-line glow spring (reference Line-mode: shadow blur 4 + 8·glow, alpha glow·0.5),
     // layered with the inactive-line distance blur when present.
@@ -413,7 +392,7 @@ internal fun DrawScope.drawLineModeLine(
             color = Color.White.copy(alpha = glowAlpha * lineAnim.opacity),
             blurRadius = 4f + 8f * lineAnim.lineGlow,
         )
-        else -> blurShadow(lineAnim, dim)
+        else -> blurShadow(lineAnim, config.gradientAlphaDim)
     }
     val lineWidth = layout.maxRowWidth.coerceAtLeast(1f)
 

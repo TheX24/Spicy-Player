@@ -93,6 +93,10 @@ internal object LyricsLayoutCalculator {
                             fontSize = dotFontSize,
                             fontWeight = mainFontWeight,
                             color = Color.White,
+                            // Distinct per-dot identity, same rationale as the word-level hack below:
+                            // three identical "•" glyphs would otherwise share one cached
+                            // TextLayoutResult (and its highlight/paint state) across dots.
+                            letterSpacing = (dotIdx * 0.0000001f).sp,
                         )
                     )
                     val dotW = result.size.width.toFloat()
@@ -160,18 +164,23 @@ internal object LyricsLayoutCalculator {
                 // `word.isPartOfWord` records that the ORIGINAL text had no whitespace before this
                 // token — true both for real hyphen-continuations ("Hel-"+"lo") and, just as often,
                 // for CJK/Hangul syllable spans (which never have inter-word whitespace in the source
-                // TTML). That "glue" is correct when drawing the original script, but once the word is
-                // displayed as its Latin romanization each syllable becomes its own word and needs a
-                // space — so drop the glue in that case instead of gluing romanized syllables together.
-                val isRomanizedFromNoSpaceScript = romanize && word.romanizedText != null &&
-                    word.text.any { isCjk(it) }
-                val effectiveIsPartOfWord = if (isRomanizedFromNoSpaceScript) false else word.isPartOfWord
+                // TTML). Romanization must preserve the source's spacing exactly: a syllable glued to
+                // its neighbour in the original script stays glued when romanized (こんにちは → "konnichiwa",
+                // not "kon nichi wa"), and only tokens that had real whitespace in the source get a gap.
+                val effectiveIsPartOfWord = word.isPartOfWord
 
                 if (text.any { isCjk(it) } || word.isLetterGroup) {
                     var currentX = 0f
                     for (charIdx in text.indices) {
                         val charText = text[charIdx].toString()
-                        val charResult = textMeasurer.measure(charText, style)
+                        // Two instances of the same letter within one word (e.g. the two "a"s in
+                        // "california") would otherwise measure with identical (text, style) and
+                        // share one cached TextLayoutResult, coupling their highlight state — mix
+                        // the char index into letterSpacing on top of the word's own identity.
+                        val charStyle = style.copy(
+                            letterSpacing = (style.letterSpacing.value + charIdx * 0.00000001f).sp
+                        )
+                        val charResult = textMeasurer.measure(charText, charStyle)
                         pieces.add(Piece(
                             word = word,
                             text = charText,
@@ -202,48 +211,63 @@ internal object LyricsLayoutCalculator {
 
             // Word-wrapping logic on pieces.
             val isSongwriterLine = line.isSongwriter
-            var R = 1
-            var currentW = 0f
             val lineMaxWidth = if (isSongwriterLine) canvasWidth - (horizontalPadding * 2) else maxLineWidth
-            
-            for (i in pieces.indices) {
-                val w = pieces[i].layout.size.width.toFloat()
-                val hspace = if (currentW > 0f && !pieces[i].isPartOfWord) wordGap else 0f
-                if (currentW + hspace + w > lineMaxWidth && currentW > 0f) {
-                    R++
-                    currentW = w
-                } else {
-                    currentW += hspace + w
-                }
-            }
-
             val numPieces = pieces.size
             val lineBreaks = mutableListOf<Int>()
-            
-            if (!hasDuet || isSongwriterLine) {
-                // Greedy wrap.
+
+            // A run of glued pieces (isPartOfWord chain — CJK char-splits, held-word letters, and
+            // romanized syllables alike) should wrap as one unit, like the reference's adjacent
+            // inline spans with no whitespace between them. Only break inside a run when the run
+            // itself can never fit a row on its own — otherwise it'd overflow off-screen forever.
+            val runFits = BooleanArray(numPieces)
+            run {
+                var runStart = 0
+                var runWidth = 0f
+                for (idx in 0 until numPieces) {
+                    if (idx > 0 && !pieces[idx].isPartOfWord) {
+                        val fits = runWidth <= lineMaxWidth
+                        for (k in runStart until idx) runFits[k] = fits
+                        runStart = idx
+                        runWidth = 0f
+                    }
+                    runWidth += pieces[idx].layout.size.width.toFloat()
+                }
+                val fits = runWidth <= lineMaxWidth
+                for (k in runStart until numPieces) runFits[k] = fits
+            }
+
+            // Greedy wrap for every line. The reference is CSS `flex-wrap: wrap`, which is always
+            // greedy — it fills each row until the next item doesn't fit, then breaks, and never
+            // balances row lengths. Duet/opposite-aligned lines wrap greedily too (right-alignment
+            // is applied afterwards), matching the reference instead of a balanced pass.
+            run {
                 var currentLineW = 0f
                 var lastBreakCandidate = 0
                 lineBreaks.add(0)
-                
+
                 var i = 0
                 while (i < numPieces) {
                     val piece = pieces[i]
                     val prevPiece = if (i > 0) pieces[i - 1] else null
                     val wordW = piece.layout.size.width.toFloat()
                     val hspace = if (currentLineW > 0f && !piece.isPartOfWord) wordGap else 0f
-                    
+
                     val isCjkBoundary = if (i > 0 && prevPiece != null) {
                         (isCjk(prevPiece.text.lastOrNull() ?: ' ')) || (isCjk(piece.text.firstOrNull() ?: ' '))
                     } else false
 
-                    val isForcedSyllable = i > 0 && piece.isPartOfWord && 
+                    // A glued piece (isPartOfWord — CJK char-split, held-word letter, or romanized
+                    // syllable) prefers to stay attached to its run, same as adjacent no-whitespace
+                    // inline spans in the reference. Falls back to breakable when the run can't
+                    // possibly fit a row (runFits == false), so an overlong glued run still wraps
+                    // instead of overflowing off-screen.
+                    val isForcedSyllable = i > 0 && piece.isPartOfWord && runFits[i] &&
                                            !(prevPiece?.text?.endsWith("-") == true) && !isCjkBoundary
-                                           
+
                     if (!isForcedSyllable) {
                         lastBreakCandidate = i
                     }
-                    
+
                     if (currentLineW + hspace + wordW > lineMaxWidth && currentLineW > 0f) {
                         val breakIdx = if (lastBreakCandidate > lineBreaks.last()) lastBreakCandidate else i
                         lineBreaks.add(breakIdx)
@@ -255,58 +279,6 @@ internal object LyricsLayoutCalculator {
                     }
                 }
                 lineBreaks.add(numPieces)
-            } else {
-                // Balanced wrap using dynamic programming.
-                val dp = IntArray(numPieces + 1) { Int.MAX_VALUE / 2 }
-                val breaks = IntArray(numPieces + 1)
-                dp[0] = 0
-
-                val targetWordCount = numPieces.toFloat() / R
-
-                for (i in 1..numPieces) {
-                    var w = 0f
-                    var j = i - 1
-                    while (j >= 0) {
-                        val piece = pieces[j]
-                        val nextPiece = if (j < numPieces - 1) pieces[j + 1] else null
-                        val wordW = piece.layout.size.width.toFloat()
-                        val hspace = if (j < i - 1 && nextPiece != null && !nextPiece.isPartOfWord) wordGap else 0f
-                        w += wordW + hspace
-                        if (w > lineMaxWidth && i - j > 1) {
-                            break
-                        }
-                        
-                        val isCjkBoundary = if (j > 0) {
-                            val curP = piece
-                            val prevP = pieces[j - 1]
-                            (isCjk(prevP.text.lastOrNull() ?: ' ')) || (isCjk(curP.text.firstOrNull() ?: ' '))
-                        } else false
-
-                        val isForcedSyllableBreak = j > 0 && piece.isPartOfWord && 
-                                                    !(pieces[j-1].text.endsWith("-")) && !isCjkBoundary
-                        
-                        val piecesInLine = i - j
-                        val variancePenalty = kotlin.math.abs(piecesInLine - targetWordCount)
-                        val penalty = if (isForcedSyllableBreak) {
-                            Int.MAX_VALUE / 2
-                        } else {
-                            (variancePenalty * 1000f).toInt() + (lineMaxWidth - w).toInt()
-                        }
-
-                        if (dp[j] + penalty < dp[i]) {
-                            dp[i] = dp[j] + penalty
-                            breaks[i] = j
-                        }
-                        j--
-                    }
-                }
-
-                var curr = numPieces
-                while (curr > 0) {
-                    lineBreaks.add(0, curr)
-                    curr = breaks[curr]
-                }
-                lineBreaks.add(0, 0)
             }
 
 

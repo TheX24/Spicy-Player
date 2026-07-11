@@ -47,11 +47,7 @@ import com.tx24.spicyplayer.tageditor.navigation.tagEditorGraph
 import com.tx24.spicyplayer.ui.compact.CompactAppScaffold
 import com.tx24.spicyplayer.uiNowPlaying.ui.BarState
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.collectAsState
-import android.os.Build
 
 
 val topLevelDestinations =
@@ -155,38 +151,6 @@ fun SpicyApp2(
                 )
             }
         }
-    }
-
-    val settingsViewModel: com.tx24.spicyplayer.settings.ISettingsViewModel = hiltViewModel<com.tx24.spicyplayer.settings.SettingsViewModel>()
-    val scanProgress by settingsViewModel.scanProgress.collectAsState()
-    val scanHistory by settingsViewModel.scanHistory.collectAsState()
-    val userPreferencesRepository = (LocalContext.current as com.tx24.spicyplayer.MainActivity).userPreferencesRepository
-    
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        val prefs = userPreferencesRepository.userSettingsFlow.first()
-        val librarySettings = userPreferencesRepository.librarySettingsFlow.first()
-        val scanPath = librarySettings.scanDirectory.ifBlank { "/sdcard/Music/" }
-        
-        val cachedSongs = com.tx24.spicyplayer.library.store.loadCachedScan(context, scanPath)
-        if (cachedSongs.isNullOrEmpty()) {
-            val intent = Intent(context, com.tx24.spicyplayer.library.store.ScanService::class.java).apply {
-                putExtra("scan_path", scanPath)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
-        }
-    }
-
-    if (scanProgress != null) {
-        com.tx24.spicyplayer.ui.dialogs.ScanProgressDialog(
-            isScanning = true,
-            scanProgress = scanProgress!!,
-            scanHistory = scanHistory
-        )
     }
 
     if (widthClass.widthSizeClass > WindowWidthSizeClass.Compact) {

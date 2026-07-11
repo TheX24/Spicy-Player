@@ -1,9 +1,6 @@
 package com.tx24.spicyplayer.settings
 
 import android.os.Build
-import android.provider.DocumentsContract
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -71,7 +69,6 @@ import com.tx24.spicyplayer.ui.model.AppThemeUi
 import com.tx24.spicyplayer.ui.model.PlayerThemeUi
 import com.tx24.spicyplayer.ui.model.UserPreferencesUi
 import com.tx24.spicyplayer.BuildConfig
-import getPath
 
 
 @Composable
@@ -82,17 +79,11 @@ fun SettingsRoute(
     settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by settingsViewModel.state.collectAsState()
-    val scanDirectory by settingsViewModel.scanDirectory.collectAsState()
-    val scanProgress by settingsViewModel.scanProgress.collectAsState()
-    val scanHistory by settingsViewModel.scanHistory.collectAsState()
     val updateStatus by settingsViewModel.updateStatus.collectAsState()
 
     SettingsScreen(
         modifier = modifier,
         state = state,
-        scanDirectory = scanDirectory,
-        scanProgress = scanProgress,
-        scanHistory = scanHistory,
         updateStatus = updateStatus,
         onBackPressed = onBackPressed,
         onNavigateToReset = onNavigateToReset,
@@ -105,9 +96,6 @@ fun SettingsRoute(
 fun SettingsScreen(
     modifier: Modifier,
     state: SettingsState,
-    scanDirectory: String,
-    scanProgress: com.tx24.spicyplayer.library.store.ScanProgress?,
-    scanHistory: List<String>,
     updateStatus: com.tx24.spicyplayer.settings.components.UpdateStatus,
     onBackPressed: () -> Unit,
     onNavigateToReset: () -> Unit,
@@ -127,14 +115,6 @@ fun SettingsScreen(
             contentAlignment = Alignment.Center
         ) {
 
-            if (scanProgress != null) {
-                com.tx24.spicyplayer.ui.dialogs.ScanProgressDialog(
-                    isScanning = true,
-                    scanProgress = scanProgress!!,
-                    scanHistory = scanHistory
-                )
-            }
-            
             com.tx24.spicyplayer.settings.components.UpdateDialog(
                 status = updateStatus,
                 onClearStatus = { settingsCallbacks.clearUpdateStatus() },
@@ -233,7 +213,6 @@ fun SettingsScreen(
                 SettingsList(
                     modifier = Modifier.fillMaxSize(),
                     userPreferences = state.userPreferences,
-                    scanDirectory = scanDirectory,
                     settingsCallbacks = settingsCallbacks,
                     onNavigateToReset = onNavigateToReset,
                     nestedScrollConnection = topBarScrollBehaviour.nestedScrollConnection,
@@ -252,7 +231,6 @@ fun SettingsScreen(
 fun SettingsList(
     modifier: Modifier,
     userPreferences: UserPreferencesUi,
-    scanDirectory: String,
     settingsCallbacks: ISettingsViewModel,
     onNavigateToReset: () -> Unit,
     nestedScrollConnection: NestedScrollConnection,
@@ -470,13 +448,19 @@ fun SettingsList(
         item { SettingsSectionHeader("Library & Storage") }
         item {
             SettingsSection {
-                var blacklistDialogVisible by remember { mutableStateOf(false) }
-                BlacklistedFoldersDialog(
-                    isVisible = blacklistDialogVisible,
-                    folders = userPreferences.librarySettings.excludedFolders,
-                    onFolderAdded = { settingsCallbacks.onFolderAdded(it) },
-                    onFolderDeleted = settingsCallbacks::onFolderDeleted,
-                    onDismissRequest = { blacklistDialogVisible = false }
+                var foldersDialogVisible by remember { mutableStateOf(false) }
+                val discoveredFolders by settingsCallbacks.discoveredFolders.collectAsState()
+                val excludedFolders = userPreferences.librarySettings.excludedFolders
+                LibraryFoldersDialog(
+                    isVisible = foldersDialogVisible,
+                    folders = discoveredFolders,
+                    excludedFolders = excludedFolders,
+                    onSetIncluded = { path, included ->
+                        if (included) settingsCallbacks.onFolderDeleted(path)
+                        else settingsCallbacks.onFolderAdded(path)
+                    },
+                    onRefresh = settingsCallbacks::refreshDiscoveredFolders,
+                    onDismissRequest = { foldersDialogVisible = false }
                 )
                 SwitchSettingItem(
                     icon = Icons.Rounded.Cached,
@@ -488,52 +472,16 @@ fun SettingsList(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 NavigationSettingItem(
                     icon = Icons.Rounded.Block,
-                    title = "Blacklisted Folders",
-                    subtitle = "Music in these folders will not appear in the app",
-                    onClick = { blacklistDialogVisible = true }
+                    title = "Library Folders",
+                    subtitle = if (excludedFolders.isEmpty()) "All ${discoveredFolders.size} folders included"
+                        else "${discoveredFolders.count { it.path !in excludedFolders }} of ${discoveredFolders.size} folders included",
+                    onClick = {
+                        settingsCallbacks.refreshDiscoveredFolders()
+                        foldersDialogVisible = true
+                    }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 val context = LocalContext.current
-                
-                val directoryPicker = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.OpenDocumentTree(),
-                    onResult = { uri ->
-                        if (uri == null) return@rememberLauncherForActivityResult
-                        val documentTree = DocumentsContract.buildDocumentUriUsingTree(
-                            uri,
-                            DocumentsContract.getTreeDocumentId(uri)
-                        )
-                        val path = getPath(context, documentTree) ?: return@rememberLauncherForActivityResult
-                        settingsCallbacks.setScanDirectory(path)
-                    }
-                )
-
-                NavigationSettingItem(
-                    icon = Icons.Rounded.FolderOpen,
-                    title = "Scan Directory",
-                    subtitle = scanDirectory,
-                    onClick = { directoryPicker.launch(null) }
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                ButtonSettingItem(
-                    icon = Icons.Rounded.Sync,
-                    title = "Rescan Library",
-                    subtitle = "Trigger background library deep scan",
-                    buttonLabel = "Scan",
-                    onClick = {
-                        val intent = android.content.Intent(context, com.tx24.spicyplayer.library.store.ScanService::class.java).apply {
-                            putExtra("scan_path", scanDirectory)
-                        }
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                            context.startForegroundService(intent)
-                        } else {
-                            context.startService(intent)
-                        }
-                        android.widget.Toast.makeText(context, "Scanning Started", android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
 
                 ButtonSettingItem(
                     icon = Icons.Rounded.Photo,
@@ -606,74 +554,63 @@ fun SettingsList(
 }
 
 
+/**
+ * Auto-discovered library folders as on/off toggles. Every folder MediaStore found audio in is
+ * listed (all included by default); switching one off adds it to the excluded-folders set that
+ * [MediaRepository] filters on, hiding its songs. Replaces the old manual blacklist path entry.
+ */
 @Composable
-fun BlacklistedFoldersDialog(
+fun LibraryFoldersDialog(
     isVisible: Boolean,
-    folders: List<String>,
-    onFolderAdded: (String) -> Unit,
-    onFolderDeleted: (String) -> Unit,
+    folders: List<com.tx24.spicyplayer.library.store.FolderInfo>,
+    excludedFolders: List<String>,
+    onSetIncluded: (path: String, included: Boolean) -> Unit,
+    onRefresh: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
 
     if (!isVisible) return
 
-    val context = LocalContext.current
-    val directoryPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree(),
-        onResult = { uri ->
-            if (uri == null) return@rememberLauncherForActivityResult
-            val documentTree = DocumentsContract.buildDocumentUriUsingTree(
-                uri,
-                DocumentsContract.getTreeDocumentId(uri)
-            )
-            val path = getPath(context, documentTree) ?: return@rememberLauncherForActivityResult
-            onFolderAdded(path)
-        }
-    )
-
-
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        dismissButton = { TextButton(onClick = onDismissRequest) { Text(text = "Close") } },
-        confirmButton = { },
-        icon = { Icon(Icons.Rounded.Block, contentDescription = null) },
-        title = { Text(text = "Blacklisted Folders") },
+        dismissButton = { TextButton(onClick = onRefresh) { Text(text = "Refresh") } },
+        confirmButton = { TextButton(onClick = onDismissRequest) { Text(text = "Close") } },
+        icon = { Icon(Icons.Rounded.FolderOpen, contentDescription = null) },
+        title = { Text(text = "Library Folders") },
         text = {
-            Column(verticalArrangement = Arrangement.SpaceBetween) {
+            if (folders.isEmpty()) {
+                Text(text = "No music folders found yet. If you just granted access, tap Refresh.")
+            } else {
                 LazyColumn(modifier = Modifier) {
-                    items(folders) {
+                    items(folders) { folder ->
+                        val included = folder.path !in excludedFolders
                         Row(
-                            modifier = Modifier,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable { onSetIncluded(folder.path, !included) }
+                                .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = it, modifier = Modifier.weight(1f))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            IconButton(onClick = { onFolderDeleted(it) }) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Delete,
-                                    contentDescription = "Remove Folder from Blacklist"
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = folder.path.substringAfterLast('/').ifBlank { folder.path },
+                                    maxLines = 1,
+                                )
+                                Text(
+                                    text = "${folder.path}  ·  ${folder.songCount} song${if (folder.songCount == 1) "" else "s"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
                                 )
                             }
-                        }
-                        if (it != folders.last()) {
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = included,
+                                onCheckedChange = { onSetIncluded(folder.path, it) }
+                            )
                         }
                     }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalDivider(Modifier.fillMaxWidth())
-                Row(
-                    verticalAlignment = Alignment.CenterVertically, modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(
-                            RoundedCornerShape(4.dp)
-                        )
-                        .clickable { directoryPicker.launch(null) }
-                        .padding(8.dp)) {
-                    Icon(imageVector = Icons.Rounded.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "Add Path")
                 }
             }
         }

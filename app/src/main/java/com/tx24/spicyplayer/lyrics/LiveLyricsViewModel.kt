@@ -13,6 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -36,7 +37,10 @@ class LiveLyricsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             playbackManager.state.distinctUntilChanged { old, new -> old.currentPlayingSong == new.currentPlayingSong }
-                .collect {
+                // collectLatest so a rapid skip cancels the previous song's in-flight load instead
+                // of queuing behind it — otherwise a slow network lookup for a song you've already
+                // skipped past blocks the next one, even when its lyrics are cached/pre-matched.
+                .collectLatest {
                     if (it.currentPlayingSong == null) {
                         _state.value = LyricsScreenState.NotPlaying
                     } else {
