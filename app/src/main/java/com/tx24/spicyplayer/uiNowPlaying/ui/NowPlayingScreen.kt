@@ -48,6 +48,7 @@ import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.IntOffset
+import com.tx24.spicyplayer.model.playback.PlayerState
 import com.tx24.spicyplayer.model.playback.RepeatMode
 import kotlin.math.abs
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
@@ -297,7 +298,8 @@ fun FullScreenNowPlaying(
                     modifier = Modifier.fillMaxSize(),
                     song = uiState.song,
                     // Suspend the per-frame rotation loop while collapsed to the mini player
-                    animate = isExpanded
+                    animate = isExpanded,
+                    isPlaying = uiState.playbackState == PlayerState.PLAYING,
                 )
 
 

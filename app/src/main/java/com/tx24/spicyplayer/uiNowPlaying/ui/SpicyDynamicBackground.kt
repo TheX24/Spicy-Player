@@ -27,6 +27,7 @@ fun SpicyDynamicBackground(
     modifier: Modifier,
     song: Song?,
     animate: Boolean = true,
+    isPlaying: Boolean = true,
 ) {
     val context = LocalContext.current
     val uiSettings = LocalUserPreferences.current.uiSettings
@@ -68,7 +69,7 @@ fun SpicyDynamicBackground(
         KawarpBackground(
             coverArtBitmap = bitmap,
             modifier = modifier,
-            blurIntensity = blurIntensity,
+            isPlaying = isPlaying,
             animate = animate
         )
     } else {
