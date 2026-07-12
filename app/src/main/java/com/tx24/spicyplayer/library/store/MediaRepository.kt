@@ -4,8 +4,10 @@ import android.annotation.TargetApi
 import android.content.ContentUris
 import android.content.Context
 import android.database.ContentObserver
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import com.tx24.spicyplayer.model.song.BasicSongMetadata
 import com.tx24.spicyplayer.library.store.model.song.Song
@@ -297,6 +299,21 @@ class MediaRepository @Inject constructor(
      */
     fun onPermissionAccepted() {
         permissionEvents.tryEmit(Unit)
+    }
+
+    /**
+     * Forces the OS media scanner over external storage, for files copied outside a
+     * MediaStore-aware app (e.g. ADB push) that the [songsFlow] ContentObserver hasn't
+     * picked up yet. MediaScannerConnection reports back through the same MediaStore
+     * change notifications songsFlow already listens to, so no manual re-query is needed.
+     */
+    fun rescanLibrary() {
+        MediaScannerConnection.scanFile(
+            context,
+            arrayOf(Environment.getExternalStorageDirectory().path),
+            null,
+            null
+        )
     }
 
 }

@@ -40,4 +40,11 @@ internal data class LineLayout(
     val isSongwriter: Boolean,
     /** True if the line is right-to-left (Arabic/Hebrew/…); right-aligned with a flipped wipe. */
     val isRtl: Boolean = false,
+    /**
+     * True if the line's block should sit on the right edge of the lyrics column. Not simply
+     * `oppositeAligned || isRtl` — an RTL duet line mirrors the LTR duet convention (primary on
+     * the right, guest on the left) instead of stacking both on the right, so this is precomputed
+     * once in [LyricsLayoutCalculator] rather than re-derived at draw/scroll time.
+     */
+    val isRightAligned: Boolean = false,
 )

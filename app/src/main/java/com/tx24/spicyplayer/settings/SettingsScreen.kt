@@ -484,6 +484,17 @@ fun SettingsList(
                 val context = LocalContext.current
 
                 ButtonSettingItem(
+                    icon = Icons.Rounded.Refresh,
+                    title = "Rescan Library",
+                    subtitle = "Finds songs added outside the app (e.g. via USB)",
+                    buttonLabel = "Rescan",
+                    onClick = {
+                        settingsCallbacks.rescanLibrary()
+                        android.widget.Toast.makeText(context, "Rescanning library…", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                ButtonSettingItem(
                     icon = Icons.Rounded.Photo,
                     title = "Clear Image Cache",
                     subtitle = "Album art bitmaps",

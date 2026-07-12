@@ -42,6 +42,20 @@ internal object LyricsLayoutCalculator {
     private fun displayText(word: Word, romanize: Boolean): String =
         if (romanize) (word.romanizedText ?: word.text) else word.text
 
+    /**
+     * Whether a line's block should sit on the right edge of the lyrics column.
+     *
+     * Plain lines: right-aligned only if RTL. Duet lines normally put the primary voice (v1,
+     * `!oppositeAligned`) on the left and the guest on the right — but the reference CSS swaps
+     * that for RTL duets (`.line.rtl.OppositeAligned` gets the padding a plain `.line.rtl` would,
+     * and vice versa), so an RTL duet mirrors instead of stacking both voices on the same side.
+     */
+    private fun resolveRightAligned(hasDuet: Boolean, isRtl: Boolean, oppositeAligned: Boolean, isSongwriter: Boolean): Boolean {
+        if (isSongwriter) return false
+        if (!hasDuet) return isRtl
+        return if (isRtl) !oppositeAligned else oppositeAligned
+    }
+
     fun calculateLineLayouts(
         lines: List<Line>,
         canvasWidth: Float,
@@ -106,12 +120,15 @@ internal object LyricsLayoutCalculator {
                 val dotH = dotLayouts.maxOfOrNull { it.textLayoutResult.size.height.toFloat() } ?: 0f
                 val totalDotsW = dotLayouts.lastOrNull()?.let { it.relativeOffset.x + it.textLayoutResult.size.width } ?: 0f
 
-                // Inherit alignment from the next non-interlude, non-background line.
-                val nextLineAlignment = lines
+                // Inherit alignment (and RTL-ness) from the next non-interlude, non-background line.
+                val nextLine = lines
                     .firstOrNull { it.startMs > line.startMs && !it.isInterlude && !it.isBackground && !it.isSongwriter }
-                    ?.oppositeAligned ?: false
+                val nextLineAlignment = nextLine?.oppositeAligned ?: false
+                val nextLineIsRtl = nextLine != null &&
+                    RtlDetector.isRtl(nextLine.words.joinToString(" ") { displayText(it, romanize) })
+                val dotsRightAligned = resolveRightAligned(hasDuet, nextLineIsRtl, nextLineAlignment, isSongwriter = false)
 
-                layouts.add(LineLayout(line, dotLayouts, currentY, dotH, totalDotsW, totalDotsW, true, isBg, nextLineAlignment, false))
+                layouts.add(LineLayout(line, dotLayouts, currentY, dotH, totalDotsW, totalDotsW, true, isBg, nextLineAlignment, false, nextLineIsRtl, dotsRightAligned))
                 currentY += 0f // Interludes collapse when not active.
                 continue
             }
@@ -337,22 +354,33 @@ internal object LyricsLayoutCalculator {
             val totalHeight = currentRowY + lastRowHeight
             val totalWidth = maxRowWidth
 
-            // Apply alignment and flatten. RTL lines are right-aligned like duet guest lines.
-            val isRightAligned = (hasDuet && line.oppositeAligned && !line.isSongwriter) || lineIsRtl
+            // Apply alignment and flatten. RTL duet lines mirror the LTR duet convention (primary
+            // right, guest left) instead of both stacking on the right — see resolveRightAligned.
+            val isRightAligned = resolveRightAligned(hasDuet, lineIsRtl, line.oppositeAligned, line.isSongwriter)
             val wordLayouts = mutableListOf<WordLayout>()
             for ((rWidth, rowPieces) in allRows) {
                 val alignmentShift = if (isRightAligned) maxRowWidth - rWidth else 0f
                 for (wLayout in rowPieces) {
+                    // Our layout builds each row left-to-right in source (logical reading) order.
+                    // For LTR that's also visual order, but RTL reading order is right-to-left, so
+                    // the row must be mirrored within its own width — otherwise words still read
+                    // left-to-right, just shifted as a block (the bug: "words are ordered left to
+                    // right" instead of right to left).
+                    val mirroredX = if (lineIsRtl) {
+                        rWidth - wLayout.relativeOffset.x - wLayout.textLayoutResult.size.width
+                    } else {
+                        wLayout.relativeOffset.x
+                    }
                     wordLayouts.add(wLayout.copy(
-                        relativeOffset = Offset(wLayout.relativeOffset.x + alignmentShift, wLayout.relativeOffset.y)
+                        relativeOffset = Offset(mirroredX + alignmentShift, wLayout.relativeOffset.y)
                     ))
                 }
             }
-            
+
             val prevIsInterlude = layouts.lastOrNull()?.isInterlude ?: false
             val drawY = if (isBg && !prevIsInterlude) currentY - 32f else if (line.isSongwriter) currentY + lineSpacing * 0.5f else currentY
 
-            layouts.add(LineLayout(line, wordLayouts, drawY, totalHeight, totalWidth, maxRowWidth, false, isBg, line.oppositeAligned, line.isSongwriter, lineIsRtl))
+            layouts.add(LineLayout(line, wordLayouts, drawY, totalHeight, totalWidth, maxRowWidth, false, isBg, line.oppositeAligned, line.isSongwriter, lineIsRtl, isRightAligned))
             
             val bottomY = drawY + totalHeight
             currentY = maxOf(currentY, bottomY + (if (isBg) 32f else lineSpacing))

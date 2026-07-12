@@ -40,6 +40,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { _discoveredFolders.value = mediaRepository.getAudioFolders() }
     }
 
+    override fun rescanLibrary() {
+        mediaRepository.rescanLibrary()
+    }
+
     init { refreshDiscoveredFolders() }
 
     override val state = userPreferencesRepository.userSettingsFlow
@@ -263,6 +267,7 @@ interface ISettingsViewModel {
     fun onFolderAdded(folder: String)
 
     fun refreshDiscoveredFolders()
+    fun rescanLibrary()
 
     fun onThemeSelected(appTheme: AppThemeUi)
 

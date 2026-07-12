@@ -268,7 +268,7 @@ private fun getLineStartX(
     if (layout.isSongwriter) {
         return horizontalPadding
     }
-    return if (layout.oppositeAligned || layout.isRtl) {
+    return if (layout.isRightAligned) {
         canvasWidth - horizontalPadding - layout.totalWidth
     } else {
         horizontalPadding
