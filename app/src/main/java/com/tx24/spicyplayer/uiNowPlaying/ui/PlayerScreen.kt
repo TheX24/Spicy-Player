@@ -8,21 +8,31 @@ import androidx.compose.animation.Animatable
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -42,7 +52,6 @@ import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -62,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.ColorUtils
@@ -69,6 +79,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.palette.graphics.Palette
 import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import com.tx24.spicyplayer.model.playback.PlayerState
 import com.tx24.spicyplayer.model.playback.RepeatMode
@@ -81,6 +92,17 @@ import com.tx24.spicyplayer.lyrics.LiveLyricsScreen
 import com.tx24.spicyplayer.lyrics.fadingEdge
 import com.tx24.spicyplayer.uiNowPlaying.viewmodel.INowPlayingViewModel
 
+/**
+ * Fires [onTouch] on the very first pointer contact, before any descendant gesture (word-seek,
+ * drag-to-scroll, button press, ...) has a chance to consume it — so it catches every touch
+ * anywhere in the subtree, not just a clean unconsumed tap.
+ */
+private fun Modifier.detectAnyTouch(onTouch: () -> Unit): Modifier = pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        onTouch()
+    }
+}
 
 @Composable
 fun PlayingScreen2(
@@ -134,7 +156,8 @@ fun PlayingScreen2(
         NowPlayingScreenSize.LANDSCAPE -> {
             LandscapePlayerScreen(
                 modifier = modifier,
-                song = song,
+                songs = songs,
+                songIndex = songIndex,
                 playbackState = playbackState,
                 repeatMode = repeatMode,
                 isShuffleOn = isShuffleOn,
@@ -371,8 +394,18 @@ fun PortraitPlayerScreen(
 
     val song = remember(songs, songIndex) { songs[songIndex] }
 
+    // Idle-fade for the bottom controls card, mirroring Spicy Lyrics' fullscreen chrome —
+    // fades out after a few seconds of inactivity, any tap on the screen brings it back.
+    var controlsVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(controlsVisible) {
+        if (controlsVisible) {
+            delay(3000)
+            controlsVisible = false
+        }
+    }
+
     Column(
-        modifier,
+        modifier.detectAnyTouch { controlsVisible = true },
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -404,7 +437,8 @@ fun PortraitPlayerScreen(
                     onSongSwitched = { newIndex ->
                         if (newIndex != songIndex)
                             nowPlayingActions.playSongAtIndex(newIndex)
-                    }
+                    },
+                    onDoubleTapArt = nowPlayingActions::togglePlayback
                 )
             }
 
@@ -432,7 +466,8 @@ fun PortraitPlayerScreen(
                             .fillMaxSize()
                             .clip(RoundedCornerShape(16.dp))
                             .fadingEdge(fadeBrush)
-                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                            .padding(horizontal = 2.dp, vertical = 2.dp),
+                        controlsVisible = controlsVisible,
                     )
                     BackHandler {
                         onToggleLyrics()
@@ -443,6 +478,13 @@ fun PortraitPlayerScreen(
 
         val contentColor = nowPlayingScreenTint(songAlbumArtModel = song.toSongAlbumArtModel())
 
+        // Only the minimized (collapsed) bar idle-fades — full controls stay put, matching
+        // landscape where only the pill (the minimized affordance) fades, not the maximized card.
+        AnimatedVisibility(
+            visible = !controlsCollapsed || controlsVisible,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -537,6 +579,7 @@ fun PortraitPlayerScreen(
                 }
             }
         }
+        }
     }
 }
 
@@ -574,7 +617,8 @@ fun TechnicalMetadataChip(song: Song) {
 @Composable
 fun LandscapePlayerScreen(
     modifier: Modifier,
-    song: Song,
+    songs: List<Song>,
+    songIndex: Int,
     playbackState: PlayerState,
     repeatMode: RepeatMode,
     isShuffleOn: Boolean,
@@ -585,113 +629,195 @@ fun LandscapePlayerScreen(
     onCollapse: () -> Unit
 ) {
 
-    var controlsCollapsed by remember {
+    val song = remember(songs, songIndex) { songs[songIndex] }
+
+    // Minimizing the controls card is landscape-only UI state (mirrors Spicy Lyrics'
+    // NowBar/lyrics split); it doesn't need to persist across sessions or screens.
+    var controlsMinimized by remember {
         mutableStateOf(false)
     }
 
-    Row(
-        modifier,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-
-        AnimatedContent(
-            modifier = Modifier.weight(1.5f),
-            targetState = isShowingLyrics,
-            label = ""
-        ) {
-            if (it) {
-                val context = LocalContext.current as Activity
-                val keepScreenOn = com.tx24.spicyplayer.ui.common.LocalUserPreferences.current.uiSettings.keepScreenOn
-                DisposableEffect(key1 = Unit) {
-                    context.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                    onDispose { 
-                        if (!keepScreenOn) {
-                            context.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                        } 
-                    }
-                }
-                val fadeBrush = remember {
-                    Brush.verticalGradient(
-                        0.0f to Color.Red,
-                        0.7f to Color.Red,
-                        1.0f to Color.Transparent
-                    )
-                }
-                LiveLyricsScreen(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .fadingEdge(fadeBrush)
-                        .padding(vertical = 4.dp),
-                )
-                BackHandler {
-                    onToggleLyrics()
-                }
-            } else {
-                CrossFadingAlbumArt(
-                    modifier = Modifier
-                        .aspectRatio(1f)
-                        .shadow(32.dp, shape = RoundedCornerShape(12.dp), clip = true)
-                        .clip(RoundedCornerShape(12.dp)),
-                    containerModifier = Modifier.fillMaxWidth(),
-                    songAlbumArtModel = song.toSongAlbumArtModel(),
-                    errorPainterType = ErrorPainterType.PLACEHOLDER
-                )
-            }
+    // Idle-fade for the pill, mirroring Spicy Lyrics' fullscreen chrome — fades out after
+    // a few seconds of inactivity, any tap on the screen brings it back.
+    var controlsVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(controlsVisible) {
+        if (controlsVisible) {
+            delay(3000)
+            controlsVisible = false
         }
+    }
 
+    BackHandler(enabled = isShowingLyrics) {
+        onToggleLyrics()
+    }
 
-        Spacer(modifier = Modifier.width(8.dp))
-        VerticalDivider(modifier = Modifier.height(1000.dp))
-        Spacer(modifier = Modifier.width(8.dp))
+    BoxWithConstraints(
+        modifier = modifier.detectAnyTouch { controlsVisible = true }
+    ) {
+        val artworkSize = minOf(maxWidth * 0.40f, maxHeight * 0.75f)
+        val rightSpacing = artworkSize / 4
+        val nowBarLeftX = maxWidth * 0.5f - artworkSize - rightSpacing
+        val nowBarCenteredX = (maxWidth - artworkSize) / 2
+        // Lyrics pane starts right where the NowBar column actually ends (plus a small
+        // breathing gap), not at an abstract screen-relative fraction — so it stays flush
+        // against the artwork regardless of how artworkSize is tuned.
+        val rightPaneStart = nowBarLeftX + artworkSize + 24.dp
+        val rightPaneWidth = maxWidth - rightPaneStart
+
+        val nowBarCentered = controlsMinimized && !isShowingLyrics
+
+        val nowBarX by animateDpAsState(
+            targetValue = if (nowBarCentered) nowBarCenteredX else nowBarLeftX,
+            animationSpec = tween(400),
+            label = "NowBarX"
+        )
 
         Column(
-            modifier = Modifier.weight(2f).padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = nowBarX)
+                .width(artworkSize),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .shadow(32.dp, shape = RoundedCornerShape(12.dp), clip = true)
+            ) {
+                AlbumArtPager(
+                    modifier = Modifier.fillMaxSize(),
+                    songs = songs,
+                    currentSongIndex = songIndex,
+                    onSongSwitched = { newIndex ->
+                        if (newIndex != songIndex) nowPlayingActions.playSongAtIndex(newIndex)
+                    },
+                    onDoubleTapArt = nowPlayingActions::togglePlayback
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             SongTextInfo(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 song = song,
                 showAlbum = false,
-                marqueeEffect = false
+                // Match NowPlayingHeader's marquee title/artist in portrait — the compact-state
+                // sizes, since landscape's NowBar column is as narrow as portrait's small header.
+                titleStyle = MaterialTheme.typography.headlineMedium,
+                titleFontWeight = FontWeight.Bold,
+                titleFontSize = TextUnit.Unspecified,
+                titleColor = Color.White,
+                artistStyle = MaterialTheme.typography.titleSmall,
+                artistFontWeight = FontWeight.Normal,
+                artistFontSize = TextUnit.Unspecified,
+                artistColor = Color.White.copy(alpha = 0.7f),
             )
+        }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(32.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                tonalElevation = 6.dp,
-                shadowElevation = 12.dp
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = rightPaneStart)
+                .width(rightPaneWidth)
+                .fillMaxHeight()
+        ) {
+            // Reserve a strip on the right for the pill so it never overlaps the
+            // controls card or the lyrics fading edge.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(5.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        IconButton(onClick = { controlsCollapsed = !controlsCollapsed }) {
-                            Icon(
-                                imageVector = if (controlsCollapsed) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "Collapse"
+                // No size modifier here on purpose: AnimatedContent follows its current
+                // content's own measured size (the card wraps, lyrics fill via their own
+                // fillMaxSize modifier) — forcing fillMaxSize here would stretch the card too.
+                AnimatedContent(
+                    targetState = controlsMinimized to isShowingLyrics,
+                    label = "LandscapeRightPane"
+                ) { (minimized, lyricsOn) ->
+                    when {
+                        !minimized -> {
+                            LandscapeControlsCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                song = song,
+                                playbackState = playbackState,
+                                repeatMode = repeatMode,
+                                isShuffleOn = isShuffleOn,
+                                nowPlayingActions = nowPlayingActions,
+                                onOpenQueue = onOpenQueue
                             )
                         }
 
-                        SongProgressInfo(
-                            modifier = Modifier.weight(1f),
-                            songDuration = song.metadata.durationMillis,
-                            song = song,
-                            isCollapsed = controlsCollapsed,
-                            songProgressProvider = nowPlayingActions::currentSongProgress,
-                            onUserSeek = nowPlayingActions::onUserSeek
-                        )
+                        lyricsOn -> {
+                            val context = LocalContext.current as Activity
+                            val keepScreenOn = com.tx24.spicyplayer.ui.common.LocalUserPreferences.current.uiSettings.keepScreenOn
+                            DisposableEffect(key1 = Unit) {
+                                context.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                                onDispose {
+                                    if (!keepScreenOn) {
+                                        context.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                                    }
+                                }
+                            }
+                            val fadeBrush = remember {
+                                Brush.verticalGradient(
+                                    0.0f to Color.Red,
+                                    0.7f to Color.Red,
+                                    1.0f to Color.Transparent
+                                )
+                            }
+                            LiveLyricsScreen(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .fadingEdge(fadeBrush)
+                                    .padding(vertical = 4.dp),
+                                // Landscape dedicates the whole pane to lyrics (no header/card
+                                // stacked above it), so anchor the active line near mid-height
+                                // instead of the ~25%-from-top used in the shorter portrait pane.
+                                focusAnchorFraction = 0.45f,
+                                controlsVisible = controlsVisible,
+                            )
+                        }
+                    }
+                }
+            }
 
-                        IconButton(onClick = onToggleLyrics) {
+            AnimatedVisibility(
+                visible = controlsVisible,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 8.dp, end = 8.dp),
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 12.dp
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            modifier = Modifier.size(40.dp),
+                            onClick = { controlsMinimized = !controlsMinimized }
+                        ) {
+                            Icon(
+                                imageVector = if (controlsMinimized) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = if (controlsMinimized) "Show controls" else "Minimize controls"
+                            )
+                        }
+
+                        IconButton(
+                            modifier = Modifier.size(40.dp),
+                            onClick = {
+                                if (!isShowingLyrics) controlsMinimized = true
+                                onToggleLyrics()
+                            }
+                        ) {
                             Icon(
                                 imageVector = Icons.Rounded.Lyrics,
                                 contentDescription = "Lyrics",
@@ -699,47 +825,77 @@ fun LandscapePlayerScreen(
                             )
                         }
                     }
-
-                    AnimatedVisibility(visible = !controlsCollapsed) {
-                        Column(
-                            modifier = Modifier.padding(top = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            SongControls(
-                                modifier = Modifier.fillMaxWidth(),
-                                isPlaying = playbackState == PlayerState.PLAYING,
-                                isShuffleOn = isShuffleOn,
-                                repeatMode = repeatMode,
-                                playButtonColor = MaterialTheme.colorScheme.primary,
-                                onPrevious = nowPlayingActions::previousSong,
-                                onTogglePlayback = nowPlayingActions::togglePlayback,
-                                onNext = nowPlayingActions::nextSong,
-                                onToggleShuffle = nowPlayingActions::toggleShuffleMode,
-                                onToggleRepeat = nowPlayingActions::toggleRepeatMode
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
-                            ) {
-                                SuggestionChip(
-                                    onClick = onOpenQueue,
-                                    label = { Text("Queue", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp) },
-                                    icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                    shape = CircleShape,
-                                    colors = SuggestionChipDefaults.suggestionChipColors(
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        iconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                )
-
-                                NowPlayingOverflowChip(options = rememberNowPlayingOptions(songUi = song))
-                            }
-                        }
-                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LandscapeControlsCard(
+    modifier: Modifier,
+    song: Song,
+    playbackState: PlayerState,
+    repeatMode: RepeatMode,
+    isShuffleOn: Boolean,
+    nowPlayingActions: INowPlayingViewModel,
+    onOpenQueue: () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        tonalElevation = 6.dp,
+        shadowElevation = 12.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            SongProgressInfo(
+                modifier = Modifier.fillMaxWidth(),
+                songDuration = song.metadata.durationMillis,
+                song = song,
+                isCollapsed = false,
+                songProgressProvider = nowPlayingActions::currentSongProgress,
+                onUserSeek = nowPlayingActions::onUserSeek
+            )
+
+            SongControls(
+                modifier = Modifier.fillMaxWidth(),
+                isPlaying = playbackState == PlayerState.PLAYING,
+                isShuffleOn = isShuffleOn,
+                repeatMode = repeatMode,
+                playButtonColor = MaterialTheme.colorScheme.primary,
+                onPrevious = nowPlayingActions::previousSong,
+                onTogglePlayback = nowPlayingActions::togglePlayback,
+                onNext = nowPlayingActions::nextSong,
+                onToggleShuffle = nowPlayingActions::toggleShuffleMode,
+                onToggleRepeat = nowPlayingActions::toggleRepeatMode
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SuggestionChip(
+                    onClick = onOpenQueue,
+                    label = { Text("Queue", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp) },
+                    icon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    shape = CircleShape,
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        iconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                )
+
+                TechnicalMetadataChip(song = song)
+
+                NowPlayingOverflowChip(options = rememberNowPlayingOptions(songUi = song))
             }
         }
     }

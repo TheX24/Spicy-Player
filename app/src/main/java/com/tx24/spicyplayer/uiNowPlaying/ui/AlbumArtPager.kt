@@ -1,6 +1,7 @@
 package com.tx24.spicyplayer.uiNowPlaying.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,7 +47,8 @@ fun AlbumArtPager(
     modifier: Modifier,
     songs: List<Song>,
     currentSongIndex: Int,
-    onSongSwitched: (Int) -> Unit
+    onSongSwitched: (Int) -> Unit,
+    onDoubleTapArt: () -> Unit = {}
 ) {
     val pagerState = LocalPagerState.current
     val updatedOnSongSwitched by rememberUpdatedState(onSongSwitched)
@@ -72,7 +75,9 @@ fun AlbumArtPager(
 
     HorizontalPager(
         state = pagerState,
-        modifier = modifier,
+        modifier = modifier.pointerInput(onDoubleTapArt) {
+            detectTapGestures(onDoubleTap = { onDoubleTapArt() })
+        },
         key = { songs.getOrNull(it)?.uri ?: it }, // optional, improves performance
         contentPadding = PaddingValues(horizontal = 0.dp),
         pageSpacing = 24.dp,

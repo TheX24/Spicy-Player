@@ -42,6 +42,7 @@ fun SpicyLyricsView(
     config: RenderConfig = RenderConfig.FULL,
     lyricsType: LyricsType = LyricsType.Syllable,
     romanize: Boolean = false,
+    focusAnchorFraction: Float = 0.25f,
 ) {
     val textMeasurer = rememberTextMeasurer()
     var lineLayouts by remember { mutableStateOf<List<LineLayout>>(emptyList()) }
@@ -67,8 +68,9 @@ fun SpicyLyricsView(
     BoxWithConstraints(modifier = modifier.fillMaxSize().clipToBounds()) {
         val canvasWidth = constraints.maxWidth.toFloat()
         val canvasHeight = constraints.maxHeight.toFloat()
-        // Anchor the active line ~25% from the top (reference: margin-top 25cqh).
-        val centerY = canvasHeight * 0.25f
+        // Anchor the active line from the top (reference: margin-top 25cqh; callers with a
+        // taller, dedicated lyrics viewport — e.g. landscape's split pane — may override this).
+        val centerY = canvasHeight * focusAnchorFraction
         val horizontalPadding = 40f
         val hasDuet = remember(displayLines) { displayLines.any { it.oppositeAligned } }
 

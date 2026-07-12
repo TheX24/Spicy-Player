@@ -5,9 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.MarqueeAnimationMode
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,13 +13,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tx24.spicyplayer.library.store.model.song.Song
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongTextInfo(
     modifier: Modifier,
@@ -30,6 +30,14 @@ fun SongTextInfo(
     showArtist: Boolean = true,
     showAlbum: Boolean = true,
     marqueeEffect: Boolean = true,
+    titleStyle: TextStyle = MaterialTheme.typography.bodyMedium,
+    titleFontWeight: FontWeight = FontWeight.Medium,
+    titleFontSize: TextUnit = 22.sp,
+    titleColor: Color = Color.Unspecified,
+    artistStyle: TextStyle = MaterialTheme.typography.labelSmall,
+    artistFontWeight: FontWeight = FontWeight.Normal,
+    artistFontSize: TextUnit = 14.sp,
+    artistColor: Color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
 ) {
 
 
@@ -40,38 +48,62 @@ fun SongTextInfo(
             targetState = song.metadata.title,
             transitionSpec = { fadeIn(tween(delayMillis = 150)) togetherWith fadeOut(tween(durationMillis = 150)) }
         ) { title ->
-            Text(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (marqueeEffect)
-                            Modifier.basicMarquee(
-                                iterations = Int.MAX_VALUE,
-                                initialDelayMillis = 1000,
-                                animationMode = MarqueeAnimationMode.Immediately
-                            )
-                        else Modifier
-                    ),
-                text = title,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyMedium,
-                fontSize = 22.sp,
-                maxLines = 1
-            )
+            if (marqueeEffect) {
+                PingPongMarquee(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = title,
+                        color = titleColor,
+                        fontWeight = titleFontWeight,
+                        textAlign = TextAlign.Center,
+                        style = titleStyle,
+                        fontSize = titleFontSize,
+                        maxLines = 1,
+                        overflow = TextOverflow.Visible,
+                        softWrap = false
+                    )
+                }
+            } else {
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = title,
+                    color = titleColor,
+                    fontWeight = titleFontWeight,
+                    textAlign = TextAlign.Center,
+                    style = titleStyle,
+                    fontSize = titleFontSize,
+                    maxLines = 1
+                )
+            }
         }
         if (showArtist) {
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                modifier = Modifier.fillMaxWidth(),
-                text = song.metadata.artistName ?: "<unknown>",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Normal,
-                textAlign = TextAlign.Center,
-                fontSize = 14.sp,
-                maxLines = 1,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-            )
+            val artistName = song.metadata.artistName ?: "<unknown>"
+            if (marqueeEffect) {
+                PingPongMarquee(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = artistName,
+                        style = artistStyle,
+                        fontWeight = artistFontWeight,
+                        textAlign = TextAlign.Center,
+                        fontSize = artistFontSize,
+                        maxLines = 1,
+                        overflow = TextOverflow.Visible,
+                        softWrap = false,
+                        color = artistColor
+                    )
+                }
+            } else {
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = artistName,
+                    style = artistStyle,
+                    fontWeight = artistFontWeight,
+                    textAlign = TextAlign.Center,
+                    fontSize = artistFontSize,
+                    maxLines = 1,
+                    color = artistColor
+                )
+            }
         }
 
         if (showAlbum) {

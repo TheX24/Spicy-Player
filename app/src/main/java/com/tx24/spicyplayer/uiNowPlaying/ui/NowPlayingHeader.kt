@@ -3,8 +3,6 @@ package com.tx24.spicyplayer.uiNowPlaying.ui
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,7 +33,8 @@ fun NowPlayingHeader(
     songs: List<Song>,
     songIndex: Int,
     isShowingLyrics: Boolean,
-    onSongSwitched: (Int) -> Unit
+    onSongSwitched: (Int) -> Unit,
+    onDoubleTapArt: () -> Unit = {}
 ) {
     val expansionProgress by animateFloatAsState(
         targetValue = if (isShowingLyrics) 0f else 1f,
@@ -84,33 +83,27 @@ fun NowPlayingHeader(
             horizontalAlignment = if (expansionProgress > 0.5f) Alignment.CenterHorizontally else Alignment.Start
         ) {
             if (song != null) {
-                @OptIn(ExperimentalFoundationApi::class)
-                Text(
-                    text = song.metadata.title,
-                    color = Color.White,
-                    style = if (expansionProgress > 0.5f) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Visible,
-                    softWrap = false,
-                    modifier = Modifier.basicMarquee(
-                        iterations = Int.MAX_VALUE,
-                        initialDelayMillis = 2000
+                PingPongMarquee {
+                    Text(
+                        text = song.metadata.title,
+                        color = Color.White,
+                        style = if (expansionProgress > 0.5f) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Visible,
+                        softWrap = false
                     )
-                )
-                @OptIn(ExperimentalFoundationApi::class)
-                Text(
-                    text = song.metadata.artistName ?: "Unknown Artist",
-                    color = Color.White.copy(alpha = 0.7f),
-                    style = if (expansionProgress > 0.5f) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Visible,
-                    softWrap = false,
-                    modifier = Modifier.basicMarquee(
-                        iterations = Int.MAX_VALUE,
-                        repeatDelayMillis = 2000
+                }
+                PingPongMarquee {
+                    Text(
+                        text = song.metadata.artistName ?: "Unknown Artist",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = if (expansionProgress > 0.5f) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Visible,
+                        softWrap = false
                     )
-                )
+                }
             }
         }
 
@@ -124,7 +117,8 @@ fun NowPlayingHeader(
                 modifier = Modifier.fillMaxSize(),
                 songs = songs,
                 currentSongIndex = songIndex,
-                onSongSwitched = onSongSwitched
+                onSongSwitched = onSongSwitched,
+                onDoubleTapArt = onDoubleTapArt
             )
         }
     }

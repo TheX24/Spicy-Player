@@ -66,7 +66,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.unit.dp
 import com.tx24.spicyplayer.lyrics.spicy.PlaybackClock
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableLongStateOf
@@ -75,6 +74,8 @@ import androidx.compose.runtime.mutableLongStateOf
 @Composable
 fun LiveLyricsScreen(
     modifier: Modifier,
+    focusAnchorFraction: Float = 0.25f,
+    controlsVisible: Boolean = true,
     lyricsViewModel: LiveLyricsViewModel = hiltViewModel()
 ) {
 
@@ -85,7 +86,9 @@ fun LiveLyricsScreen(
         lyricsViewModel::songProgressMillis,
         lyricsViewModel::setSongProgressMillis,
         lyricsViewModel::onRetry,
-        lyricsViewModel::isPlaying
+        lyricsViewModel::isPlaying,
+        focusAnchorFraction = focusAnchorFraction,
+        controlsVisible = controlsVisible,
     )
 }
 
@@ -97,6 +100,8 @@ fun LiveLyricsScreen(
     onSeekToPositionMillis: (Long) -> Unit,
     onRetry: () -> Unit,
     isPlaying: () -> Boolean = { true },
+    focusAnchorFraction: Float = 0.25f,
+    controlsVisible: Boolean = true,
 ) {
     when (state) {
         is LyricsScreenState.NoLyrics ->
@@ -114,7 +119,9 @@ fun LiveLyricsScreen(
                 plainLyrics = state.plainLyrics,
                 onSeekToPositionMillis = onSeekToPositionMillis,
                 songProgressMillis = songProgressMillis,
-                isPlaying = isPlaying
+                isPlaying = isPlaying,
+                focusAnchorFraction = focusAnchorFraction,
+                controlsVisible = controlsVisible,
             )
 
         is LyricsScreenState.SyncedLyrics ->
@@ -123,7 +130,9 @@ fun LiveLyricsScreen(
                 synchronizedLyrics = state.syncedLyrics,
                 onSeekToPositionMillis = onSeekToPositionMillis,
                 songProgressMillis = songProgressMillis,
-                isPlaying = isPlaying
+                isPlaying = isPlaying,
+                focusAnchorFraction = focusAnchorFraction,
+                controlsVisible = controlsVisible,
             )
 
         is LyricsScreenState.TtmlLyrics ->
@@ -132,7 +141,9 @@ fun LiveLyricsScreen(
                 parsedLyrics = state.parsedLyrics,
                 onSeekToPositionMillis = onSeekToPositionMillis,
                 songProgressMillis = songProgressMillis,
-                isPlaying = isPlaying
+                isPlaying = isPlaying,
+                focusAnchorFraction = focusAnchorFraction,
+                controlsVisible = controlsVisible,
             )
     }
 }
@@ -286,11 +297,13 @@ fun SyncedLyricsState(
     onSeekToPositionMillis: (Long) -> Unit,
     songProgressMillis: () -> Long,
     isPlaying: () -> Boolean = { true },
+    focusAnchorFraction: Float = 0.25f,
+    controlsVisible: Boolean = true,
 ) {
     val spicyLines = remember(synchronizedLyrics) {
         synchronizedLyrics.toSpicyLines()
     }
-    SpicyLyricsPlayer(modifier, spicyLines, LyricsType.Line, onSeekToPositionMillis, songProgressMillis, isPlaying)
+    SpicyLyricsPlayer(modifier, spicyLines, LyricsType.Line, onSeekToPositionMillis, songProgressMillis, isPlaying, focusAnchorFraction, controlsVisible)
 }
 
 @Composable
@@ -300,9 +313,11 @@ fun StaticLyricsState(
     onSeekToPositionMillis: (Long) -> Unit,
     songProgressMillis: () -> Long,
     isPlaying: () -> Boolean = { true },
+    focusAnchorFraction: Float = 0.25f,
+    controlsVisible: Boolean = true,
 ) {
     val staticLines = remember(plainLyrics) { plainLyrics.toSpicyStaticParsed().lines }
-    SpicyLyricsPlayer(modifier, staticLines, LyricsType.Static, onSeekToPositionMillis, songProgressMillis, isPlaying)
+    SpicyLyricsPlayer(modifier, staticLines, LyricsType.Static, onSeekToPositionMillis, songProgressMillis, isPlaying, focusAnchorFraction, controlsVisible)
 }
 
 @Composable
@@ -312,14 +327,16 @@ fun TtmlLyricsState(
     onSeekToPositionMillis: (Long) -> Unit,
     songProgressMillis: () -> Long,
     isPlaying: () -> Boolean = { true },
+    focusAnchorFraction: Float = 0.25f,
+    controlsVisible: Boolean = true,
 ) {
-    SpicyLyricsPlayer(modifier, parsedLyrics.lines, parsedLyrics.type, onSeekToPositionMillis, songProgressMillis, isPlaying)
+    SpicyLyricsPlayer(modifier, parsedLyrics.lines, parsedLyrics.type, onSeekToPositionMillis, songProgressMillis, isPlaying, focusAnchorFraction, controlsVisible)
 }
 
 /**
  * Shared karaoke lyrics surface for both the TTML and synced (.lrc) sources —
  * they differ only in how the [lines] are produced. Polls the playback position
- * into the animated [SpicyLyricsView] and auto-hides the tap actions.
+ * into the animated [SpicyLyricsView].
  */
 @Composable
 private fun SpicyLyricsPlayer(
@@ -329,6 +346,8 @@ private fun SpicyLyricsPlayer(
     onSeekToPositionMillis: (Long) -> Unit,
     songProgressMillis: () -> Long,
     isPlaying: () -> Boolean = { true },
+    focusAnchorFraction: Float = 0.25f,
+    controlsVisible: Boolean = true,
 ) {
     var currentTimeMs by remember { mutableLongStateOf(0L) }
 
@@ -387,42 +406,25 @@ private fun SpicyLyricsPlayer(
         }
     }
 
-    var actionsShown by remember {
-        mutableStateOf(true)
-    }
-
-    LaunchedEffect(key1 = actionsShown) {
-        if (actionsShown) {
-            delay(3000)
-            actionsShown = false
-        }
-    }
-
-    Box(
-        modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { actionsShown = !actionsShown })
-            }
-    ) {
+    Box(modifier.fillMaxSize()) {
         SpicyLyricsView(
             lines = romanizedLines,
             currentTimeMs = currentTimeMs,
             onSeekWord = {
                 onSeekToPositionMillis(it - lyricsOffsetMs - 100L)
-                actionsShown = false
             },
             modifier = Modifier.fillMaxSize(),
             fontSizeScale = fontSizeScale,
             config = renderConfig,
             lyricsType = lyricsType,
             romanize = romanize,
+            focusAnchorFraction = focusAnchorFraction,
         )
 
-        // In-view romanization toggle: a persistent view control (unlike the tap-actions,
-        // it does not auto-hide — the user needs it reachable throughout playback).
+        // In-view romanization toggle: fades with the rest of the screen's controls
+        // (caller-driven — see LandscapePlayerScreen/PortraitPlayerScreen's idle timer).
         AnimatedVisibility(
-            visible = hasRomanization,
+            visible = hasRomanization && controlsVisible,
             modifier = Modifier.align(Alignment.TopEnd)
         ) {
             Surface(
