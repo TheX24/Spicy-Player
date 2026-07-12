@@ -264,6 +264,12 @@ private fun DrawScope.drawSyllabicLetterFragment(
     val sLYPos = yPos + scrollOffset
     val sPivotX = xPos + textWidth / 2f
     val sPivotY = sLYPos + textHeight / 2f
+    // Word-container pivot: the reference nests letters inside the word element, so the
+    // word's own scale() pivots at the WORD's center (spreading letters outward), not each
+    // letter's own center. Recover the word's left edge from this fragment's offset within it.
+    // ponytail: single-row word-center pivot; wrapped held words approximate.
+    val wordLeftX = xPos - wLayout.startXOffset
+    val wordPivotX = wordLeftX + wLayout.fullWordWidth / 2f
     // Letter yOffset applied ×2 (reference), on top of the word container's own transform.
     val lYShift = lState.yOffset * textHeight * 2f
     val containerYShift = wordAnim.yOffset * textHeight
@@ -292,7 +298,7 @@ private fun DrawScope.drawSyllabicLetterFragment(
     withTransform({
         // The reference nests letter spans inside the word element: the word's own
         // scale/translate wraps every letter's individual scale/translate.
-        scale(wordAnim.scale, wordAnim.scale, Offset(sPivotX, sPivotY))
+        scale(wordAnim.scale, wordAnim.scale, Offset(wordPivotX, sPivotY))
         translate(top = containerYShift)
         scale(lState.scale, lState.scale, Offset(sPivotX, sPivotY))
         translate(top = lYShift)

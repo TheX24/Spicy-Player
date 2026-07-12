@@ -32,9 +32,11 @@ object LetterSynthesizer {
         val display = if (romanized) (word.romanizedText ?: word.text) else word.text
         val len = display.length
 
+        // Reference (IsLetterCapable.ts) has no lower length bound — even a single-character
+        // held word (e.g. "I", "oh") gets the letter treatment if held long enough.
         val capable = config.lettersEnabled &&
             word.duration >= config.letterDurationThresholdMs &&
-            len in 2..config.letterMaxLength &&
+            len in 1..config.letterMaxLength &&
             !RtlDetector.isRtl(display)
 
         if (!capable) {
