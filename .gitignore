@@ -19,3 +19,5 @@ gradle/
 !gradle/wrapper/
 !gradle/libs.versions.toml
 spicy-lyrics/
+.remember/
+PORTING_BLUEPRINT_LYRICS.md

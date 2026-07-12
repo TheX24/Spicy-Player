@@ -26,7 +26,7 @@ android {
         applicationId = "com.tx24.spicyplayer"
 
         versionCode = 5
-        versionName = "v0.4.0-alpha-prerelease"
+        versionName = "v0.5.0-alpha-prerelease"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
