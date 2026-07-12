@@ -22,14 +22,17 @@ import androidx.compose.ui.graphics.ShaderBrush
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 /**
  * 1:1 port of @kawarp/core 1.2.0 as configured by spicy-lyrics' dynamicBackground.ts.
  *
  * Image-change path (KawarpBlurCore): tint → 8 Kawase passes at 128×128, stored as
  * RGBA_F16 "album" bitmaps (half-float FBO parity). Per-frame path: one fused AGSL
- * shader = the original's BLEND + DOMAIN_WARP + OUTPUT passes composed — identical
- * math because blend is linear and warp/output are pure functions of uv.
+ * shader = the original's BLEND + DOMAIN_WARP + OUTPUT passes, PLUS the
+ * `saturate(2.5) brightness(0.65)` CSS filter Spicetify applies to the canvas element
+ * itself (spicy-dynamic-bg.css) — composed in one shader since blend/warp/output are
+ * pure functions of uv and the CSS filter is just a final per-pixel color transform.
  */
 private const val KAWARP_FUSED_AGSL = """
 uniform float2 uResolution;
@@ -111,6 +114,23 @@ half4 main(float2 fragCoord) {
     float2 pixelPos = floor(vTexCoord * uResolution);
     float noise = hash(float3(pixelPos, floor(uTime * 60.0)));
     color.rgb += half3(half((noise - 0.5) * uDithering));
+    // WebGL's default canvas backbuffer is 8-bit UNORM: this is where the browser
+    // clamps before CSS ever sees the pixels, same as here.
+    color.rgb = clamp(color.rgb, half3(0.0), half3(1.0));
+
+    // spicy-dynamic-bg.css: `.spicy-dynamic-bg { filter: saturate(2.5) brightness(0.65); }`
+    // is applied directly to the canvas element by Spicetify, on top of the shader's own
+    // internal saturation/vignette/dither above. CSS saturate() is a luma-preserving mix
+    // using Rec.709-ish weights (0.213/0.715/0.072), distinct from the shader's own 0.299/
+    // 0.587/0.114 (Rec.601) — kept separate to match the spec exactly. Chained CSS filter
+    // primitives each rasterize to 8-bit before the next runs, so clamp between them too —
+    // skipping this let saturate(2.5) push channels past 1.0 where brightness(0.65)
+    // could no longer pull them back down, which is why the port looked too bright.
+    half cssGray = dot(color.rgb, half3(0.213, 0.715, 0.072));
+    color.rgb = mix(half3(cssGray), color.rgb, half(2.5));
+    color.rgb = clamp(color.rgb, half3(0.0), half3(1.0));
+    color.rgb *= half(0.65);
+
     return color;
 }
 """
@@ -169,7 +189,14 @@ fun KawarpBackground(
     modifier: Modifier = Modifier,
     isPlaying: Boolean = true,
     animate: Boolean = true,
+    blurIntensity: Int = 60,
 ) {
+    // spicy-lyrics hardcodes blurPasses=8 (no UI slider); this app exposes one shared
+    // slider for both engines. Kawase blur passes are much stronger per-step than the
+    // legacy StackBlur radius, so scaling this the same way the legacy path does (0-100%
+    // -> 0-20px) makes the slider's default (60%) way blurrier than intended for Kawarp.
+    // Anchor 60% to the library's own reference default (8 passes) instead of its max (40).
+    val blurPasses = (blurIntensity.coerceIn(0, 100) * 8f / 60f).roundToInt().coerceIn(1, 40)
     val shader = remember { RuntimeShader(KAWARP_FUSED_AGSL) }
     val engine = remember { KawarpEngine(SPICY_OPTIONS) }
     val blackAlbum = remember {
@@ -195,13 +222,15 @@ fun KawarpBackground(
     }
 
     // processNewImage(): blur off the UI thread, swap FBOs, start the transition.
-    LaunchedEffect(coverArtBitmap) {
+    // Also re-runs on blurIntensity change, matching reblurCurrentImage()'s behavior
+    // when blurPasses changes (though we don't preserve currentAlbum's old blur level).
+    LaunchedEffect(coverArtBitmap, blurPasses) {
         val src = coverArtBitmap ?: return@LaunchedEffect
         val blurred = withContext(Dispatchers.Default) {
             val (floats, w, h) = bitmapToFloats(src)
             val out = KawarpBlurCore.process(
                 floats, w, h,
-                blurPasses = SPICY_OPTIONS.blurPasses,
+                blurPasses = blurPasses,
                 tintColor = SPICY_OPTIONS.tintColor,
                 tintIntensity = SPICY_OPTIONS.tintIntensity,
             )

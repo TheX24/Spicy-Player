@@ -70,7 +70,8 @@ fun SpicyDynamicBackground(
             coverArtBitmap = bitmap,
             modifier = modifier,
             isPlaying = isPlaying,
-            animate = animate
+            animate = animate,
+            blurIntensity = blurIntensity
         )
     } else {
         DynamicBackgroundView(
