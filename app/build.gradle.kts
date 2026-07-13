@@ -1,28 +1,38 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 import java.io.FileInputStream
 
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
+    id("com.tx24.android.application")
+    id("com.tx24.android.application.compose")
+    id("com.tx24.android.hilt")
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 android {
     namespace = "com.tx24.spicyplayer"
-    compileSdk = 35
-
+    
     val keystorePropertiesFile = rootProject.file("app/keystore.properties")
     val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "com.tx24.spicyplayer"
-        minSdk = 26
-        targetSdk = 35
-        versionCode = 4
-        versionName = "v0.3.1-alpha"
+
+        versionCode = 5
+        versionName = "v0.5.0-alpha"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
     }
 
     signingConfigs {
@@ -44,24 +54,26 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
+        }
+
+        debug {
+            applicationIdSuffix = ".debug"
+            resValue("string", "app_name", "Spicy Player.d")
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-    buildFeatures {
-        compose = true
-        buildConfig = true
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // Kuromoji's core/ipadic jars ship duplicate doc/metadata files.
+            excludes += "/META-INF/{CONTRIBUTORS.md,LICENSE.md,NOTICE.md,README.md}"
+        }
     }
 
     applicationVariants.all {
@@ -74,36 +86,58 @@ android {
     }
 }
 
+
+ksp {
+    // Export Room schemas so migrations can be reviewed and tested against history.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    // Use alpha for Expressive APIs
-    implementation("androidx.compose.material3:material3:1.4.0-alpha06")
+    implementation(libs.core.ktx)
+    implementation(libs.media3.session)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.timber)
     
-    // ExoPlayer
-    implementation("androidx.media3:media3-exoplayer:1.3.1")
-    implementation("androidx.media3:media3-session:1.3.1")
-    implementation("androidx.media3:media3-ui:1.3.1")
+    // Extracted from features
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.iconsExtended)
+    implementation(libs.androidx.compose.tooling)
+    debugImplementation(libs.androidx.ui.tooling)
+    implementation(libs.androidx.compose.material3.windowSizeClass)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.lifecycle.runtimeCompose)
+    implementation(libs.androidx.lifecycle.viewModelCompose)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+    implementation(libs.retrofit)
+    implementation(libs.gson.converter)
+    implementation(libs.okio)
+    implementation(libs.datastore)
+    implementation(libs.coil)
+    implementation(libs.androidx.palette)
+    implementation(libs.material)
+    implementation(libs.drag.reorder)
+    implementation(libs.jaudio.tagger)
+    implementation(libs.glance)
+    implementation(libs.glance.material)
+    // On-device romanization: Kuromoji (Japanese, dictionary bundled) + pinyin4j (Chinese).
+    implementation(libs.kuromoji.ipadic)
+    implementation(libs.pinyin4j)
 
-    // Palette for dynamic color from cover art
-    implementation("androidx.palette:palette-ktx:1.0.0")
+    api(libs.accompanist.permissions)
 
-    // Extended Material Icons for player controls
-    implementation("androidx.compose.material:material-icons-extended")
+    // Installs the AOT-compiled profile shipped in the APK (assets/dexopt/baseline.prof) so
+    // ART pre-compiles the hot classpath instead of interpreting it on first run.
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
 
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-    // DataStore for settings persistence
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
-
-    // ViewModel + Compose integration
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    testImplementation(libs.junit)
+    // Real XmlPullParser implementation for JVM unit tests (Android ships kxml2 built in)
+    testImplementation(libs.kxml2)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.espresso.core)
 }

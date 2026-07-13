@@ -7,17 +7,21 @@
     - [x] Tap to seek
     - [x] 3 Dots Interlude indicator
     - [x] Dynamic Background
-    - [ ] Update word-wrapping to match Spicy Lyrics
-    - [ ] Romanization
+      - [x] Legacy Background
+      - [x] Kawarp
+      - [x] Option to keep current legacy background
+    - [x] Update word-wrapping to match Spicy Lyrics
+    - [x] Romanization
     - [ ] Translation (?)
-    - [ ] Line synced lyrics
-    - [ ] Static lyrics
-    - [ ] Spicy Lyrics-like settings
+      - [ ] Leverage ML Kit Translate API for on-device fallback translation
+    - [x] Line synced lyrics
+    - [x] Static lyrics
+    - [~] Spicy Lyrics' settings (quality mode, background engine, romanize toggle added)
     - [ ] Landscape view
       - [ ] Split screen layout with cover art/controls on the left and scrolling lyrics on the right
-    - [ ] Fixes
-      - [ ] Resolve overlapping text issues during fast sections or duets
-      - [ ] Improve parser resilience for malformed `.ttml` files to prevent crashes
+    - [ ] API's
+      - [ ] LRCLIB
+      - [ ] Paxsenix
   - Audio player aspect
     - [x] ExoPlayer
     - [x] Folder scanner + auto-pairing
@@ -25,70 +29,65 @@
         - [x] Use Android Storage Access Framework (SAF) for scoped storage compliance
         - [x] Background service for scanning with a progress notification
       - [x] Auto-pair `.flac` and `.ttml` files based on name
+      - [ ] Multiple folder support
     - [x] Implement MediaSession for song info broadcasting
+    - [ ] Last.fm
     - [ ] UI
       - [ ] Introduction screen
         - [ ] Greeting
         - [ ] Tutorial
-        - [ ] Select folder to scan
+        - [ ] Select folder to scan (Triggers SAF picker)
         - [x] Show progress of scanning
-      - [ ] Library
-        - [ ] Categorized tabs: Albums, Artists, Songs, Folders, and Playlists
-        - [ ] Grid view for Albums/Artists with fast-scroll alphabet indexer on the right edge
-      - [ ] Queue
-        - [ ] Drag-and-drop to reorder tracks
-        - [ ] Swipe left/right to remove a track from the queue
-        - [ ] Sleep timer
+      - [x] Library
+        - [x] Categorized tabs: Albums, Artists, Songs, Folders, and Playlists
+          - [ ] Artists
+          - [ ] Folders
+          - [x] Playlist
+            - [ ] Add .m3u support
+        - [x] Grid view for Albums/Artists with fast-scroll alphabet indexer on the right edge
+        - [x] Playlists
+        - [ ] Update to M3E
+      - [x] Queue
+        - [x] Drag-and-drop to reorder tracks
+        - [x] Swipe left/right to remove a track from the queue
+        - [x] Sleep timer
+        - [ ] Update to M3E
       - [x] Now Playing
         - [ ] Fully hide controls
-        - [ ] Swipe horizontally to skip to previous/next track
-        - [ ] Tap album cover to show/hide lyrics overlay or toggle full-screen cover
+          - [ ] Detect tap on background/cover to AnimatedVisibility fade-out all UI Chrome
+        - [x] Swipe horizontally to skip to previous/next track
+        - [x] Show/hide lyrics overlay
         - [x] Controls
           - [ ] Advanced controls
         - [x] Progress bar
         - [x] Cover art and track info
           - [x] Auto expand cover art and track info to middle if no TTML is found
-            - [x] Use `animateContentSize` or `updateTransition` in Compose for a smooth centering animation
           - [x] Scrolling track info if too long
       - [ ] Spectrum visualization
         - [ ] Fetch audio session ID from ExoPlayer to drive visualizer data
         - [ ] Multiple visualizer styles (e.g., bar graph, waveform, circular aura around cover art)
   - Settings
+    - [x] Update to M3E
     - [x] Lyrics settings
       - [x] Global offset/delay adjustment (e.g., ±500ms) for out-of-sync lyrics
       - [x] Custom font size
-    - [x] Audio player settings
-      - [x] Equalizer (EQ) preset selection and Bass Boost toggle
-        - [ ] *TODO* Musicolet-like EQ
-      - [x] Crossfade duration slider (0-10 seconds) and gapless playback toggle
+    - [ ] Audio player settings
+      - [ ] Musicolet-like EQ
+      - [ ] Crossfade duration slider (0-10 seconds)
+      - [x] Gapless playback toggle
     - [x] General settings
       - [x] App theme selector (Light, Dark, System Default, Material You)
-      - [ ] Cache management (clear cached images/lyrics to free up space)
+      - [x] Cache management (clear cached images/lyrics to free up space)
       - [x] Keep screen on
-      - [x] Scan directory
       - [x] Audio focus mode
-      - [x] Rescan library
-        - [x] Cache scanned and matched
     - [x] Reset to defaults
+    - [ ] Add more settings
   - General
     - [x] Update checking
 - Bugs
-  - [ ] RTL Languages
-    - [ ] Ensure the Word renderer calculates layout widths properly from right to left
-    - [ ] Mirror the scroll direction metrics for RTL text in the lyrics list
-    - [ ] Flip gradient scan direction
-    - [ ] Turn off held word animation
+  - [~] RTL Languages (right-align + gradient flip; full bidi word-reorder still pending)
   - [ ] Held word animation
-    - [ ] Slower anims look fine but faster anims look weird
-  - [x] Audio focus handling
+    - [ ] Animation on shorter words look fine, longer words don't match 1:1 and are weird
+    - [ ] Don't animate punctuation
   - [ ] Bluetooth/general audio delay fix
-  - [x] 3 Dots interlude BG line spacings
-  - [x] Previous song
-  - [x] Seeking doesn't move lyrics view
-  - [x] BG Blur and timing offset have too many steps/circles in slider
-  - [x] Fix scan directory setting
-  - [x] Custom EQ doesn't work
-  - [x] Transition/animation between settings pages
-  - [ ] Performance improvements
-  - [x] Fix logo sizing
-  - [x] Shuffle not shuffling?
+  - [ ] Performance improvements?
