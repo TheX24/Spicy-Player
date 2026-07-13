@@ -35,7 +35,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SpicyLyricsView(
     lines: List<Line>,
-    currentTimeMs: Long,
+    currentTimeMs: () -> Long,
     onSeekWord: (Long) -> Unit,
     modifier: Modifier = Modifier,
     fontSizeScale: Float = 1.0f,
@@ -43,6 +43,12 @@ fun SpicyLyricsView(
     lyricsType: LyricsType = LyricsType.Syllable,
     romanize: Boolean = false,
     focusAnchorFraction: Float = 0.25f,
+    // Invoked with the raw frame-nanos at the top of this view's own animation frame, before
+    // currentTimeMs() is read. Lets a caller (e.g. the playback clock smoothing in
+    // SpicyLyricsPlayer) piggyback on this view's single withFrameNanos loop instead of running
+    // a second, independent one — halving the Choreographer callbacks registered per lyrics
+    // screen. Optional so other/future callers aren't forced to supply one.
+    onFrameTick: ((Long) -> Unit)? = null,
 ) {
     val textMeasurer = rememberTextMeasurer()
     var lineLayouts by remember { mutableStateOf<List<LineLayout>>(emptyList()) }
@@ -59,9 +65,13 @@ fun SpicyLyricsView(
     LaunchedEffect(lines) { animator.reset() }
     val isStatic = lyricsType == LyricsType.Static
 
-    val currentTimeMsUpdated by rememberUpdatedState(currentTimeMs)
+    // Keep the latest time provider without recomposing on every position tick: the frame loop
+    // invokes it off-composition (inside withFrameNanos), so the changing clock never re-runs this
+    // composable's body — only the Canvas redraws when the derived anim state actually changes.
+    val currentTimeProvider by rememberUpdatedState(currentTimeMs)
     val linesUpdated by rememberUpdatedState(displayLines)
     val lineLayoutsUpdated by rememberUpdatedState(lineLayouts)
+    val onFrameTickUpdated by rememberUpdatedState(onFrameTick)
 
     val scrollManager = remember { ScrollManager() }
 
@@ -89,11 +99,18 @@ fun SpicyLyricsView(
         
         // The high-frequency animation loop.
         LaunchedEffect(Unit) {
+            // Reused per-frame scratch for the dynamic Y offsets: filled every frame but only
+            // published to state when its contents actually change, so a paused/idle screen stops
+            // invalidating the Canvas (a fresh FloatArray each frame was forcing a redraw via array
+            // identity-equality even when nothing moved).
+            var dynamicYScratch = FloatArray(0)
             while (true) {
                 withFrameNanos { frameTimeNanos ->
+                    onFrameTickUpdated?.invoke(frameTimeNanos)
+
                     val currentLayouts = lineLayoutsUpdated
                     val currentLines = linesUpdated
-                    val currentTime = currentTimeMsUpdated
+                    val currentTime = currentTimeProvider()
 
                     // Unclamped like the reference: springs integrate analytically over any dt.
                     val deltaTime = if (lastFrameTimeNanos == 0L) {
@@ -109,24 +126,33 @@ fun SpicyLyricsView(
 
                         // 1.5 Calculate dynamic Y offsets based on interlude scales.
                         var accumulatedY = 0f
-                        val newDynamicYOffsets = FloatArray(currentLayouts.size)
-                        
+                        if (dynamicYScratch.size != currentLayouts.size) {
+                            dynamicYScratch = FloatArray(currentLayouts.size)
+                        }
+                        val newDynamicYOffsets = dynamicYScratch
+
                         for (i in currentLayouts.indices) {
                             val layout = currentLayouts[i]
                             val state = animStates.getOrNull(i)
-                            
+
                             if (layout.isInterlude) {
                                 val scale = state?.scale?.coerceIn(0f, 1f) ?: 0f
                                 val padding = 64f * scale
                                 val expansion = padding * 2f
-                                
+
                                 newDynamicYOffsets[i] = layout.yOffset + accumulatedY + padding
                                 accumulatedY += expansion
                             } else {
                                 newDynamicYOffsets[i] = layout.yOffset + accumulatedY
                             }
                         }
-                        dynamicYOffsets = newDynamicYOffsets
+                        // Publish only when the offsets actually changed (i.e. an interlude is
+                        // expanding/collapsing); otherwise the Canvas keeps the last array and
+                        // isn't invalidated. copyOf() so the published snapshot is immutable while
+                        // the scratch keeps mutating next frame.
+                        if (!newDynamicYOffsets.contentEquals(dynamicYOffsets)) {
+                            dynamicYOffsets = newDynamicYOffsets.copyOf()
+                        }
 
                         // 2. Identify all active lines and update the scroll target to center on
                         // them. Done with plain index loops to avoid allocating intermediate

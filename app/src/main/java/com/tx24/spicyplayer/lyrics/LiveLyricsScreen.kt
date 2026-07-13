@@ -63,10 +63,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.unit.dp
 import com.tx24.spicyplayer.lyrics.spicy.PlaybackClock
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableLongStateOf
 
@@ -380,38 +378,46 @@ private fun SpicyLyricsPlayer(
     val playbackClock = remember { PlaybackClock() }
     LaunchedEffect(lines, lyricsOffsetMs) {
         playbackClock.reset()
-        var lastOut = Long.MIN_VALUE
-        var lastPlaying = false
-        while (isActive) {
-            withFrameNanos { frameNanos ->
-                val measured = songProgressMillis()
-                val playing = isPlaying()
-                val smoothed = playbackClock.positionMs(
-                    measuredMs = measured,
-                    isPlaying = playing,
-                    nowMs = frameNanos / 1_000_000L,
+    }
+    // Diagnostic jump-detection state, reset alongside the clock so a song swap doesn't log a
+    // false jump against the previous song's last sample.
+    val clockJumpTracker = remember(lines, lyricsOffsetMs) { ClockJumpTracker() }
+
+    // Folded into SpicyLyricsView's own withFrameNanos loop via onFrameTick instead of running a
+    // second, independent frame loop here — halves the Choreographer callbacks registered while a
+    // lyrics screen is on-screen. Recreated on the same keys the old loop restarted on.
+    val onFrameTick = remember(lines, lyricsOffsetMs) {
+        { frameNanos: Long ->
+            val measured = songProgressMillis()
+            val playing = isPlaying()
+            val smoothed = playbackClock.positionMs(
+                measuredMs = measured,
+                isPlaying = playing,
+                nowMs = frameNanos / 1_000_000L,
+            )
+            // Diagnostic: any frame-to-frame jump beyond ~4 frames means the sweep teleports.
+            if (clockJumpTracker.lastOut != Long.MIN_VALUE && playing && clockJumpTracker.lastPlaying &&
+                kotlin.math.abs(smoothed - clockJumpTracker.lastOut) > 64L
+            ) {
+                timber.log.Timber.tag("SpicyClock").d(
+                    "JUMP out %d -> %d (Δ%d) measured=%d",
+                    clockJumpTracker.lastOut, smoothed, smoothed - clockJumpTracker.lastOut, measured,
                 )
-                // Diagnostic: any frame-to-frame jump beyond ~4 frames means the sweep teleports.
-                if (lastOut != Long.MIN_VALUE && playing && lastPlaying &&
-                    kotlin.math.abs(smoothed - lastOut) > 64L
-                ) {
-                    timber.log.Timber.tag("SpicyClock").d(
-                        "JUMP out %d -> %d (Δ%d) measured=%d", lastOut, smoothed, smoothed - lastOut, measured,
-                    )
-                }
-                lastOut = smoothed
-                lastPlaying = playing
-                currentTimeMs = smoothed + lyricsOffsetMs
             }
+            clockJumpTracker.lastOut = smoothed
+            clockJumpTracker.lastPlaying = playing
+            currentTimeMs = smoothed + lyricsOffsetMs
         }
     }
 
     Box(modifier.fillMaxSize()) {
         SpicyLyricsView(
             lines = romanizedLines,
-            currentTimeMs = currentTimeMs,
-            onSeekWord = {
-                onSeekToPositionMillis(it - lyricsOffsetMs - 100L)
+            // Pass the clock as a provider rather than a value: reading it here would recompose
+            // this composable every frame. The view invokes it inside its own frame loop instead.
+            currentTimeMs = { currentTimeMs },
+            onSeekWord = remember(lyricsOffsetMs, onSeekToPositionMillis) {
+                { seekTarget: Long -> onSeekToPositionMillis(seekTarget - lyricsOffsetMs - 100L) }
             },
             modifier = Modifier.fillMaxSize(),
             fontSizeScale = fontSizeScale,
@@ -419,6 +425,7 @@ private fun SpicyLyricsPlayer(
             lyricsType = lyricsType,
             romanize = romanize,
             focusAnchorFraction = focusAnchorFraction,
+            onFrameTick = onFrameTick,
         )
 
         // In-view romanization toggle: fades with the rest of the screen's controls
@@ -444,6 +451,12 @@ private fun SpicyLyricsPlayer(
             }
         }
     }
+}
+
+/** Jump-detection state for [SpicyLyricsPlayer]'s onFrameTick, held across frames via `remember`. */
+private class ClockJumpTracker {
+    var lastOut: Long = Long.MIN_VALUE
+    var lastPlaying: Boolean = false
 }
 
 

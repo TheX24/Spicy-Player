@@ -20,4 +20,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Spicy Player"
 include(":app")
+include(":baselineprofile")
 

@@ -7,6 +7,7 @@ plugins {
     id("com.tx24.android.application.compose")
     id("com.tx24.android.hilt")
     alias(libs.plugins.ksp)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 android {
@@ -26,7 +27,7 @@ android {
         applicationId = "com.tx24.spicyplayer"
 
         versionCode = 5
-        versionName = "v0.5.0-alpha-prerelease"
+        versionName = "v0.5.0-alpha"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -128,6 +129,11 @@ dependencies {
     implementation(libs.pinyin4j)
 
     api(libs.accompanist.permissions)
+
+    // Installs the AOT-compiled profile shipped in the APK (assets/dexopt/baseline.prof) so
+    // ART pre-compiles the hot classpath instead of interpreting it on first run.
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)
     // Real XmlPullParser implementation for JVM unit tests (Android ships kxml2 built in)

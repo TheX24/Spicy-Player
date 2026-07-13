@@ -4,6 +4,10 @@ accompanist = "0.34.0"
 agp = "8.9.2"
 androidDesugarJdkLibs = "2.0.3"
 androidx-test-ext-junit = "1.1.5"
+androidxBaselineProfile = "1.3.4"
+androidxBenchmarkMacro = "1.3.3"
+androidxUiautomator = "2.3.0"
+androidxProfileinstaller = "1.4.1"
 androidxComposeBom = "2024.09.03"
 androidxComposeCompiler = "1.5.5"
 androidxHiltNavigationCompose = "1.2.0"
@@ -62,6 +66,9 @@ androidx-lifecycle-viewModelCompose = { group = "androidx.lifecycle", name = "li
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "androidxNavigation" }
 androidx-palette = { module = "androidx.palette:palette", version.ref = "palette" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext-junit" }
+androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "androidxBenchmarkMacro" }
+androidx-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "androidxUiautomator" }
+androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "androidxProfileinstaller" }
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 coil = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose"}
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
@@ -104,8 +111,10 @@ org-jetbrains-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "org
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 com-android-library = { id = "com.android.library", version.ref = "agp" }
+com-android-test = { id = "com.android.test", version.ref = "agp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+androidx-baselineprofile = { id = "androidx.baselineprofile", version.ref = "androidxBaselineProfile" }
 
 [bundles]
 

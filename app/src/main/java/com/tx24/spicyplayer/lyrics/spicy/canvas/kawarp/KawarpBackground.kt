@@ -152,18 +152,21 @@ private const val KAWARP_TRANSITION_DURATION_MS = 1000f
 
 private fun floatsToF16Bitmap(pixels: FloatArray, size: Int): Bitmap {
     val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.RGBA_F16)
+    // Same Color.argb(float...) conversion as before, but built into one IntArray and written
+    // with a single setPixels() JNI call instead of size*size (16,384 at BLUR_SIZE) individual
+    // setPixel() calls — identical output, far less per-pixel call overhead.
+    val colors = IntArray(size * size)
     var i = 0
-    for (y in 0 until size) {
-        for (x in 0 until size) {
-            bmp.setPixel(x, y, Color.argb(
-                pixels[i + 3].coerceIn(0f, 1f),
-                pixels[i].coerceIn(0f, 1f),
-                pixels[i + 1].coerceIn(0f, 1f),
-                pixels[i + 2].coerceIn(0f, 1f),
-            ))
-            i += 4
-        }
+    for (p in colors.indices) {
+        colors[p] = Color.argb(
+            pixels[i + 3].coerceIn(0f, 1f),
+            pixels[i].coerceIn(0f, 1f),
+            pixels[i + 1].coerceIn(0f, 1f),
+            pixels[i + 2].coerceIn(0f, 1f),
+        )
+        i += 4
     }
+    bmp.setPixels(colors, 0, size, 0, 0, size, size)
     return bmp
 }
 
@@ -253,6 +256,16 @@ fun KawarpBackground(
         }
     }
 
+    // The album BitmapShaders and the ShaderBrush wrap objects that only change on a cover swap;
+    // recreating them every frame (as the draw block used to) was pure per-frame allocation.
+    val texCur = remember(currentAlbum) {
+        BitmapShader(currentAlbum, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    }
+    val texNext = remember(nextAlbum) {
+        BitmapShader(nextAlbum, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    }
+    val shaderBrush = remember(shader) { ShaderBrush(shader) }
+
     Canvas(modifier = modifier.fillMaxSize()) {
         @Suppress("UNUSED_EXPRESSION") frameTick
         val blend = engine.blendFactor(System.currentTimeMillis())
@@ -263,10 +276,8 @@ fun KawarpBackground(
         shader.setFloatUniform("uSaturation", SPICY_OPTIONS.saturation)
         shader.setFloatUniform("uDithering", SPICY_OPTIONS.dithering)
         shader.setFloatUniform("uScale", SPICY_OPTIONS.scale)
-        shader.setInputShader("texCur",
-            BitmapShader(currentAlbum, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
-        shader.setInputShader("texNext",
-            BitmapShader(nextAlbum, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
-        drawRect(brush = ShaderBrush(shader))
+        shader.setInputShader("texCur", texCur)
+        shader.setInputShader("texNext", texNext)
+        drawRect(brush = shaderBrush)
     }
 }
