@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun getReadingMediaPermissionName() =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             Manifest.permission.READ_MEDIA_AUDIO
         else Manifest.permission.READ_EXTERNAL_STORAGE
 
