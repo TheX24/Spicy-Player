@@ -3,9 +3,6 @@ package com.tx24.spicyplayer.settings
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tx24.spicyplayer.BuildConfig
-import com.tx24.spicyplayer.settings.components.GitHubUpdateChecker
-import com.tx24.spicyplayer.settings.components.UpdateStatus
 import com.tx24.spicyplayer.library.store.FolderInfo
 import com.tx24.spicyplayer.library.store.MediaRepository
 import com.tx24.spicyplayer.library.store.preferences.UserPreferencesRepository
@@ -53,31 +50,6 @@ class SettingsViewModel @Inject constructor(
     override val cacheAlbumArt =
         userPreferencesRepository.librarySettingsFlow.map { it.cacheAlbumCoverArt }
             .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
-    override val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
-
-    override fun checkForUpdates(isManual: Boolean) {
-        viewModelScope.launch {
-            _updateStatus.value = UpdateStatus.Checking
-            val release = GitHubUpdateChecker.getLatestRelease()
-            if (release != null) {
-                val currentVersion = BuildConfig.VERSION_NAME
-                val latestTag = release.tagName.lowercase().removePrefix("v")
-                if (currentVersion.lowercase().removePrefix("v") != latestTag) {
-                    _updateStatus.value = UpdateStatus.NewVersion(release)
-                } else {
-                    _updateStatus.value = UpdateStatus.UpToDate(isManual)
-                }
-            } else {
-                _updateStatus.value = UpdateStatus.Error(isManual, "Failed to check for updates")
-            }
-        }
-    }
-
-    override fun clearUpdateStatus() {
-        _updateStatus.value = UpdateStatus.Idle
-    }
 
     override fun onFolderDeleted(folder: String) {
         viewModelScope.launch {
@@ -255,11 +227,6 @@ interface ISettingsViewModel {
     val state: StateFlow<SettingsState>
     val cacheAlbumArt: StateFlow<Boolean>
     val discoveredFolders: StateFlow<List<FolderInfo>>
-    val updateStatus: StateFlow<UpdateStatus>
-
-    fun checkForUpdates(isManual: Boolean)
-    fun clearUpdateStatus()
-
     fun onFolderDeleted(folder: String)
 
     fun onToggleCacheAlbumArt()

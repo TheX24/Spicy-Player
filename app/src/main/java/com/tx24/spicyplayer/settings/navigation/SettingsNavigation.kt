@@ -18,6 +18,7 @@ import androidx.navigation.NavHostController
 import com.tx24.spicyplayer.settings.SettingsScreen
 import com.tx24.spicyplayer.settings.ResetSettingsScreen
 import com.tx24.spicyplayer.settings.SettingsViewModel
+import com.tx24.spicyplayer.settings.IUpdateViewModel
 import com.tx24.spicyplayer.ui.model.UserPreferencesUi
 
 
@@ -30,6 +31,7 @@ fun NavGraphBuilder.settingsGraph(
     contentModifier: MutableState<Modifier>,
     navController: NavHostController,
     onBackPressed: () -> Unit,
+    updateCallbacks: IUpdateViewModel,
     enterAnimationFactory:
         (String, AnimatedContentTransitionScope<NavBackStackEntry>) -> EnterTransition,
     exitAnimationFactory:
@@ -61,13 +63,12 @@ fun NavGraphBuilder.settingsGraph(
         ) {
             val viewModel: SettingsViewModel = hiltViewModel()
             val state by viewModel.state.collectAsState()
-            val updateStatus by viewModel.updateStatus.collectAsState()
 
             SettingsScreen(
                 modifier = contentModifier.value,
                 state = state,
-                updateStatus = updateStatus,
                 settingsCallbacks = viewModel,
+                updateCallbacks = updateCallbacks,
                 onBackPressed = onBackPressed,
                 onNavigateToReset = { navController.navigate(RESET_SETTINGS_ROUTE) }
             )
