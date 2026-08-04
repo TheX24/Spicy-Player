@@ -17,6 +17,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,8 @@ import com.tx24.spicyplayer.navigation.navigateToTopLevelDestination
 import com.tx24.spicyplayer.playback.PlaybackService
 import com.tx24.spicyplayer.uiLibrary.playlists.navigation.playlistsGraph
 import com.tx24.spicyplayer.settings.navigation.settingsGraph
+import com.tx24.spicyplayer.settings.UpdateViewModel
+import com.tx24.spicyplayer.settings.components.UpdateDialog
 import com.tx24.spicyplayer.uiLibrary.songs.navigation.SONGS_NAVIGATION_GRAPH
 import com.tx24.spicyplayer.uiLibrary.songs.navigation.songsGraph
 import com.tx24.spicyplayer.state.rememberSpicyAppState
@@ -65,6 +68,14 @@ fun SpicyApp2(
     modifier: Modifier,
     navController: NavHostController
 ) {
+
+    val updateViewModel: UpdateViewModel = hiltViewModel()
+    val updateStatus by updateViewModel.updateStatus.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(updateViewModel) {
+        updateViewModel.checkForUpdatesOnStartup()
+    }
 
 
     val widthClass = calculateWindowSizeClass(activity = LocalContext.current as Activity)
@@ -135,6 +146,7 @@ fun SpicyApp2(
                     contentModifier = contentModifier,
                     navController = navController,
                     onBackPressed = { navController.popBackStack() },
+                    updateCallbacks = updateViewModel,
                     enterAnimationFactory = ::getEnterAnimationForRoute,
                     exitAnimationFactory = ::getExitAnimationForRoute,
                     popEnterAnimationFactory = ::getPopEnterAnimationForRoute,
@@ -176,6 +188,12 @@ fun SpicyApp2(
             navHost(navHostModifier, contentModifier)
         }
     }
+
+    UpdateDialog(
+        status = updateStatus,
+        onClearStatus = updateViewModel::clearUpdateStatus,
+        context = context
+    )
 
     ViewNowPlayingScreenListenerEffect(
         navController = navController,

@@ -1,5 +1,7 @@
 package com.tx24.spicyplayer.settings.components
 
+import android.content.Context
+import androidx.core.content.pm.PackageInfoCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -12,6 +14,19 @@ data class GitHubRelease(
     val htmlUrl: String,
     val body: String
 )
+
+data class AppVersion(
+    val name: String,
+    val code: Long
+)
+
+fun getInstalledAppVersion(context: Context): AppVersion {
+    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+    return AppVersion(
+        name = packageInfo.versionName.orEmpty(),
+        code = PackageInfoCompat.getLongVersionCode(packageInfo)
+    )
+}
 
 sealed class UpdateStatus {
     object Idle : UpdateStatus()

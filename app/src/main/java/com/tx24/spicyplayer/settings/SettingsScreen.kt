@@ -68,7 +68,8 @@ import com.tx24.spicyplayer.ui.common.toInt
 import com.tx24.spicyplayer.ui.model.AppThemeUi
 import com.tx24.spicyplayer.ui.model.PlayerThemeUi
 import com.tx24.spicyplayer.ui.model.UserPreferencesUi
-import com.tx24.spicyplayer.BuildConfig
+import com.tx24.spicyplayer.settings.components.AppVersion
+import com.tx24.spicyplayer.settings.components.getInstalledAppVersion
 
 
 @Composable
@@ -76,18 +77,18 @@ fun SettingsRoute(
     modifier: Modifier = Modifier,
     onBackPressed: () -> Unit,
     onNavigateToReset: () -> Unit,
-    settingsViewModel: SettingsViewModel = hiltViewModel()
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
+    updateViewModel: UpdateViewModel = hiltViewModel()
 ) {
     val state by settingsViewModel.state.collectAsState()
-    val updateStatus by settingsViewModel.updateStatus.collectAsState()
 
     SettingsScreen(
         modifier = modifier,
         state = state,
-        updateStatus = updateStatus,
         onBackPressed = onBackPressed,
         onNavigateToReset = onNavigateToReset,
-        settingsCallbacks = settingsViewModel
+        settingsCallbacks = settingsViewModel,
+        updateCallbacks = updateViewModel
     )
 }
 
@@ -96,12 +97,14 @@ fun SettingsRoute(
 fun SettingsScreen(
     modifier: Modifier,
     state: SettingsState,
-    updateStatus: com.tx24.spicyplayer.settings.components.UpdateStatus,
     onBackPressed: () -> Unit,
     onNavigateToReset: () -> Unit,
-    settingsCallbacks: ISettingsViewModel
+    settingsCallbacks: ISettingsViewModel,
+    updateCallbacks: IUpdateViewModel
 ) {
 
+    val context = LocalContext.current
+    val appVersion = remember(context) { getInstalledAppVersion(context) }
     val topBarScrollBehaviour = TopAppBarDefaults.pinnedScrollBehavior()
     Scaffold(
         modifier = modifier,
@@ -114,12 +117,6 @@ fun SettingsScreen(
                 .padding(top = paddingValues.calculateTopPadding()),
             contentAlignment = Alignment.Center
         ) {
-
-            com.tx24.spicyplayer.settings.components.UpdateDialog(
-                status = updateStatus,
-                onClearStatus = { settingsCallbacks.clearUpdateStatus() },
-                context = LocalContext.current
-            )
 
             var showLicensesDialog by remember { mutableStateOf(false) }
 
@@ -191,7 +188,7 @@ fun SettingsScreen(
                             )
                             Spacer(Modifier.height(16.dp))
                             Text("Developed by TX24", style = MaterialTheme.typography.labelLarge)
-                            val versionText = remember { "Version ${BuildConfig.VERSION_NAME}" }
+                            val versionText = "Version ${appVersion.name}"
                             Text(versionText, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     },
@@ -214,6 +211,8 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxSize(),
                     userPreferences = state.userPreferences,
                     settingsCallbacks = settingsCallbacks,
+                    updateCallbacks = updateCallbacks,
+                    appVersion = appVersion,
                     onNavigateToReset = onNavigateToReset,
                     nestedScrollConnection = topBarScrollBehaviour.nestedScrollConnection,
                     showLicenses = { showLicensesDialog = true },
@@ -232,6 +231,8 @@ fun SettingsList(
     modifier: Modifier,
     userPreferences: UserPreferencesUi,
     settingsCallbacks: ISettingsViewModel,
+    updateCallbacks: IUpdateViewModel,
+    appVersion: AppVersion,
     onNavigateToReset: () -> Unit,
     nestedScrollConnection: NestedScrollConnection,
     showLicenses: () -> Unit,
@@ -533,8 +534,8 @@ fun SettingsList(
                 NavigationSettingItem(
                     icon = Icons.Rounded.Update,
                     title = "Check for Updates",
-                    subtitle = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                    onClick = { settingsCallbacks.checkForUpdates(true) }
+                    subtitle = "Version ${appVersion.name} (${appVersion.code})",
+                    onClick = { updateCallbacks.checkForUpdates(true) }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 NavigationSettingItem(
