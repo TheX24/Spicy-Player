@@ -10,8 +10,8 @@ data class SongLyricsNetwork(
     val lyricsId: Int,
 
     @SerializedName("plainLyrics")
-    val plainLyrics: String,
+    val plainLyrics: String?,
 
     @SerializedName("syncedLyrics")
-    val syncedLyrics: String
+    val syncedLyrics: String?
 )

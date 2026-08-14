@@ -189,19 +189,11 @@ class LyricsRepository @Inject constructor(
             val lyricsEntity = lyricsDao.getSongLyrics(title, album, artist)
 
             Timber.d("DB result: %s", lyricsEntity)
-            if (lyricsEntity != null && lyricsEntity.syncedLyrics.isNotBlank()) {
-                val synced = SynchronizedLyrics.fromString(lyricsEntity.syncedLyrics)
-                if (synced != null) {
-                    return@withContext LyricsResult.FoundSyncedLyrics(
-                        synced,
-                        LyricsFetchSource.FROM_INTERNET
-                    )
-                } else if (lyricsEntity.plainLyrics.isNotBlank()) {
-                    return@withContext LyricsResult.FoundPlainLyrics(
-                        PlainLyrics.fromString(lyricsEntity.plainLyrics),
-                        LyricsFetchSource.FROM_INTERNET
-                    )
-                }
+            if (lyricsEntity != null) {
+                lyricsResultFromStrings(
+                    lyricsEntity.plainLyrics,
+                    lyricsEntity.syncedLyrics
+                )?.let { return@withContext it }
             }
         }
 
@@ -211,28 +203,28 @@ class LyricsRepository @Inject constructor(
             val lyricsNetwork =
                 lyricsDataSource.getSongLyrics(artist, title, album, durationSeconds)
             Timber.d("Downloaded: %s", lyricsNetwork)
-            val syncedLyrics = SynchronizedLyrics.fromString(lyricsNetwork.syncedLyrics)
-            lyricsDao.saveSongLyrics(
-                LyricsEntity(
-                    0,
-                    title,
-                    album,
-                    artist,
-                    lyricsNetwork.plainLyrics,
-                    lyricsNetwork.syncedLyrics
-                )
+            // lrclib returns null for either field depending on what's available
+            // (e.g. instrumental tracks, or entries with only one lyrics type)
+            val result = lyricsResultFromStrings(
+                lyricsNetwork.plainLyrics,
+                lyricsNetwork.syncedLyrics
             )
-            if (syncedLyrics != null)
-                LyricsResult.FoundSyncedLyrics(
-                    syncedLyrics,
-                    LyricsFetchSource.FROM_INTERNET
+            if (result != null) {
+                lyricsDao.saveSongLyrics(
+                    LyricsEntity(
+                        0,
+                        title,
+                        album,
+                        artist,
+                        lyricsNetwork.plainLyrics.orEmpty(),
+                        lyricsNetwork.syncedLyrics.orEmpty()
+                    )
                 )
-            else LyricsResult.FoundPlainLyrics(
-                PlainLyrics.fromString(
-                    lyricsNetwork.plainLyrics,
-                ),
-                LyricsFetchSource.FROM_INTERNET
-            )
+                result
+            } else {
+                // Instrumental track or no lyrics content returned
+                LyricsResult.NotFound
+            }
         } catch (e: NotFoundException) {
             Timber.d("Downloaded: Not found")
             LyricsResult.NotFound
@@ -244,4 +236,24 @@ class LyricsRepository @Inject constructor(
 
 
 
+}
+
+internal fun lyricsResultFromStrings(
+    plainLyrics: String?,
+    syncedLyrics: String?
+): LyricsResult? {
+    val parsedSyncedLyrics = SynchronizedLyrics.fromString(syncedLyrics)
+    return if (parsedSyncedLyrics != null) {
+        LyricsResult.FoundSyncedLyrics(
+            parsedSyncedLyrics,
+            LyricsFetchSource.FROM_INTERNET
+        )
+    } else if (!plainLyrics.isNullOrBlank()) {
+        LyricsResult.FoundPlainLyrics(
+            PlainLyrics.fromString(plainLyrics),
+            LyricsFetchSource.FROM_INTERNET
+        )
+    } else {
+        null
+    }
 }

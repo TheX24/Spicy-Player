@@ -1,6 +1,7 @@
 package com.tx24.spicyplayer.network.di
 
 import android.content.Context
+import com.tx24.spicyplayer.BuildConfig
 import com.tx24.spicyplayer.network.service.LyricsService
 import dagger.Module
 import dagger.Provides
@@ -36,6 +37,15 @@ object RetrofitModule {
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
             .callTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header(
+                        "User-Agent",
+                        "SpicyPlayer/${BuildConfig.VERSION_NAME} (Android; https://github.com/TheX24/Spicy-Player)"
+                    )
+                    .build()
+                chain.proceed(request)
+            }
             .build()
 
     @LyricsRetrofitService
