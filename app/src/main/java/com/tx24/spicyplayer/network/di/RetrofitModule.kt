@@ -36,6 +36,12 @@ object RetrofitModule {
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
             .callTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("User-Agent", "SpicyPlayer/0.5.1 (Android; https://github.com/TheX24/Spicy-Player)")
+                    .build()
+                chain.proceed(request)
+            }
             .build()
 
     @LyricsRetrofitService

@@ -211,6 +211,8 @@ class LyricsRepository @Inject constructor(
             val lyricsNetwork =
                 lyricsDataSource.getSongLyrics(artist, title, album, durationSeconds)
             Timber.d("Downloaded: %s", lyricsNetwork)
+            // lrclib returns null for either field depending on what's available
+            // (e.g. instrumental tracks, or entries with only one lyrics type)
             val syncedLyrics = SynchronizedLyrics.fromString(lyricsNetwork.syncedLyrics)
             lyricsDao.saveSongLyrics(
                 LyricsEntity(
@@ -218,21 +220,24 @@ class LyricsRepository @Inject constructor(
                     title,
                     album,
                     artist,
-                    lyricsNetwork.plainLyrics,
-                    lyricsNetwork.syncedLyrics
+                    lyricsNetwork.plainLyrics.orEmpty(),
+                    lyricsNetwork.syncedLyrics.orEmpty()
                 )
             )
-            if (syncedLyrics != null)
+            if (syncedLyrics != null) {
                 LyricsResult.FoundSyncedLyrics(
                     syncedLyrics,
                     LyricsFetchSource.FROM_INTERNET
                 )
-            else LyricsResult.FoundPlainLyrics(
-                PlainLyrics.fromString(
-                    lyricsNetwork.plainLyrics,
-                ),
-                LyricsFetchSource.FROM_INTERNET
-            )
+            } else if (!lyricsNetwork.plainLyrics.isNullOrBlank()) {
+                LyricsResult.FoundPlainLyrics(
+                    PlainLyrics.fromString(lyricsNetwork.plainLyrics),
+                    LyricsFetchSource.FROM_INTERNET
+                )
+            } else {
+                // Instrumental track or no lyrics content returned
+                LyricsResult.NotFound
+            }
         } catch (e: NotFoundException) {
             Timber.d("Downloaded: Not found")
             LyricsResult.NotFound
