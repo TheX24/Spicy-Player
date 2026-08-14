@@ -189,7 +189,7 @@ class LyricsRepository @Inject constructor(
             val lyricsEntity = lyricsDao.getSongLyrics(title, album, artist)
 
             Timber.d("DB result: %s", lyricsEntity)
-            if (lyricsEntity != null && lyricsEntity.syncedLyrics.isNotBlank()) {
+            if (lyricsEntity != null) {
                 val synced = SynchronizedLyrics.fromString(lyricsEntity.syncedLyrics)
                 if (synced != null) {
                     return@withContext LyricsResult.FoundSyncedLyrics(
