@@ -60,6 +60,7 @@ import com.tx24.spicyplayer.lyrics.spicy.models.Line
 import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
 import com.tx24.spicyplayer.lyrics.spicy.models.ParsedLyrics
 import com.tx24.spicyplayer.lyrics.spicy.models.LyricsDocument
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsFooter
 import com.tx24.spicyplayer.lyrics.spicy.models.buildDisplayTimeline
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.padding
@@ -338,7 +339,7 @@ fun LyricsDocumentState(
 ) {
     SpicyLyricsPlayer(
         modifier, document.lines, document.type, onSeekToPositionMillis, songProgressMillis, isPlaying,
-        playbackSpeed, songDurationMillis, document.documentId, focusAnchorFraction, controlsVisible,
+        playbackSpeed, songDurationMillis, document.documentId, document.footer, focusAnchorFraction, controlsVisible,
     )
 }
 
@@ -358,6 +359,7 @@ private fun SpicyLyricsPlayer(
     playbackSpeed: () -> Float = { 1f },
     songDurationMillis: () -> Long = { 0L },
     documentId: String = "",
+    footer: LyricsFooter = LyricsFooter(),
     focusAnchorFraction: Float = 0.25f,
     controlsVisible: Boolean = true,
 ) {
@@ -370,11 +372,17 @@ private fun SpicyLyricsPlayer(
         "LARGE" -> 1.15f
         else -> 1.0f
     }
-    val renderConfig = remember(uiSettings.lyricsQualityMode) {
-        RenderConfig.forModeName(uiSettings.lyricsQualityMode)
+    val renderConfig = remember(
+        uiSettings.simpleLyricsMode, uiSettings.minimalLyricsMode, uiSettings.simpleAnimationStyle,
+    ) {
+        RenderConfig.create(
+            simpleLyricsMode = uiSettings.simpleLyricsMode,
+            minimalLyricsMode = uiSettings.minimalLyricsMode,
+            simpleAnimationStyle = uiSettings.simpleAnimationStyle,
+        )
     }
-    val timelineLines = remember(lines, renderConfig.mode) {
-        buildDisplayTimeline(lines, minimalMode = renderConfig.mode.name == "MINIMAL")
+    val timelineLines = remember(lines, renderConfig.isMinimal) {
+        buildDisplayTimeline(lines, minimalMode = renderConfig.isMinimal)
     }
 
     // Populate romanization off the main thread; TTML-supplied romanization is preserved.
@@ -433,6 +441,7 @@ private fun SpicyLyricsPlayer(
         SpicyLyricsView(
             lines = romanizedLines,
             documentId = documentId,
+            footer = footer,
             // Pass the clock as a provider rather than a value: reading it here would recompose
             // this composable every frame. The view invokes it inside its own frame loop instead.
             currentTimeMs = { currentTimeMs },

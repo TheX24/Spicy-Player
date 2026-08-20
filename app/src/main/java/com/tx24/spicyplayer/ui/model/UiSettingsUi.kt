@@ -6,6 +6,7 @@ import com.tx24.spicyplayer.model.prefs.AppTheme
 import com.tx24.spicyplayer.model.prefs.DEFAULT_ACCENT_COLOR
 import com.tx24.spicyplayer.model.prefs.PlayerTheme
 import com.tx24.spicyplayer.model.prefs.UiSettings
+import com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle
 
 
 @Stable
@@ -20,7 +21,9 @@ data class UiSettingsUi(
     val lyricsFontSize: String = "MEDIUM",
     val backgroundBlur: Int = 60,
     val keepScreenOn: Boolean = false,
-    val lyricsQualityMode: String = "FULL",
+    val simpleLyricsMode: Boolean = false,
+    val minimalLyricsMode: Boolean = false,
+    val simpleAnimationStyle: SimpleAnimationStyle = SimpleAnimationStyle.CALCULATE,
     val lyricsBackgroundEngine: String = "AUTO",
     val lyricsRomanize: Boolean = false,
 )
@@ -61,7 +64,9 @@ fun UiSettings.toUiSettingsUi() =
         lyricsFontSize,
         backgroundBlur,
         keepScreenOn,
-        lyricsQualityMode,
+        simpleLyricsMode,
+        minimalLyricsMode,
+        simpleAnimationStyle,
         lyricsBackgroundEngine,
         lyricsRomanize
     )

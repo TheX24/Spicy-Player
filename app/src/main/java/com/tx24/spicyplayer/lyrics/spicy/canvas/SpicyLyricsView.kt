@@ -12,6 +12,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
 import com.tx24.spicyplayer.lyrics.fadingEdge
 import com.tx24.spicyplayer.lyrics.spicy.RenderConfig
@@ -19,6 +24,7 @@ import com.tx24.spicyplayer.lyrics.spicy.animation.LineAnimState
 import com.tx24.spicyplayer.lyrics.spicy.animation.LyricsAnimator
 import com.tx24.spicyplayer.lyrics.spicy.models.Line
 import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsFooter
 import com.tx24.spicyplayer.lyrics.spicy.parser.LetterSynthesizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -37,6 +43,7 @@ import kotlinx.coroutines.withContext
 fun SpicyLyricsView(
     lines: List<Line>,
     documentId: String,
+    footer: LyricsFooter = LyricsFooter(),
     currentTimeMs: () -> Long,
     onSeekWord: (Long) -> Unit,
     modifier: Modifier = Modifier,
@@ -85,6 +92,26 @@ fun SpicyLyricsView(
         val canvasHeight = constraints.maxHeight.toFloat()
         // Reference anchor: viewport center minus 30 logical dp.
         val centerY = ScrollPolicyController.anchorY(canvasHeight, density.density)
+        val footerMetrics = remember(canvasWidth, density.density, fontSizeScale, lyricsType) {
+            LyricsLayoutMetrics(canvasWidth, density.density, lyricsType, fontSizeScale)
+        }
+        val footerLayouts = remember(footer, footerMetrics.baseFontSizeSp) {
+            buildList {
+                if (footer.songwriters.isNotEmpty()) {
+                    add(textMeasurer.measure(
+                        AnnotatedString("Written by: ${footer.songwriters.joinToString(", ")}"),
+                        TextStyle(fontSize = (footerMetrics.baseFontSizeSp * 0.47f).sp, fontWeight = FontWeight.Medium),
+                    ) to 0.6f)
+                }
+                footer.provenance?.let { provenance ->
+                    val contributor = provenance.contributor?.takeIf { it.isNotBlank() }?.let { " • $it" }.orEmpty()
+                    add(textMeasurer.measure(
+                        AnnotatedString("Lyrics: ${provenance.provider}$contributor"),
+                        TextStyle(fontSize = (footerMetrics.baseFontSizeSp * 0.38f).sp, fontWeight = FontWeight.Normal),
+                    ) to 0.45f)
+                }
+            }
+        }
         // Recalculate layouts whenever the lyrics, dimensions, or font size change.
         LaunchedEffect(displayLines, canvasWidth, fontSizeScale, romanize, documentId) {
             val generation = layoutGeneration.next()
@@ -264,6 +291,21 @@ fun SpicyLyricsView(
                     lyricsType == LyricsType.Static -> drawStaticLine(layout, lineAnim, lineStartX, scrollOffset, dynamicY)
                     lyricsType == LyricsType.Line -> drawLineModeLine(layout, lineAnim, lineStartX, scrollOffset, dynamicY, config)
                     else -> drawStandardLine(layout, lineAnim, lineStartX, scrollOffset, dynamicY, config)
+                }
+            }
+
+            if (footerLayouts.isNotEmpty()) {
+                var footerY = (lineLayouts.lastOrNull()?.let { layout ->
+                    dynamicYOffsets.getOrElse(lineLayouts.lastIndex) { layout.yOffset } + layout.height
+                } ?: 0f) + footerMetrics.lineGapPx * 3f + scrollOffset
+                footerLayouts.forEach { (textLayout, alpha) ->
+                    drawText(
+                        textLayoutResult = textLayout,
+                        color = Color.White,
+                        alpha = alpha,
+                        topLeft = androidx.compose.ui.geometry.Offset(footerMetrics.viewportWidthPx * 0.05f, footerY),
+                    )
+                    footerY += textLayout.size.height + footerMetrics.lineGapPx
                 }
             }
         }

@@ -147,8 +147,16 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { userPreferencesRepository.setBackgroundBlur(blur) }
     }
 
-    override fun setLyricsQualityMode(mode: String) {
-        viewModelScope.launch { userPreferencesRepository.setLyricsQualityMode(mode) }
+    override fun setSimpleLyricsMode(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesRepository.setSimpleLyricsMode(enabled) }
+    }
+
+    override fun setMinimalLyricsMode(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesRepository.setMinimalLyricsMode(enabled) }
+    }
+
+    override fun setSimpleAnimationStyle(style: com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle) {
+        viewModelScope.launch { userPreferencesRepository.setSimpleAnimationStyle(style) }
     }
 
     override fun setLyricsBackgroundEngine(engine: String) {
@@ -170,7 +178,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferencesRepository.setLyricsOffsetMs(0)
             userPreferencesRepository.setLyricsFontSize("MEDIUM")
-            userPreferencesRepository.setLyricsQualityMode("FULL")
+            userPreferencesRepository.setSimpleLyricsMode(false)
+            userPreferencesRepository.setMinimalLyricsMode(false)
+            userPreferencesRepository.setSimpleAnimationStyle(com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle.CALCULATE)
             userPreferencesRepository.setLyricsBackgroundEngine("AUTO")
             userPreferencesRepository.setLyricsRomanize(false)
         }
@@ -260,7 +270,9 @@ interface ISettingsViewModel {
     fun setLyricsOffsetMs(offset: Int)
     fun setLyricsFontSize(size: String)
     fun setBackgroundBlur(blur: Int)
-    fun setLyricsQualityMode(mode: String)
+    fun setSimpleLyricsMode(enabled: Boolean)
+    fun setMinimalLyricsMode(enabled: Boolean)
+    fun setSimpleAnimationStyle(style: com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle)
     fun setLyricsBackgroundEngine(engine: String)
     fun setLyricsRomanize(enabled: Boolean)
     fun resetAll()

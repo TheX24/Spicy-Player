@@ -61,4 +61,14 @@ class RomanizerTest {
     fun `latin text is left unchanged`() {
         assertTrue(ScriptDetector.detect("hello world").isEmpty())
     }
+
+    @Test
+    fun `service composes every detected romanizer in priority order`() = runBlocking {
+        val line = Line(
+            words = listOf(Word("Привет κόσμος", 0L, 1_000L)),
+            startMs = 0L,
+        )
+        val out = RomanizationService.romanize(listOf(line)).single().words.single().romanizedText
+        assertTrue(out != null && out.none { it in '\u0370'..'\u052F' })
+    }
 }

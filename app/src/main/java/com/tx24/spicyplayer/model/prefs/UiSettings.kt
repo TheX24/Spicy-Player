@@ -1,5 +1,7 @@
 package com.tx24.spicyplayer.model.prefs
 
+import com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle
+
 /**
  * Settings related to Ui of the Application
  */
@@ -45,8 +47,9 @@ data class UiSettings(
     val backgroundBlur: Int = 60,
     val keepScreenOn: Boolean = false,
 
-    /** Rendering-quality track for the lyrics engine: "FULL", "SIMPLE", or "MINIMAL". */
-    val lyricsQualityMode: String = "FULL",
+    val simpleLyricsMode: Boolean = false,
+    val minimalLyricsMode: Boolean = false,
+    val simpleAnimationStyle: SimpleAnimationStyle = SimpleAnimationStyle.CALCULATE,
     /** Dynamic background engine: "AUTO", "KAWARP", or "LEGACY". */
     val lyricsBackgroundEngine: String = "AUTO",
     /** Whether romanization is shown by default when available. */
