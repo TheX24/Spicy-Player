@@ -6,11 +6,18 @@ package com.tx24.spicyplayer.lyrics.spicy.parser
  * suppress per-letter splitting (RTL scripts are never letter-emphasised).
  */
 object RtlDetector {
-    // Hebrew, Arabic, Arabic Supplement/Extended, Syriac, Thaana, and related presentation forms.
-    private val RTL_REGEX = Regex(
-        "[\\u0591-\\u07FF\\uFB1D-\\uFDFD\\uFE70-\\uFEFC]"
-    )
-
-    /** True if [text] contains any strong RTL character. */
-    fun isRtl(text: String): Boolean = RTL_REGEX.containsMatchIn(text)
+    /** Unicode first-strong direction, defaulting neutral-only text to LTR. */
+    fun isRtl(text: String): Boolean {
+        var index = 0
+        while (index < text.length) {
+            val codePoint = text.codePointAt(index)
+            when (Character.getDirectionality(codePoint)) {
+                Character.DIRECTIONALITY_LEFT_TO_RIGHT -> return false
+                Character.DIRECTIONALITY_RIGHT_TO_LEFT,
+                Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC -> return true
+            }
+            index += Character.charCount(codePoint)
+        }
+        return false
+    }
 }

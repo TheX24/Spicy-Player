@@ -47,4 +47,7 @@ internal data class LineLayout(
      * once in [LyricsLayoutCalculator] rather than re-derived at draw/scroll time.
      */
     val isRightAligned: Boolean = false,
+    /** Logical content slot after the reference's 5cqw/15cqw side padding. */
+    val contentStartX: Float = 0f,
+    val contentWidth: Float = 0f,
 )

@@ -85,14 +85,13 @@ fun SpicyLyricsView(
         val canvasHeight = constraints.maxHeight.toFloat()
         // Reference anchor: viewport center minus 30 logical dp.
         val centerY = ScrollPolicyController.anchorY(canvasHeight, density.density)
-        val horizontalPadding = 40f
-        val hasDuet = remember(displayLines) { displayLines.any { it.oppositeAligned } }
-
         // Recalculate layouts whenever the lyrics, dimensions, or font size change.
         LaunchedEffect(displayLines, canvasWidth, fontSizeScale, romanize, documentId) {
             val generation = layoutGeneration.next()
             val measured = withContext(Dispatchers.Default) {
-                LyricsLayoutCalculator.calculateLineLayouts(displayLines, canvasWidth, textMeasurer, fontSizeScale, romanize)
+                LyricsLayoutCalculator.calculateLineLayouts(
+                    displayLines, canvasWidth, textMeasurer, density.density, lyricsType, fontSizeScale, romanize,
+                )
             }
             if (layoutGeneration.isCurrent(generation)) {
                 lineLayouts = measured
@@ -255,7 +254,7 @@ fun SpicyLyricsView(
                     return@forEachIndexed
                 }
 
-                val lineStartX = getLineStartX(layout, size.width, horizontalPadding, hasDuet)
+                val lineStartX = getLineStartX(layout)
 
                 when {
                     layout.isInterlude -> drawInterludeGroup(layout, lineAnim, lineStartX, scrollOffset, dynamicY)
@@ -273,16 +272,10 @@ fun SpicyLyricsView(
  */
 private fun getLineStartX(
     layout: LineLayout,
-    canvasWidth: Float,
-    horizontalPadding: Float,
-    hasDuet: Boolean,
 ): Float {
-    if (layout.isSongwriter) {
-        return horizontalPadding
-    }
     return if (layout.isRightAligned) {
-        canvasWidth - horizontalPadding - layout.totalWidth
+        layout.contentStartX + layout.contentWidth - layout.totalWidth
     } else {
-        horizontalPadding
+        layout.contentStartX
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.withStyle
 import com.tx24.spicyplayer.lyrics.spicy.models.Line
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
 import com.tx24.spicyplayer.lyrics.spicy.models.Word
 import com.tx24.spicyplayer.lyrics.spicy.parser.RtlDetector
 
@@ -25,6 +26,24 @@ internal object LyricsLayoutCalculator {
         Font(R.font.lyrics_semibold, FontWeight.SemiBold),
         Font(R.font.lyrics_bold, FontWeight.Bold)
     )
+    private val vazirmatnFontFamily = FontFamily(
+        Font(R.font.vazirmatn_variable, FontWeight.Normal),
+        Font(R.font.vazirmatn_variable, FontWeight.Medium),
+        Font(R.font.vazirmatn_variable, FontWeight.SemiBold),
+        Font(R.font.vazirmatn_variable, FontWeight.Bold),
+    )
+    private val georgianFontFamily = FontFamily(
+        Font(R.font.noto_sans_georgian_variable, FontWeight.Normal),
+        Font(R.font.noto_sans_georgian_variable, FontWeight.Medium),
+        Font(R.font.noto_sans_georgian_variable, FontWeight.SemiBold),
+        Font(R.font.noto_sans_georgian_variable, FontWeight.Bold),
+    )
+
+    private fun fontFamilyFor(text: String): FontFamily = when (ScriptFontSelector.select(text)) {
+        LyricScriptFont.DEFAULT -> spicyFontFamily
+        LyricScriptFont.VAZIRMATN -> vazirmatnFontFamily
+        LyricScriptFont.NOTO_SANS_GEORGIAN -> georgianFontFamily
+    }
 
     private fun isCjk(c: Char): Boolean {
         val block = Character.UnicodeBlock.of(c)
@@ -60,34 +79,30 @@ internal object LyricsLayoutCalculator {
         lines: List<Line>,
         canvasWidth: Float,
         textMeasurer: TextMeasurer,
+        density: Float,
+        lyricsType: LyricsType,
         fontSizeScale: Float = 1.0f,
         romanize: Boolean = false,
     ): List<LineLayout> {
 
         val layouts = mutableListOf<LineLayout>()
         var currentY = 0f
-        val lineSpacing = 32f
-        val horizontalPadding = 40f
-        
-        // Choose your desired main lyrics font weight right here:
-        // Options: FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold
-        val mainFontWeight = FontWeight.Bold
+        val metrics = LyricsLayoutMetrics(canvasWidth, density, lyricsType, fontSizeScale)
+        val lineSpacing = metrics.lineGapPx
         
         val hasDuet = lines.any { it.oppositeAligned }
-        val maxLineWidth = if (hasDuet) {
-            (canvasWidth - (horizontalPadding * 2)) * 0.85f
-        } else {
-            canvasWidth - (horizontalPadding * 2)
-        }
-        
-        val baseFontSize = (canvasWidth / 20f).coerceIn(16f, 32f).sp * fontSizeScale
+        val baseFontSize = metrics.baseFontSizeSp.sp
         val bgFontSize = baseFontSize * 0.75f
-        val songwriterFontSize = baseFontSize * 0.47f
 
         for (line in lines) {
             val isInterlude = line.isInterlude
             val isBg = line.isBackground
-            val fontSize = if (line.isSongwriter) songwriterFontSize else if (isBg) bgFontSize else baseFontSize
+            val fontSize = if (isBg) bgFontSize else baseFontSize
+            val fontWeight = when {
+                lyricsType == LyricsType.Static -> FontWeight.Medium
+                isBg -> FontWeight.SemiBold
+                else -> FontWeight.Bold
+            }
 
             if (isInterlude) {
                 // Instrumental interludes are rendered as three dots.
@@ -105,7 +120,7 @@ internal object LyricsLayoutCalculator {
                         style = TextStyle(
                             fontFamily = spicyFontFamily,
                             fontSize = dotFontSize,
-                            fontWeight = mainFontWeight,
+                            fontWeight = fontWeight,
                             color = Color.White,
                             // Distinct per-dot identity, same rationale as the word-level hack below:
                             // three identical "•" glyphs would otherwise share one cached
@@ -128,7 +143,9 @@ internal object LyricsLayoutCalculator {
                     RtlDetector.isRtl(nextLine.words.joinToString(" ") { displayText(it, romanize) })
                 val dotsRightAligned = resolveRightAligned(hasDuet, nextLineIsRtl, nextLineAlignment, isSongwriter = false)
 
-                layouts.add(LineLayout(line, dotLayouts, currentY, dotH, totalDotsW, totalDotsW, true, isBg, nextLineAlignment, false, nextLineIsRtl, dotsRightAligned))
+                val slot = metrics.contentSlot(hasDuet, nextLineIsRtl, nextLineAlignment)
+                layouts.add(LineLayout(line, dotLayouts, currentY, dotH, totalDotsW, totalDotsW, true, isBg,
+                    nextLineAlignment, false, nextLineIsRtl, dotsRightAligned, slot.startPx, slot.widthPx))
                 currentY += 0f // Interludes collapse when not active.
                 continue
             }
@@ -136,13 +153,16 @@ internal object LyricsLayoutCalculator {
 
             // Standard lyric line layout.
             val lineIsRtl = RtlDetector.isRtl(line.words.joinToString(" ") { displayText(it, romanize) })
+            val lineFontFamily = fontFamilyFor(line.words.joinToString(" ") { displayText(it, romanize) })
+            val contentSlot = metrics.contentSlot(hasDuet, lineIsRtl, line.oppositeAligned)
+            val lineMaxWidth = contentSlot.widthPx
             // Inter-word gap of 0.32ch (width of "0"), matching the reference's `margin-right: 0.32ch`.
             val chWidth = textMeasurer.measure(
                 text = AnnotatedString("0"),
                 style = TextStyle(
-                    fontFamily = spicyFontFamily,
+                    fontFamily = lineFontFamily,
                     fontSize = fontSize,
-                    fontWeight = mainFontWeight,
+                    fontWeight = fontWeight,
                     color = Color.White,
                 )
             ).size.width.toFloat()
@@ -164,9 +184,9 @@ internal object LyricsLayoutCalculator {
             for (wIdx in line.words.indices) {
                 val word = line.words[wIdx]
                 val style = TextStyle(
-                    fontFamily = spicyFontFamily,
+                    fontFamily = lineFontFamily,
                     fontSize = fontSize,
-                    fontWeight = if (line.isSongwriter) FontWeight.Normal else mainFontWeight,
+                    fontWeight = fontWeight,
                     color = Color.White,
                     // Use a tiny unique letter spacing based on the Word object's identity.
                     // This prevents Compose from sharing cached TextLayoutResults (and highlights) 
@@ -186,10 +206,11 @@ internal object LyricsLayoutCalculator {
                 // not "kon nichi wa"), and only tokens that had real whitespace in the source get a gap.
                 val effectiveIsPartOfWord = word.isPartOfWord
 
-                if (text.any { isCjk(it) } || word.isLetterGroup) {
+                if (word.isLetterGroup) {
                     var currentX = 0f
-                    for (charIdx in text.indices) {
-                        val charText = text[charIdx].toString()
+                    val graphemes = com.tx24.spicyplayer.lyrics.spicy.parser.GraphemeSegmenter.segment(text)
+                    for (charIdx in graphemes.indices) {
+                        val charText = graphemes[charIdx]
                         // Two instances of the same letter within one word (e.g. the two "a"s in
                         // "california") would otherwise measure with identical (text, style) and
                         // share one cached TextLayoutResult, coupling their highlight state — mix
@@ -206,7 +227,7 @@ internal object LyricsLayoutCalculator {
                             charIdx = charIdx,
                             fullWidth = fullW,
                             startX = currentX,
-                            isCjkPiece = isCjk(text[charIdx]),
+                            isCjkPiece = charText.firstOrNull()?.let(::isCjk) == true,
                             isPartOfWord = charIdx > 0 || effectiveIsPartOfWord
                         ))
                         currentX += charResult.size.width
@@ -227,8 +248,6 @@ internal object LyricsLayoutCalculator {
             }
 
             // Word-wrapping logic on pieces.
-            val isSongwriterLine = line.isSongwriter
-            val lineMaxWidth = if (isSongwriterLine) canvasWidth - (horizontalPadding * 2) else maxLineWidth
             val numPieces = pieces.size
             val lineBreaks = mutableListOf<Int>()
 
@@ -303,7 +322,7 @@ internal object LyricsLayoutCalculator {
             val allRows = mutableListOf<Pair<Float, List<WordLayout>>>()
             var currentRowY = 0f
             var maxRowWidth = 0f
-            var lastRowHeight = 0f
+            val explicitRowHeight = metrics.lineHeightPx(fontSize.value)
 
             for (b in 0 until lineBreaks.size - 1) {
                 val startIdx = lineBreaks[b]
@@ -344,14 +363,12 @@ internal object LyricsLayoutCalculator {
                 
                 allRows.add(rowX to rowPieces)
                 maxRowWidth = maxOf(maxRowWidth, rowX)
-                lastRowHeight = rowMaxBottom
-                
                 if (b < lineBreaks.size - 2) {
-                    currentRowY += lastRowHeight
+                    currentRowY += explicitRowHeight
                 }
             }
             
-            val totalHeight = currentRowY + lastRowHeight
+            val totalHeight = if (allRows.isEmpty()) explicitRowHeight else currentRowY + explicitRowHeight
             val totalWidth = maxRowWidth
 
             // Apply alignment and flatten. RTL duet lines mirror the LTR duet convention (primary
@@ -378,12 +395,14 @@ internal object LyricsLayoutCalculator {
             }
 
             val prevIsInterlude = layouts.lastOrNull()?.isInterlude ?: false
-            val drawY = if (isBg && !prevIsInterlude) currentY - 32f else if (line.isSongwriter) currentY + lineSpacing * 0.5f else currentY
+            val drawY = if (isBg && !prevIsInterlude) currentY - lineSpacing else currentY
 
-            layouts.add(LineLayout(line, wordLayouts, drawY, totalHeight, totalWidth, maxRowWidth, false, isBg, line.oppositeAligned, line.isSongwriter, lineIsRtl, isRightAligned))
+            layouts.add(LineLayout(line, wordLayouts, drawY, totalHeight, totalWidth, maxRowWidth, false, isBg,
+                line.oppositeAligned, line.isSongwriter, lineIsRtl, isRightAligned,
+                contentSlot.startPx, contentSlot.widthPx))
             
             val bottomY = drawY + totalHeight
-            currentY = maxOf(currentY, bottomY + (if (isBg) 32f else lineSpacing))
+            currentY = maxOf(currentY, bottomY + lineSpacing)
         }
         return layouts
     }

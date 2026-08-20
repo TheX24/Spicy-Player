@@ -30,7 +30,8 @@ object LetterSynthesizer {
 
     private fun synthesize(word: Word, config: RenderConfig, romanized: Boolean): Word {
         val display = if (romanized) (word.romanizedText ?: word.text) else word.text
-        val len = display.length
+        val graphemes = GraphemeSegmenter.segment(display)
+        val len = graphemes.size
 
         // Reference (IsLetterCapable.ts) has no lower length bound — even a single-character
         // held word (e.g. "I", "oh") gets the letter treatment if held long enough.
@@ -54,9 +55,9 @@ object LetterSynthesizer {
 
         // Every character — including punctuation — is split into its own timed letter and
         // animated identically; the reference (Emphasize.ts) has no exclusion for punctuation.
-        val letters = display.mapIndexed { i, ch ->
+        val letters = graphemes.mapIndexed { i, grapheme ->
             Letter(
-                char = ch.toString(),
+                char = grapheme,
                 startMs = windowStart + (i * span).toLong(),
                 endMs = windowStart + ((i + 1) * span).toLong(),
             )
