@@ -22,10 +22,12 @@ internal data class LyricsLayoutMetrics(
 
     fun contentSlot(hasDuet: Boolean, isRtl: Boolean, oppositeAligned: Boolean): ContentSlot {
         if (!hasDuet) {
-            return if (isRtl) ContentSlot(viewportWidthPx * 0.05f, viewportWidthPx * 0.95f)
-            else ContentSlot(0f, viewportWidthPx * 0.95f)
+            return ContentSlot(viewportWidthPx * 0.05f, viewportWidthPx * 0.90f)
         }
         val startsAtInset = if (isRtl) !oppositeAligned else oppositeAligned
-        return ContentSlot(if (startsAtInset) viewportWidthPx * 0.15f else 0f, viewportWidthPx * 0.85f)
+        return ContentSlot(
+            if (startsAtInset) viewportWidthPx * 0.15f else viewportWidthPx * 0.05f,
+            viewportWidthPx * 0.80f,
+        )
     }
 }

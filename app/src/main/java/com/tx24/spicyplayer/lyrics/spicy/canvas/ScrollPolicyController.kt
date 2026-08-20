@@ -87,7 +87,7 @@ internal class ScrollPolicyController {
         fun flingDecayMultiplier(deltaTimeSeconds: Float): Float =
             exp(ln(0.95f) * deltaTimeSeconds.coerceAtLeast(0f) * 60f)
 
-        fun anchorY(viewportHeightPx: Float, density: Float): Float =
-            viewportHeightPx / 2f - 30f * density
+        fun anchorY(viewportHeightPx: Float, focusFraction: Float): Float =
+            viewportHeightPx * focusFraction.coerceIn(0f, 1f)
     }
 }

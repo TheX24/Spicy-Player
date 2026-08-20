@@ -46,8 +46,8 @@ class ScrollPolicyControllerTest {
     }
 
     @Test
-    fun `active lead anchor is viewport center minus thirty logical dp`() {
-        assertEquals(570f, ScrollPolicyController.anchorY(1_200f, density = 1f), 0f)
-        assertEquals(510f, ScrollPolicyController.anchorY(1_200f, density = 3f), 0f)
+    fun `active lead anchor follows the compact fullscreen focus fraction`() {
+        assertEquals(300f, ScrollPolicyController.anchorY(1_200f, focusFraction = 0.25f), 0f)
+        assertEquals(540f, ScrollPolicyController.anchorY(1_200f, focusFraction = 0.45f), 0f)
     }
 }

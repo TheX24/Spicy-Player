@@ -17,6 +17,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.LocalDensity
 import com.tx24.spicyplayer.lyrics.fadingEdge
 import com.tx24.spicyplayer.lyrics.spicy.RenderConfig
@@ -28,6 +29,7 @@ import com.tx24.spicyplayer.lyrics.spicy.models.LyricsFooter
 import com.tx24.spicyplayer.lyrics.spicy.parser.LetterSynthesizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 /**
  * The main lyrics display component representing the split architecture.
@@ -90,17 +92,20 @@ fun SpicyLyricsView(
     BoxWithConstraints(modifier = modifier.fillMaxSize().clipToBounds()) {
         val canvasWidth = constraints.maxWidth.toFloat()
         val canvasHeight = constraints.maxHeight.toFloat()
-        // Reference anchor: viewport center minus 30 logical dp.
-        val centerY = ScrollPolicyController.anchorY(canvasHeight, density.density)
+        // Compact fullscreen keeps the active lyric in the upper portion of the viewport.
+        val centerY = ScrollPolicyController.anchorY(canvasHeight, focusAnchorFraction)
         val footerMetrics = remember(canvasWidth, density.density, fontSizeScale, lyricsType) {
             LyricsLayoutMetrics(canvasWidth, density.density, lyricsType, fontSizeScale)
         }
-        val footerLayouts = remember(footer, footerMetrics.baseFontSizeSp) {
+        val footerSlot = footerMetrics.contentSlot(false, false, false)
+        val footerLayouts = remember(footer, footerMetrics.baseFontSizeSp, footerSlot.widthPx) {
+            val constraints = Constraints(maxWidth = footerSlot.widthPx.roundToInt().coerceAtLeast(1))
             buildList {
                 if (footer.songwriters.isNotEmpty()) {
                     add(textMeasurer.measure(
                         AnnotatedString("Written by: ${footer.songwriters.joinToString(", ")}"),
                         TextStyle(fontSize = (footerMetrics.baseFontSizeSp * 0.47f).sp, fontWeight = FontWeight.Medium),
+                        constraints = constraints,
                     ) to 0.6f)
                 }
                 footer.provenance?.let { provenance ->
@@ -108,6 +113,7 @@ fun SpicyLyricsView(
                     add(textMeasurer.measure(
                         AnnotatedString("Lyrics: ${provenance.provider}$contributor"),
                         TextStyle(fontSize = (footerMetrics.baseFontSizeSp * 0.38f).sp, fontWeight = FontWeight.Normal),
+                        constraints = constraints,
                     ) to 0.45f)
                 }
             }
@@ -303,7 +309,7 @@ fun SpicyLyricsView(
                         textLayoutResult = textLayout,
                         color = Color.White,
                         alpha = alpha,
-                        topLeft = androidx.compose.ui.geometry.Offset(footerMetrics.viewportWidthPx * 0.05f, footerY),
+                        topLeft = androidx.compose.ui.geometry.Offset(footerSlot.startPx, footerY),
                     )
                     footerY += textLayout.size.height + footerMetrics.lineGapPx
                 }

@@ -1,24 +1,30 @@
 package com.tx24.spicyplayer.lyrics.spicy.parser
 
 import android.os.Build
+import androidx.annotation.RequiresApi
 
 object GraphemeSegmenter {
     fun segment(text: String, sdkInt: Int = Build.VERSION.SDK_INT): List<String> {
         if (text.isEmpty()) return emptyList()
-        if (sdkInt >= 24) {
-            val iterator = android.icu.text.BreakIterator.getCharacterInstance()
-            iterator.setText(text)
-            val result = ArrayList<String>()
-            var start = iterator.first()
-            var end = iterator.next()
-            while (end != android.icu.text.BreakIterator.DONE) {
-                result += text.substring(start, end)
-                start = end
-                end = iterator.next()
-            }
-            return result
+        if (sdkInt >= 24 && Build.VERSION.SDK_INT >= 24) {
+            return segmentWithIcu(text)
         }
         return fallback(text)
+    }
+
+    @RequiresApi(24)
+    private fun segmentWithIcu(text: String): List<String> {
+        val iterator = android.icu.text.BreakIterator.getCharacterInstance()
+        iterator.setText(text)
+        val result = ArrayList<String>()
+        var start = iterator.first()
+        var end = iterator.next()
+        while (end != android.icu.text.BreakIterator.DONE) {
+            result += text.substring(start, end)
+            start = end
+            end = iterator.next()
+        }
+        return result
     }
 
     internal fun fallback(text: String): List<String> {

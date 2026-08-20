@@ -21,8 +21,9 @@ class LyricsLayoutMetricsTest {
         assertEquals(56f, LyricsLayoutMetrics(840f, 1f, LyricsType.Line, 1f).baseFontSizeSp, 0f)
         assertEquals(40f, LyricsLayoutMetrics(840f, 1f, LyricsType.Static, 1f).baseFontSizeSp, 0f)
         val metrics = LyricsLayoutMetrics(600f, 1f, LyricsType.Syllable, 1f)
-        assertEquals(ContentSlot(90f, 510f), metrics.contentSlot(true, false, true))
-        assertEquals(ContentSlot(0f, 510f), metrics.contentSlot(true, true, true))
+        assertEquals(ContentSlot(30f, 540f), metrics.contentSlot(false, false, false))
+        assertEquals(ContentSlot(90f, 480f), metrics.contentSlot(true, false, true))
+        assertEquals(ContentSlot(30f, 480f), metrics.contentSlot(true, true, true))
         assertEquals(1.1818182f, metrics.lineHeightMultiplier, 0f)
     }
 }

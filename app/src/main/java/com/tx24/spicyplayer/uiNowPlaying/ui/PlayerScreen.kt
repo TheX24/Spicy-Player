@@ -756,10 +756,6 @@ fun LandscapePlayerScreen(
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(16.dp))
                                     .padding(vertical = 4.dp),
-                                // Landscape dedicates the whole pane to lyrics (no header/card
-                                // stacked above it), so anchor the active line near mid-height
-                                // instead of the ~25%-from-top used in the shorter portrait pane.
-                                focusAnchorFraction = 0.45f,
                                 controlsVisible = controlsVisible,
                             )
                         }
