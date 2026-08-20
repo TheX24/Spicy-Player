@@ -34,9 +34,16 @@ data class SynchronizedLyrics(
 
                 val minutes = timeInfoArray[0].toIntOrNull() ?: continue
 
-                val secondsArray = timeInfoArray[1].split(".")
+                if (timeInfoArray.size != 2) continue
+                val secondsArray = timeInfoArray[1].split(".", limit = 2)
                 val seconds = secondsArray[0].toIntOrNull() ?: continue
-                val millis = secondsArray[1].toIntOrNull()?.times(10) ?: continue
+                val fraction = secondsArray.getOrNull(1).orEmpty()
+                val millis = when (fraction.length) {
+                    0 -> 0
+                    1 -> fraction.toIntOrNull()?.times(100)
+                    2 -> fraction.toIntOrNull()?.times(10)
+                    else -> fraction.take(3).toIntOrNull()
+                } ?: continue
 
                 SyncedLyricsSegment(
                     line.substring(timeInfoLastIndex + 1).trim(),

@@ -1,6 +1,7 @@
 package com.tx24.spicyplayer.lyrics.spicy.parser
 
 import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
+import com.tx24.spicyplayer.lyrics.spicy.models.buildDisplayTimeline
 import com.tx24.spicyplayer.lyrics.spicy.models.ParsedLyrics
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -47,7 +48,8 @@ class TtmlLyricsParserTest {
         assertEquals(10_500L, first.words[0].endMs)
 
         assertEquals(16_000L, second.startMs)
-        assertEquals(17_500L, second.endMs)
+        assertEquals(18_000L, second.endMs)
+        assertEquals(17_500L, second.words.single().endMs)
     }
 
     @Test
@@ -82,6 +84,45 @@ class TtmlLyricsParserTest {
     @Test
     fun `word-timed ttml is detected as syllable type`() {
         assertEquals(LyricsType.Syllable, parse(duetTtml).type)
+    }
+
+    @Test
+    fun `line lifetime preserves declared paragraph end after final syllable`() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="Word">
+              <body><div>
+                <p begin="0:01.000" end="0:03.000"><span begin="0:01.000" end="0:02.000">Held</span></p>
+              </div></body>
+            </tt>
+        """.trimIndent()
+
+        val line = parse(ttml).lines.single { !it.isInterlude && !it.isSongwriter }
+        assertEquals(3_000L, line.endMs)
+        assertEquals(2_000L, line.words.single().endMs)
+    }
+
+    @Test
+    fun `untimed ttml is static rather than line synced`() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml">
+              <body><div><p>Hello world</p></div></body>
+            </tt>
+        """.trimIndent()
+
+        assertEquals(LyricsType.Static, parse(ttml).type)
+    }
+
+    @Test
+    fun `empty timed paragraph preserves its declared interval`() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="Line">
+              <body><div><p begin="0:01.000" end="0:02.000"></p></div></body>
+            </tt>
+        """.trimIndent()
+
+        val line = parse(ttml).lines.single { !it.isInterlude && !it.isSongwriter }
+        assertEquals(1_000L, line.startMs)
+        assertEquals(2_000L, line.endMs)
     }
 
     @Test
@@ -127,7 +168,7 @@ class TtmlLyricsParserTest {
         assertEquals("Hito", line.words[0].romanizedText)
         assertEquals("ni", line.words[1].romanizedText)
         // The real ("en") translation is parsed separately and must not leak into romanizedText.
-        assertEquals("There are people", line.translatedText)
+        assertTrue(line.words.none { it.text == "There" || it.text == "people" })
     }
 
     @Test
@@ -148,7 +189,7 @@ class TtmlLyricsParserTest {
 
         val line = parse(ttml).lines.first { !it.isInterlude && !it.isSongwriter }
         assertEquals(listOf("ねぇ、", "知", "って", "る?"), line.words.map { it.text })
-        assertEquals("Ne~e, shitteru?", line.romanizedFull)
+        assertEquals(listOf("ねぇ、", "知", "って", "る?"), line.words.map { it.text })
     }
 
     @Test
@@ -165,7 +206,7 @@ class TtmlLyricsParserTest {
 
     @Test
     fun `interludes are injected for gaps of three seconds or more`() {
-        val lines = parse(duetTtml).lines
+        val lines = buildDisplayTimeline(parse(duetTtml).lines, minimalMode = false)
         val interludes = lines.filter { it.isInterlude }
         assertEquals(2, interludes.size)
 
@@ -181,16 +222,10 @@ class TtmlLyricsParserTest {
     }
 
     @Test
-    fun `songwriter credits become a trailing songwriter line`() {
+    fun `songwriter credits stay in footer metadata and out of timed lines`() {
         val result = parse(duetTtml)
         assertEquals(listOf("Jane Doe", "John Smith"), result.songwriters)
-
-        val credits = result.lines.single { it.isSongwriter }
-        assertEquals(17_500L, credits.startMs)
-        assertEquals(
-            "Written by Jane Doe, John Smith",
-            credits.words.joinToString(" ") { it.text }
-        )
+        assertTrue(result.lines.none { it.isSongwriter })
     }
 
     @Test

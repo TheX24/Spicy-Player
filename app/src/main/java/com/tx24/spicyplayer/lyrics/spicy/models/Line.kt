@@ -1,5 +1,7 @@
 package com.tx24.spicyplayer.lyrics.spicy.models
 
+enum class LineRole { LEAD, BACKGROUND, INTERLUDE }
+
 /**
  * Represents a full line of lyrics composed of multiple [Word]s.
  */
@@ -8,35 +10,21 @@ data class Line(
     val words: List<Word>,
     /** The official start time of the line in milliseconds. */
     val startMs: Long,
+    /** The normalized line lifetime, independent from the final word's timing. */
+    val endMs: Long = words.lastOrNull()?.endMs ?: startMs,
     /** Optional identifier for the singer (agent). */
     val agent: String? = null,
-    /** If true, this is a background vocal line. */
-    val isBackground: Boolean = false,
+    /** Structural role in the normalized lyric timeline. */
+    val role: LineRole = LineRole.LEAD,
+    /** Stable group shared by a lead line and its background vocals. */
+    val groupId: Int? = null,
     /** If true, the line should be aligned to the opposite side (e.g., right-aligned for harmonies). */
     val oppositeAligned: Boolean = false,
-    /** If true, this line contains songwriter information rather than lyrics. */
-    val isSongwriter: Boolean = false,
-    /** If true, this line represents an instrumental interlude. */
-    val isInterlude: Boolean = false,
-    /** Explicit end time for interludes, as they might not have words. */
-    val interludeEndMs: Long = -1L,
-    /** Reserved for a future translation feature; not yet displayed. */
-    val translatedText: String? = null,
-    /**
-     * Whole-line romanization fallback (e.g. from an inline `<span ttm:role="x-roman">`),
-     * captured when the per-word transliteration metadata doesn't cover this line. Not
-     * currently rendered — per-word [Word.romanizedText] (metadata-derived or on-device) is
-     * used for display; this is reserved for a future line-level fallback path.
-     */
-    val romanizedFull: String? = null,
 ) {
-    /** 
-     * The end time of the line. 
-     * For interludes, it uses [interludeEndMs]. 
-     * Otherwise, it uses the end time of the last word. 
-     */
-    val endMs: Long
-        get() = if (isInterlude && interludeEndMs > 0) interludeEndMs else words.lastOrNull()?.endMs ?: startMs
+    val isBackground: Boolean get() = role == LineRole.BACKGROUND
+    val isInterlude: Boolean get() = role == LineRole.INTERLUDE
+    /** Compatibility property while footer rendering is moved out of the timed layout. */
+    val isSongwriter: Boolean get() = false
 
     /** The duration of the entire line in milliseconds, guaranteed to be at least 1ms. */
     val duration: Long
