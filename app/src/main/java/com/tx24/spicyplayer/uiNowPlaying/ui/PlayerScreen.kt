@@ -66,7 +66,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.BiasAlignment
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -89,7 +88,6 @@ import com.tx24.spicyplayer.ui.albumart.SongAlbumArtModel
 import com.tx24.spicyplayer.ui.albumart.toSongAlbumArtModel
 import com.tx24.spicyplayer.ui.common.toInt
 import com.tx24.spicyplayer.lyrics.LiveLyricsScreen
-import com.tx24.spicyplayer.lyrics.fadingEdge
 import com.tx24.spicyplayer.uiNowPlaying.viewmodel.INowPlayingViewModel
 
 /**
@@ -454,18 +452,10 @@ fun PortraitPlayerScreen(
                             }
                         }
                     }
-                    val fadeBrush = remember {
-                        Brush.verticalGradient(
-                            0.0f to Color.Red,
-                            0.7f to Color.Red,
-                            1.0f to Color.Transparent
-                        )
-                    }
                     LiveLyricsScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(RoundedCornerShape(16.dp))
-                            .fadingEdge(fadeBrush)
                             .padding(horizontal = 2.dp, vertical = 2.dp),
                         controlsVisible = controlsVisible,
                     )
@@ -761,18 +751,10 @@ fun LandscapePlayerScreen(
                                     }
                                 }
                             }
-                            val fadeBrush = remember {
-                                Brush.verticalGradient(
-                                    0.0f to Color.Red,
-                                    0.7f to Color.Red,
-                                    1.0f to Color.Transparent
-                                )
-                            }
                             LiveLyricsScreen(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(16.dp))
-                                    .fadingEdge(fadeBrush)
                                     .padding(vertical = 4.dp),
                                 // Landscape dedicates the whole pane to lyrics (no header/card
                                 // stacked above it), so anchor the active line near mid-height

@@ -219,6 +219,7 @@ class LyricsAnimator(
                 LineAnimState(
                     opacity = 1f, blur = 0f, scale = 1f, isActive = false,
                     wordStates = emptyList(), isBackground = false, isSongwriter = false,
+                    state = ElementState.NotSung,
                 )
             }
         }
@@ -326,6 +327,7 @@ class LyricsAnimator(
                 lineGradientPercent = lineGradient,
                 lineGlow = lineGlow,
                 suppressShadows = suppressBlur,
+                state = lineState,
             )
         }
     }

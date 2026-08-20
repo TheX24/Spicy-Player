@@ -190,13 +190,16 @@ fun SpicyLyricsView(
             }
         }
 
-        // Top/bottom fade mask (reference: 64px --ImageMask fade on the lyrics content).
-        val fadeFraction = if (canvasHeight > 0f) (64f / canvasHeight).coerceIn(0f, 0.45f) else 0f
-        val fadeBrush = remember(fadeFraction) {
+        // The sole renderer mask: transparent through 16dp, ramping to opaque at 64dp,
+        // with a symmetric bottom edge.
+        val maskStops = lyricsMaskStops(canvasHeight, density.density)
+        val fadeBrush = remember(maskStops) {
             Brush.verticalGradient(
                 0f to Color.Transparent,
-                fadeFraction to Color.Black,
-                1f - fadeFraction to Color.Black,
+                maskStops.outerTop to Color.Transparent,
+                maskStops.innerTop to Color.Black,
+                maskStops.innerBottom to Color.Black,
+                maskStops.outerBottom to Color.Transparent,
                 1f to Color.Transparent,
             )
         }

@@ -42,6 +42,7 @@ data class LineAnimState(
     val lineGlow: Float = 0f,
     /** True while the user is manually scrolling — every shadow/glow halo is suppressed, not just distance blur. */
     val suppressShadows: Boolean = false,
+    val state: ElementState = ElementState.NotSung,
 )
 
 /**
