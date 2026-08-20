@@ -66,7 +66,7 @@ data class RenderConfig(
             opacityActive = 1.0f,
             opacityNotSung = 0.51f,
             opacitySung = 0.497f,
-            lineTransitionMs = 350,
+            lineTransitionMs = 200,
             distanceBlurEnabled = true,
             lettersEnabled = true,
             letterDurationThresholdMs = 1000L,
@@ -90,7 +90,7 @@ data class RenderConfig(
             mode = LyricsQualityMode.MINIMAL,
             opacityNotSung = 0.5f,
             opacitySung = 0.0f,            // sung lines fade out entirely
-            lineTransitionMs = 550,
+            lineTransitionMs = 400,
             distanceBlurEnabled = false,
             lettersEnabled = false,
             interludeGapThresholdMs = 5000L,

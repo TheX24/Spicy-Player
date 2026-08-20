@@ -24,6 +24,7 @@ internal class ScrollManager(
 
     private var scrollVelocity by mutableFloatStateOf(0f)
     private var lastDragTimeMs by mutableLongStateOf(0L)
+    private var snapNextTarget = false
 
     fun reset() {
         scrollSpring.resetTo(0f)
@@ -36,13 +37,16 @@ internal class ScrollManager(
         animScrollY = 0f
         scrollVelocity = 0f
         lastDragTimeMs = 0L
+        snapNextTarget = false
     }
 
     fun updateScroll(
         currentTimeMs: Long,
         dt: Float,
         totalContentHeight: Float,
-        targetY: Float?
+        targetY: Float?,
+        snap: Boolean = false,
+        targetVisiblePx: Float = Float.POSITIVE_INFINITY,
     ) {
         val timeJump = abs(currentTimeMs - lastFrameSongTime)
         val isFirstFrame = lastFrameSongTime == 0L
@@ -53,10 +57,12 @@ internal class ScrollManager(
             // with the boundary constraints at the very top or bottom of the lyrics.
             val clampedGoal = targetY.coerceIn(-totalContentHeight, 0f)
             
-            if (isFirstFrame) {
-                scrollSpring.resetTo(clampedGoal)
+            if (isFirstFrame || snap || snapNextTarget) {
+                scrollSpring.setGoal(clampedGoal, replacePosition = true)
                 userScrollOffset = 0f
                 lastInteractionTimeMs = 0L
+                scrollVelocity = 0f
+                snapNextTarget = false
             } else if (isSeek) {
                 userScrollOffset = 0f
                 lastInteractionTimeMs = 0L
@@ -70,9 +76,11 @@ internal class ScrollManager(
         val actualSpringY = scrollSpring.step(dt)
         val springDelta = actualSpringY - springPosBefore
 
-        val timeSinceInteraction = System.currentTimeMillis() - lastInteractionTimeMs
+        val timeSinceInteraction = monotonicNowMs() - lastInteractionTimeMs
         // Resume auto-scroll 750ms after the user stops interacting (reference: USER_SCROLL_COOLDOWN).
-        val isInManualMode = isUserScrolling || (timeSinceInteraction < 750L && lastInteractionTimeMs > 0L)
+        val targetStillDisconnected = userScrollOffset != 0f && targetVisiblePx < 5f
+        val isInManualMode = isUserScrolling || targetStillDisconnected ||
+            (timeSinceInteraction < 750L && lastInteractionTimeMs > 0L)
 
         if (isInManualMode) {
             // Cancel out the auto-scroll movement to keep the view static where the user left it.
@@ -87,7 +95,7 @@ internal class ScrollManager(
         lastFrameSongTime = currentTimeMs
 
         if (isUserScrolling) {
-            lastInteractionTimeMs = System.currentTimeMillis()
+            lastInteractionTimeMs = monotonicNowMs()
         }
 
         val maxScrollDown = 60f
@@ -98,9 +106,9 @@ internal class ScrollManager(
             // Apply inertia if there is remaining velocity.
             if (abs(scrollVelocity) > 0.1f) {
                 userScrollOffset += scrollVelocity * dt
-                scrollVelocity *= 0.95f 
+                scrollVelocity *= ScrollPolicyController.flingDecayMultiplier(dt)
                 if (abs(scrollVelocity) < 10f) scrollVelocity = 0f
-                lastInteractionTimeMs = System.currentTimeMillis()
+                lastInteractionTimeMs = monotonicNowMs()
             }
 
             // Boundaries & Focus Recovery.
@@ -139,7 +147,7 @@ internal class ScrollManager(
         isUserScrolling = true
         userScrollDecayTimer = 0f
         scrollVelocity = 0f
-        lastDragTimeMs = System.currentTimeMillis()
+        lastDragTimeMs = monotonicNowMs()
     }
 
     fun onDragEnd() {
@@ -148,7 +156,7 @@ internal class ScrollManager(
     }
 
     fun onDrag(dy: Float) {
-        val now = System.currentTimeMillis()
+        val now = monotonicNowMs()
         val dtSec = (now - lastDragTimeMs) / 1000f
         if (dtSec > 0) {
             val instantV = dy / dtSec
@@ -165,5 +173,9 @@ internal class ScrollManager(
         userScrollOffset = 0f
         userScrollDecayTimer = 0f
         lastInteractionTimeMs = 0L
+        scrollVelocity = 0f
+        snapNextTarget = true
     }
+
+    private fun monotonicNowMs(): Long = System.nanoTime() / 1_000_000L
 }

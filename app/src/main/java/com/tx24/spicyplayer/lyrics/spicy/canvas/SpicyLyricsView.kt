@@ -12,6 +12,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 import com.tx24.spicyplayer.lyrics.fadingEdge
 import com.tx24.spicyplayer.lyrics.spicy.RenderConfig
 import com.tx24.spicyplayer.lyrics.spicy.animation.LineAnimState
@@ -76,13 +77,14 @@ fun SpicyLyricsView(
     val onFrameTickUpdated by rememberUpdatedState(onFrameTick)
 
     val scrollManager = remember(documentId) { ScrollManager().also { it.reset() } }
+    val scrollPolicy = remember(documentId) { ScrollPolicyController() }
+    val density = LocalDensity.current
 
     BoxWithConstraints(modifier = modifier.fillMaxSize().clipToBounds()) {
         val canvasWidth = constraints.maxWidth.toFloat()
         val canvasHeight = constraints.maxHeight.toFloat()
-        // Anchor the active line from the top (reference: margin-top 25cqh; callers with a
-        // taller, dedicated lyrics viewport — e.g. landscape's split pane — may override this).
-        val centerY = canvasHeight * focusAnchorFraction
+        // Reference anchor: viewport center minus 30 logical dp.
+        val centerY = ScrollPolicyController.anchorY(canvasHeight, density.density)
         val horizontalPadding = 40f
         val hasDuet = remember(displayLines) { displayLines.any { it.oppositeAligned } }
 
@@ -160,46 +162,18 @@ fun SpicyLyricsView(
                             dynamicYOffsets = newDynamicYOffsets.copyOf()
                         }
 
-                        // 2. Identify all active lines and update the scroll target to center on
-                        // them. Done with plain index loops to avoid allocating intermediate
-                        // lists on every frame.
-                        var minY = Float.MAX_VALUE
-                        var maxY = -Float.MAX_VALUE
-                        var hasActive = false
-                        for (i in currentLayouts.indices) {
-                            val layout = currentLayouts[i]
-                            if (layout.isBackground || layout.isSongwriter) continue
-                            val line = currentLines[i]
-                            if (line.startMs <= currentTime && currentTime <= line.endMs) {
-                                hasActive = true
-                                val top = newDynamicYOffsets[i]
-                                val bottom = top + layout.height
-                                if (top < minY) minY = top
-                                if (bottom > maxY) maxY = bottom
-                            }
+                        // 2. Resolve the reference lead/background overlap policy, then anchor
+                        // that one line at viewport center minus 30dp.
+                        val decision = scrollPolicy.decide(currentLines, currentTime)
+                        val targetIndex = decision.targetIndex
+                        var targetY: Float? = targetIndex?.let { index ->
+                            -(newDynamicYOffsets[index] + currentLayouts[index].height / 2f)
                         }
-
-                        var targetY: Float? = null
-                        if (hasActive) {
-                            // Center on the combined Y-range of all active lines.
-                            val clusterCenterY = (minY + maxY) / 2f
-                            targetY = -clusterCenterY
-                        } else {
-                            // Fallback: center on the latest line that has already started.
-                            var lastStartedIdx = -1
-                            for (i in currentLayouts.indices) {
-                                val layout = currentLayouts[i]
-                                if (layout.isBackground || layout.isSongwriter) continue
-                                if (currentLines[i].startMs <= currentTime) lastStartedIdx = i
-                            }
-                            if (lastStartedIdx < 0) lastStartedIdx = 0
-
-                            if (lastStartedIdx < currentLayouts.size) {
-                                val fallbackLayout = currentLayouts[lastStartedIdx]
-                                val fallbackDynamicY = newDynamicYOffsets[lastStartedIdx]
-                                targetY = -(fallbackDynamicY + fallbackLayout.height / 2f)
-                            }
-                        }
+                        val targetVisiblePx = targetIndex?.let { index ->
+                            val top = centerY + scrollManager.animScrollY + newDynamicYOffsets[index]
+                            val bottom = top + currentLayouts[index].height
+                            (minOf(bottom, canvasHeight) - maxOf(top, 0f)).coerceAtLeast(0f)
+                        } ?: Float.POSITIVE_INFINITY
 
                         // 3. Step the scroll spring and handle user overrides.
                         val lastLayout = currentLayouts.lastOrNull()
@@ -207,7 +181,11 @@ fun SpicyLyricsView(
 
                         // Static lyrics have no timing to follow: leave scrolling entirely to the user.
                         if (isStatic) targetY = null
-                        scrollManager.updateScroll(currentTime, deltaTime, totalContentHeight, targetY)
+                        scrollManager.updateScroll(
+                            currentTime, deltaTime, totalContentHeight, targetY,
+                            snap = decision.motion == ScrollMotion.SNAP,
+                            targetVisiblePx = targetVisiblePx,
+                        )
                     }
                 }
             }

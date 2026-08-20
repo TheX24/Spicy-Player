@@ -3,6 +3,7 @@ package com.tx24.spicyplayer.lyrics.spicy.animation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.tween
 import com.tx24.spicyplayer.lyrics.spicy.RenderConfig
 import com.tx24.spicyplayer.lyrics.spicy.models.Line
@@ -121,7 +122,24 @@ class LyricsAnimator(
         val OPACITY_EASING = CubicBezierEasing(0.61f, 1f, 0.88f, 1f)
         val SCALE_EASING = CubicBezierEasing(0.37f, 0f, 0.63f, 1f)
         /** Reference dot-group collapse (Mixed.css .pre-hidden .dotGroup): 0.4s w/ dip-then-overshoot. */
-        val DOT_GROUP_COLLAPSE_EASING = CubicBezierEasing(0.68f, -0.6f, 0.32f, 1.6f)
+        val DOT_COLLAPSE_STOPS = floatArrayOf(
+            0f, 0f, 0.094f, -0.006f, 0.18f, -0.029f, 0.433f, -0.157f,
+            0.514f, -0.185f, 0.559f, -0.189f, 0.6f, -0.182f, 0.639f, -0.163f,
+            0.676f, -0.133f, 0.723f, -0.074f, 0.767f, 0.006f, 0.85f, 0.238f,
+            0.927f, 0.566f, 1f, 1f,
+        )
+        val DOT_GROUP_COLLAPSE_EASING = Easing { fraction ->
+            val stops = DOT_COLLAPSE_STOPS
+            var index = 0
+            while (index < stops.size - 4 && fraction > stops[index + 2]) index += 2
+            val x0 = stops[index]
+            val y0 = stops[index + 1]
+            val x1 = stops[index + 2]
+            val y1 = stops[index + 3]
+            y0 + (y1 - y0) * ((fraction - x0) / (x1 - x0).coerceAtLeast(0.0001f))
+        }
+        const val MUSICAL_LINE_TRANSITION_MS = 140
+        const val DOT_GROUP_EXPANSION_MS = 300
         const val DOT_GROUP_COLLAPSE_MS = 400
 
         fun spline(vararg points: Pair<Float, Float>) =
@@ -322,7 +340,7 @@ class LyricsAnimator(
     ): Float {
         val target = when {
             line.isSongwriter -> 0.6f
-            line.isInterlude -> 1.0f  // dots manage their own visibility
+            line.isInterlude -> if (isActive) 1f else 0f
             // Reference: bg-lines have NO opacity override — they use the standard .line state
             // opacities; only their gradient alphas differ (0.6/0.3, applied in the renderer).
             else -> when (lineState) {
@@ -334,7 +352,8 @@ class LyricsAnimator(
         val animatable = lineOpacityAnims.getOrPut(lineIdx) { Animatable(target) }
         if (animatable.targetValue != target) {
             coroutineScope.launch {
-                animatable.animateTo(target, tween(config.lineTransitionMs, easing = OPACITY_EASING))
+                val duration = if (line.isInterlude) MUSICAL_LINE_TRANSITION_MS else config.lineTransitionMs
+                animatable.animateTo(target, tween(duration, easing = OPACITY_EASING))
             }
         }
         return animatable.value
@@ -358,7 +377,7 @@ class LyricsAnimator(
         if (animatable.targetValue != target) {
             // The collapse (1→0, at pre-hidden) uses the reference's slower 0.4s dip-then-overshoot
             // curve; expansion (0→1, on activation) keeps the default line-transition tween.
-            val duration = if (target == 0f) DOT_GROUP_COLLAPSE_MS else config.lineTransitionMs
+            val duration = if (target == 0f) DOT_GROUP_COLLAPSE_MS else DOT_GROUP_EXPANSION_MS
             val easing = if (target == 0f) DOT_GROUP_COLLAPSE_EASING else SCALE_EASING
             coroutineScope.launch {
                 animatable.animateTo(target, tween(duration, easing = easing))
