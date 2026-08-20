@@ -35,6 +35,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SpicyLyricsView(
     lines: List<Line>,
+    documentId: String,
     currentTimeMs: () -> Long,
     onSeekWord: (Long) -> Unit,
     modifier: Modifier = Modifier,
@@ -51,7 +52,8 @@ fun SpicyLyricsView(
     onFrameTick: ((Long) -> Unit)? = null,
 ) {
     val textMeasurer = rememberTextMeasurer()
-    var lineLayouts by remember { mutableStateOf<List<LineLayout>>(emptyList()) }
+    var lineLayouts by remember(documentId) { mutableStateOf<List<LineLayout>>(emptyList()) }
+    val layoutGeneration = remember(documentId) { LayoutGenerationGate() }
     val coroutineScope = rememberCoroutineScope()
 
     // Synthesize per-letter emphasis for held words using the active config (mode-dependent
@@ -60,9 +62,9 @@ fun SpicyLyricsView(
         if (lyricsType == LyricsType.Syllable) LetterSynthesizer.apply(lines, config, romanize) else lines
     }
 
-    val animator = remember { LyricsAnimator(coroutineScope, config) }
+    val animator = remember(documentId) { LyricsAnimator(coroutineScope, config) }
     LaunchedEffect(config) { animator.config = config }
-    LaunchedEffect(lines) { animator.reset() }
+    LaunchedEffect(documentId) { animator.reset() }
     val isStatic = lyricsType == LyricsType.Static
 
     // Keep the latest time provider without recomposing on every position tick: the frame loop
@@ -73,7 +75,7 @@ fun SpicyLyricsView(
     val lineLayoutsUpdated by rememberUpdatedState(lineLayouts)
     val onFrameTickUpdated by rememberUpdatedState(onFrameTick)
 
-    val scrollManager = remember { ScrollManager() }
+    val scrollManager = remember(documentId) { ScrollManager().also { it.reset() } }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize().clipToBounds()) {
         val canvasWidth = constraints.maxWidth.toFloat()
@@ -85,9 +87,13 @@ fun SpicyLyricsView(
         val hasDuet = remember(displayLines) { displayLines.any { it.oppositeAligned } }
 
         // Recalculate layouts whenever the lyrics, dimensions, or font size change.
-        LaunchedEffect(displayLines, canvasWidth, fontSizeScale, romanize) {
-            withContext(Dispatchers.Default) {
-                lineLayouts = LyricsLayoutCalculator.calculateLineLayouts(displayLines, canvasWidth, textMeasurer, fontSizeScale, romanize)
+        LaunchedEffect(displayLines, canvasWidth, fontSizeScale, romanize, documentId) {
+            val generation = layoutGeneration.next()
+            val measured = withContext(Dispatchers.Default) {
+                LyricsLayoutCalculator.calculateLineLayouts(displayLines, canvasWidth, textMeasurer, fontSizeScale, romanize)
+            }
+            if (layoutGeneration.isCurrent(generation)) {
+                lineLayouts = measured
             }
         }
 

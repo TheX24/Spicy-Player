@@ -22,6 +22,8 @@ import com.tx24.spicyplayer.model.prefs.PlayerSettings
 import com.tx24.spicyplayer.model.prefs.PlayerTheme
 import com.tx24.spicyplayer.model.prefs.UiSettings
 import com.tx24.spicyplayer.model.prefs.UserPreferences
+import com.tx24.spicyplayer.lyrics.LYRICS_OFFSET_CONVENTION_VERSION
+import com.tx24.spicyplayer.lyrics.migrateLyricsOffset
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +36,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,6 +49,18 @@ class UserPreferencesRepository @Inject constructor(
 ) {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    init {
+        scope.launch {
+            context.datastore.edit { prefs ->
+                val version = prefs[LYRICS_OFFSET_VERSION_KEY] ?: 0
+                if (version < LYRICS_OFFSET_CONVENTION_VERSION) {
+                    prefs[LYRICS_OFFSET_KEY] = migrateLyricsOffset(prefs[LYRICS_OFFSET_KEY] ?: 0, version)
+                    prefs[LYRICS_OFFSET_VERSION_KEY] = LYRICS_OFFSET_CONVENTION_VERSION
+                }
+            }
+        }
+    }
 
     // Shared so the DataStore read + blacklist Room query run once for all
     // collectors (PlaybackManager, PlaybackService, MainActivity, widgets)
@@ -290,7 +305,8 @@ class UserPreferencesRepository @Inject constructor(
         val accentColor = this[ACCENT_COLOR_KEY] ?: DEFAULT_ACCENT_COLOR
         val miniPlayerExtraControls = this[MINI_PLAYER_EXTRA_CONTROLS] ?: false
         
-        val lyricsOffsetMs = this[LYRICS_OFFSET_KEY] ?: 0
+        val offsetVersion = this[LYRICS_OFFSET_VERSION_KEY] ?: 0
+        val lyricsOffsetMs = migrateLyricsOffset(this[LYRICS_OFFSET_KEY] ?: 0, offsetVersion)
         val lyricsFontSize = this[LYRICS_FONT_SIZE_KEY] ?: "MEDIUM"
         val backgroundBlur = this[BACKGROUND_BLUR_KEY] ?: 60
         val keepScreenOn = this[KEEP_SCREEN_ON_KEY] ?: false
@@ -370,6 +386,7 @@ class UserPreferencesRepository @Inject constructor(
         val ALBUMS_GRID_SIZE_KEY = intPreferencesKey("ALBUMS_GRID_SIZE")
 
         val LYRICS_OFFSET_KEY = intPreferencesKey("LYRICS_OFFSET")
+        val LYRICS_OFFSET_VERSION_KEY = intPreferencesKey("LYRICS_OFFSET_CONVENTION_VERSION")
         val LYRICS_FONT_SIZE_KEY = stringPreferencesKey("LYRICS_FONT_SIZE")
         val BACKGROUND_BLUR_KEY = intPreferencesKey("BACKGROUND_BLUR")
         val KEEP_SCREEN_ON_KEY = booleanPreferencesKey("KEEP_SCREEN_ON")

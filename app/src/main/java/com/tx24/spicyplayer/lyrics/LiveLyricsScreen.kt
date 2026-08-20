@@ -59,6 +59,8 @@ import com.tx24.spicyplayer.lyrics.toSpicyStaticParsed
 import com.tx24.spicyplayer.lyrics.spicy.models.Line
 import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
 import com.tx24.spicyplayer.lyrics.spicy.models.ParsedLyrics
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsDocument
+import com.tx24.spicyplayer.lyrics.spicy.models.buildDisplayTimeline
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
@@ -85,6 +87,8 @@ fun LiveLyricsScreen(
         lyricsViewModel::setSongProgressMillis,
         lyricsViewModel::onRetry,
         lyricsViewModel::isPlaying,
+        lyricsViewModel::playbackSpeed,
+        lyricsViewModel::songDurationMillis,
         focusAnchorFraction = focusAnchorFraction,
         controlsVisible = controlsVisible,
     )
@@ -98,6 +102,8 @@ fun LiveLyricsScreen(
     onSeekToPositionMillis: (Long) -> Unit,
     onRetry: () -> Unit,
     isPlaying: () -> Boolean = { true },
+    playbackSpeed: () -> Float = { 1f },
+    songDurationMillis: () -> Long = { 0L },
     focusAnchorFraction: Float = 0.25f,
     controlsVisible: Boolean = true,
 ) {
@@ -111,35 +117,15 @@ fun LiveLyricsScreen(
         is LyricsScreenState.NotPlaying ->
             NotPlayingState(modifier = modifier)
 
-        is LyricsScreenState.TextLyrics ->
-            StaticLyricsState(
+        is LyricsScreenState.Ready ->
+            LyricsDocumentState(
                 modifier = modifier,
-                plainLyrics = state.plainLyrics,
+                document = state.document,
                 onSeekToPositionMillis = onSeekToPositionMillis,
                 songProgressMillis = songProgressMillis,
                 isPlaying = isPlaying,
-                focusAnchorFraction = focusAnchorFraction,
-                controlsVisible = controlsVisible,
-            )
-
-        is LyricsScreenState.SyncedLyrics ->
-            SyncedLyricsState(
-                modifier = modifier,
-                synchronizedLyrics = state.syncedLyrics,
-                onSeekToPositionMillis = onSeekToPositionMillis,
-                songProgressMillis = songProgressMillis,
-                isPlaying = isPlaying,
-                focusAnchorFraction = focusAnchorFraction,
-                controlsVisible = controlsVisible,
-            )
-
-        is LyricsScreenState.TtmlLyrics ->
-            TtmlLyricsState(
-                modifier = modifier,
-                parsedLyrics = state.parsedLyrics,
-                onSeekToPositionMillis = onSeekToPositionMillis,
-                songProgressMillis = songProgressMillis,
-                isPlaying = isPlaying,
+                playbackSpeed = playbackSpeed,
+                songDurationMillis = songDurationMillis,
                 focusAnchorFraction = focusAnchorFraction,
                 controlsVisible = controlsVisible,
             )
@@ -301,7 +287,10 @@ fun SyncedLyricsState(
     val spicyLines = remember(synchronizedLyrics) {
         synchronizedLyrics.toSpicyLines()
     }
-    SpicyLyricsPlayer(modifier, spicyLines, LyricsType.Line, onSeekToPositionMillis, songProgressMillis, isPlaying, focusAnchorFraction, controlsVisible)
+    SpicyLyricsPlayer(
+        modifier, spicyLines, LyricsType.Line, onSeekToPositionMillis, songProgressMillis, isPlaying,
+        focusAnchorFraction = focusAnchorFraction, controlsVisible = controlsVisible,
+    )
 }
 
 @Composable
@@ -315,7 +304,10 @@ fun StaticLyricsState(
     controlsVisible: Boolean = true,
 ) {
     val staticLines = remember(plainLyrics) { plainLyrics.toSpicyStaticParsed().lines }
-    SpicyLyricsPlayer(modifier, staticLines, LyricsType.Static, onSeekToPositionMillis, songProgressMillis, isPlaying, focusAnchorFraction, controlsVisible)
+    SpicyLyricsPlayer(
+        modifier, staticLines, LyricsType.Static, onSeekToPositionMillis, songProgressMillis, isPlaying,
+        focusAnchorFraction = focusAnchorFraction, controlsVisible = controlsVisible,
+    )
 }
 
 @Composable
@@ -328,7 +320,26 @@ fun TtmlLyricsState(
     focusAnchorFraction: Float = 0.25f,
     controlsVisible: Boolean = true,
 ) {
-    SpicyLyricsPlayer(modifier, parsedLyrics.lines, parsedLyrics.type, onSeekToPositionMillis, songProgressMillis, isPlaying, focusAnchorFraction, controlsVisible)
+    SpicyLyricsPlayer(modifier, parsedLyrics.lines, parsedLyrics.type, onSeekToPositionMillis, songProgressMillis, isPlaying,
+        documentId = parsedLyrics.documentId, focusAnchorFraction = focusAnchorFraction, controlsVisible = controlsVisible)
+}
+
+@Composable
+fun LyricsDocumentState(
+    modifier: Modifier,
+    document: LyricsDocument,
+    onSeekToPositionMillis: (Long) -> Unit,
+    songProgressMillis: () -> Long,
+    isPlaying: () -> Boolean,
+    playbackSpeed: () -> Float,
+    songDurationMillis: () -> Long,
+    focusAnchorFraction: Float,
+    controlsVisible: Boolean,
+) {
+    SpicyLyricsPlayer(
+        modifier, document.lines, document.type, onSeekToPositionMillis, songProgressMillis, isPlaying,
+        playbackSpeed, songDurationMillis, document.documentId, focusAnchorFraction, controlsVisible,
+    )
 }
 
 /**
@@ -344,6 +355,9 @@ private fun SpicyLyricsPlayer(
     onSeekToPositionMillis: (Long) -> Unit,
     songProgressMillis: () -> Long,
     isPlaying: () -> Boolean = { true },
+    playbackSpeed: () -> Float = { 1f },
+    songDurationMillis: () -> Long = { 0L },
+    documentId: String = "",
     focusAnchorFraction: Float = 0.25f,
     controlsVisible: Boolean = true,
 ) {
@@ -359,16 +373,19 @@ private fun SpicyLyricsPlayer(
     val renderConfig = remember(uiSettings.lyricsQualityMode) {
         RenderConfig.forModeName(uiSettings.lyricsQualityMode)
     }
+    val timelineLines = remember(lines, renderConfig.mode) {
+        buildDisplayTimeline(lines, minimalMode = renderConfig.mode.name == "MINIMAL")
+    }
 
     // Populate romanization off the main thread; TTML-supplied romanization is preserved.
-    val romanizedLines by produceState(initialValue = lines, lines) {
-        value = RomanizationService.romanize(lines)
+    val romanizedLines by produceState(initialValue = timelineLines, timelineLines) {
+        value = RomanizationService.romanize(timelineLines)
     }
     val hasRomanization = remember(romanizedLines) {
         romanizedLines.any { line -> line.words.any { it.romanizedText != null } }
     }
     // In-view toggle, seeded from the default setting.
-    var romanizeEnabled by remember(lines) { mutableStateOf(uiSettings.lyricsRomanize) }
+    var romanizeEnabled by remember(documentId) { mutableStateOf(uiSettings.lyricsRomanize) }
     val romanize = romanizeEnabled && hasRomanization
 
     // Frame-synced predicted playback clock (port of the reference's GetProgress pipeline):
@@ -376,24 +393,26 @@ private fun SpicyLyricsPlayer(
     // jitter-smoothed, so the karaoke sweep advances continuously instead of stepping with
     // the controller's coarse position updates. The +100ms forward lead lives in the clock.
     val playbackClock = remember { PlaybackClock() }
-    LaunchedEffect(lines, lyricsOffsetMs) {
+    LaunchedEffect(documentId) {
         playbackClock.reset()
     }
     // Diagnostic jump-detection state, reset alongside the clock so a song swap doesn't log a
     // false jump against the previous song's last sample.
-    val clockJumpTracker = remember(lines, lyricsOffsetMs) { ClockJumpTracker() }
+    val clockJumpTracker = remember(documentId) { ClockJumpTracker() }
 
     // Folded into SpicyLyricsView's own withFrameNanos loop via onFrameTick instead of running a
     // second, independent frame loop here — halves the Choreographer callbacks registered while a
     // lyrics screen is on-screen. Recreated on the same keys the old loop restarted on.
-    val onFrameTick = remember(lines, lyricsOffsetMs) {
+    val onFrameTick = remember(documentId, lyricsOffsetMs) {
         { frameNanos: Long ->
             val measured = songProgressMillis()
             val playing = isPlaying()
             val smoothed = playbackClock.positionMs(
                 measuredMs = measured,
                 isPlaying = playing,
+                playbackSpeed = playbackSpeed(),
                 nowMs = frameNanos / 1_000_000L,
+                durationMs = songDurationMillis(),
             )
             // Diagnostic: any frame-to-frame jump beyond ~4 frames means the sweep teleports.
             if (clockJumpTracker.lastOut != Long.MIN_VALUE && playing && clockJumpTracker.lastPlaying &&
@@ -406,18 +425,19 @@ private fun SpicyLyricsPlayer(
             }
             clockJumpTracker.lastOut = smoothed
             clockJumpTracker.lastPlaying = playing
-            currentTimeMs = smoothed + lyricsOffsetMs
+            currentTimeMs = smoothed - lyricsOffsetMs
         }
     }
 
     Box(modifier.fillMaxSize()) {
         SpicyLyricsView(
             lines = romanizedLines,
+            documentId = documentId,
             // Pass the clock as a provider rather than a value: reading it here would recompose
             // this composable every frame. The view invokes it inside its own frame loop instead.
             currentTimeMs = { currentTimeMs },
             onSeekWord = remember(lyricsOffsetMs, onSeekToPositionMillis) {
-                { seekTarget: Long -> onSeekToPositionMillis(seekTarget - lyricsOffsetMs - 100L) }
+                { seekTarget: Long -> onSeekToPositionMillis(seekTarget + lyricsOffsetMs - 100L) }
             },
             modifier = Modifier.fillMaxSize(),
             fontSizeScale = fontSizeScale,

@@ -8,6 +8,9 @@ import com.tx24.spicyplayer.playback.PlaybackManager
 import com.tx24.spicyplayer.library.store.lyrics.LyricsRepository
 import com.tx24.spicyplayer.library.store.lyrics.LyricsResult
 import com.tx24.spicyplayer.library.store.model.song.Song
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsFooter
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsProvenance
+import com.tx24.spicyplayer.lyrics.spicy.models.lyricsDocumentId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -92,17 +95,38 @@ class LiveLyricsViewModel @Inject constructor(
                 is LyricsResult.NetworkError ->
                     LyricsScreenState.NoLyrics(NoLyricsReason.NETWORK_ERROR)
 
-                is LyricsResult.FoundPlainLyrics ->
-                    LyricsScreenState.TextLyrics(lyricsResult.plainLyrics, lyricsResult.lyricsSource)
+                is LyricsResult.FoundPlainLyrics -> {
+                    val raw = lyricsResult.plainLyrics.constructStringForSharing()
+                    val document = lyricsResult.plainLyrics.toSpicyStaticParsed().copy(
+                        documentId = lyricsDocumentId(song.uri.toString(), lyricsResult.lyricsSource.name, raw),
+                        footer = LyricsFooter(provenance = LyricsProvenance(lyricsResult.lyricsSource.name)),
+                    )
+                    LyricsScreenState.Ready(document)
+                }
 
-                is LyricsResult.FoundSyncedLyrics ->
-                    LyricsScreenState.SyncedLyrics(lyricsResult.syncedLyrics, lyricsResult.lyricsSource)
+                is LyricsResult.FoundSyncedLyrics -> {
+                    val raw = lyricsResult.syncedLyrics.originalString
+                    val document = lyricsResult.syncedLyrics.toSpicyParsedLyrics().copy(
+                        documentId = lyricsDocumentId(song.uri.toString(), lyricsResult.lyricsSource.name, raw),
+                        footer = LyricsFooter(provenance = LyricsProvenance(lyricsResult.lyricsSource.name)),
+                    )
+                    LyricsScreenState.Ready(document)
+                }
 
                 is LyricsResult.FoundTtmlLyrics -> {
                     val parsed = com.tx24.spicyplayer.lyrics.spicy.parser.TtmlLyricsParser.parse(
                         lyricsResult.ttmlContent.byteInputStream()
                     )
-                    LyricsScreenState.TtmlLyrics(parsed, lyricsResult.lyricsSource)
+                    LyricsScreenState.Ready(
+                        parsed.copy(
+                            documentId = lyricsDocumentId(
+                                song.uri.toString(), lyricsResult.lyricsSource.name, lyricsResult.ttmlContent,
+                            ),
+                            footer = parsed.footer.copy(
+                                provenance = LyricsProvenance(lyricsResult.lyricsSource.name),
+                            ),
+                        )
+                    )
                 }
             }
         } catch (e: CancellationException) {
@@ -121,6 +145,11 @@ class LiveLyricsViewModel @Inject constructor(
     }
 
     fun isPlaying(): Boolean = playbackManager.isCurrentlyPlaying
+
+    fun playbackSpeed(): Float = playbackManager.playbackParameters.first
+
+    fun songDurationMillis(): Long =
+        playbackManager.state.value.currentPlayingSong?.metadata?.durationMillis ?: 0L
 
     fun setSongProgressMillis(millis: Long) {
         return playbackManager.seekToPositionMillis(millis)

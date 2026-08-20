@@ -1,9 +1,6 @@
 package com.tx24.spicyplayer.lyrics
 
-import com.tx24.spicyplayer.model.lyrics.LyricsFetchSource
-import com.tx24.spicyplayer.model.lyrics.PlainLyrics
-import com.tx24.spicyplayer.model.lyrics.SynchronizedLyrics
-import com.tx24.spicyplayer.library.store.model.song.Song
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsDocument
 
 
 sealed interface LyricsScreenState {
@@ -14,20 +11,7 @@ sealed interface LyricsScreenState {
 
     data object SearchingLyrics: LyricsScreenState
 
-    data class TextLyrics(
-        val plainLyrics: PlainLyrics,
-        val lyricsSource: LyricsFetchSource
-    ): LyricsScreenState
-
-    data class SyncedLyrics(
-        val syncedLyrics: SynchronizedLyrics,
-        val lyricsSource: LyricsFetchSource
-    ): LyricsScreenState
-
-    data class TtmlLyrics(
-        val parsedLyrics: com.tx24.spicyplayer.lyrics.spicy.models.ParsedLyrics,
-        val lyricsSource: LyricsFetchSource
-    ): LyricsScreenState
+    data class Ready(val document: LyricsDocument): LyricsScreenState
 
     data class NoLyrics(val reason: NoLyricsReason): LyricsScreenState
 }

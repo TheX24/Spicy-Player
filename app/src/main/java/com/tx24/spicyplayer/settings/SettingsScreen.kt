@@ -255,7 +255,7 @@ fun SettingsList(
                     value = userPreferences.uiSettings.lyricsOffsetMs,
                     onValueChange = { settingsCallbacks.setLyricsOffsetMs(it) },
                     valueRange = -5000..5000,
-                    step = 50,
+                    step = 10,
                     suffix = "ms"
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))

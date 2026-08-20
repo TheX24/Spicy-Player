@@ -25,6 +25,19 @@ internal class ScrollManager(
     private var scrollVelocity by mutableFloatStateOf(0f)
     private var lastDragTimeMs by mutableLongStateOf(0L)
 
+    fun reset() {
+        scrollSpring.resetTo(0f)
+        userScrollOffset = 0f
+        isUserScrolling = false
+        userScrollDecayTimer = 0f
+        lastInteractionTimeMs = 0L
+        lastFrameSongTime = 0L
+        wasPlaying = false
+        animScrollY = 0f
+        scrollVelocity = 0f
+        lastDragTimeMs = 0L
+    }
+
     fun updateScroll(
         currentTimeMs: Long,
         dt: Float,
