@@ -44,10 +44,11 @@ object RomanizationService {
             var changed = false
             val words = line.words.map { word ->
                 if (word.romanizedText != null) return@map word  // supplied romanization wins
-                val script = ScriptDetector.detect(word.text).firstOrNull() ?: return@map word
-                val romanizer = Romanizers.forScript(script) ?: return@map word
-                if (!romanizer.isAvailable()) return@map word
-                val romanized = romanizer.romanize(word.text)
+                var romanized = word.text
+                for (script in ScriptDetector.detect(word.text)) {
+                    val romanizer = Romanizers.forScript(script) ?: continue
+                    if (romanizer.isAvailable()) romanized = romanizer.romanize(romanized)
+                }
                 if (romanized != word.text && romanized.isNotBlank()) {
                     changed = true
                     word.copy(romanizedText = romanized)

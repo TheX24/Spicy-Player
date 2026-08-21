@@ -152,13 +152,25 @@ private fun DrawScope.drawVerticalWipeText(
  * paints inactive text as its own text-shadow (NotSung at the dim alpha, Sung at the bright
  * alpha) whose blur radius is the distance-based --BlurAmount.
  */
-private fun blurShadow(lineAnim: LineAnimState, stateAlpha: Float): Shadow? =
-    if (!lineAnim.suppressShadows && lineAnim.blur > 0.1f)
-        Shadow(
-            color = Color.White.copy(alpha = (stateAlpha * lineAnim.opacity).coerceIn(0f, 1f)),
-            blurRadius = lineAnim.blur,
-        )
-    else null
+private fun inactiveShadow(plan: LyricPaintPlan.InactiveShadow, suppressBlur: Boolean): Shadow = Shadow(
+    color = Color.White.copy(alpha = plan.alpha),
+    blurRadius = if (suppressBlur) 0f else plan.blurRadius,
+)
+
+private fun DrawScope.drawInactiveText(
+    layoutResult: TextLayoutResult,
+    xPos: Float,
+    yPos: Float,
+    plan: LyricPaintPlan.InactiveShadow,
+    suppressBlur: Boolean,
+) {
+    drawText(
+        textLayoutResult = layoutResult,
+        color = Color.Transparent,
+        shadow = inactiveShadow(plan, suppressBlur),
+        topLeft = Offset(xPos, yPos),
+    )
+}
 
 internal fun DrawScope.drawInterludeGroup(
     layout: LineLayout,
@@ -234,14 +246,12 @@ internal fun DrawScope.drawStandardLine(
         val textWidth = wLayout.textLayoutResult.size.width.toFloat()
         val textHeight = wLayout.textLayoutResult.size.height.toFloat()
 
-        // Non-active lines (blur-shadowed) render uniformly dim regardless of Sung/NotSung —
-        // the reference shows the same gradient dim stop for every unsung/inactive word.
-        val baseShadow = blurShadow(lineAnim, config.gradientAlphaDim)
+        val paintPlan = lyricPaintPlan(lineAnim.state, lineAnim.isBackground, lineAnim.opacity, lineAnim.blur, config)
 
         if (wordAnim.isLetterGroup) {
-            drawSyllabicLetterFragment(wLayout, wordAnim, lineAnim, xPos, yPos, textWidth, textHeight, scrollOffset, config, baseShadow, rtl)
+            drawSyllabicLetterFragment(wLayout, wordAnim, lineAnim, xPos, yPos, textWidth, textHeight, scrollOffset, config, paintPlan, rtl)
         } else {
-            drawStandardWord(wLayout, wordAnim, lineAnim, xPos, yPos, textWidth, textHeight, scrollOffset, config, baseShadow, rtl)
+            drawStandardWord(wLayout, wordAnim, lineAnim, xPos, yPos, textWidth, textHeight, scrollOffset, config, paintPlan, rtl)
         }
     }
 }
@@ -256,7 +266,7 @@ private fun DrawScope.drawSyllabicLetterFragment(
     textHeight: Float,
     scrollOffset: Float,
     config: RenderConfig,
-    baseShadow: Shadow?,
+    paintPlan: LyricPaintPlan,
     rtl: Boolean,
 ) {
     val lState = wordAnim.letterStates.getOrNull(wLayout.charIndex) ?: return
@@ -282,7 +292,7 @@ private fun DrawScope.drawSyllabicLetterFragment(
     val lShadow = when {
         !lineAnim.suppressShadows && lGlowOpacity > 0.02f ->
             Shadow(color = Color.White.copy(alpha = lGlowOpacity * lineAnim.opacity), blurRadius = lGlowBlur)
-        else -> baseShadow
+        else -> null
     }
 
     // Reference gradient stops are fixed for every state (bright 0.85 / dim 0.35; bg-line
@@ -303,7 +313,9 @@ private fun DrawScope.drawSyllabicLetterFragment(
         scale(lState.scale, lState.scale, Offset(sPivotX, sPivotY))
         translate(top = lYShift)
     }) {
-        drawWipeText(
+        if (paintPlan is LyricPaintPlan.InactiveShadow) drawInactiveText(
+            wLayout.textLayoutResult, xPos, yPos + scrollOffset, paintPlan, lineAnim.suppressShadows,
+        ) else drawWipeText(
             layoutResult = wLayout.textLayoutResult,
             xPos = xPos,
             yPos = yPos + scrollOffset,
@@ -330,7 +342,7 @@ private fun DrawScope.drawStandardWord(
     textHeight: Float,
     scrollOffset: Float,
     config: RenderConfig,
-    baseShadow: Shadow?,
+    paintPlan: LyricPaintPlan,
     rtl: Boolean,
 ) {
     // Glow shadow tracks the spring in every state (not gated to Active): the reference keeps
@@ -341,7 +353,7 @@ private fun DrawScope.drawStandardWord(
     val shadow = when {
         !lineAnim.suppressShadows && glowOpacity > 0.02f ->
             Shadow(color = Color.White.copy(alpha = glowOpacity * lineAnim.opacity), blurRadius = glowBlur)
-        else -> baseShadow
+        else -> null
     }
 
     val wordScale = wordAnim.scale
@@ -360,7 +372,9 @@ private fun DrawScope.drawStandardWord(
         scale(scaleX = wordScale, scaleY = wordScale, pivot = Offset(pivotX, pivotY))
         translate(top = wordYShift)
     }) {
-        drawWipeText(
+        if (paintPlan is LyricPaintPlan.InactiveShadow) drawInactiveText(
+            wLayout.textLayoutResult, xPos, yPos, paintPlan, lineAnim.suppressShadows,
+        ) else drawWipeText(
             layoutResult = wLayout.textLayoutResult,
             xPos = xPos,
             yPos = yPos,
@@ -386,7 +400,8 @@ internal fun DrawScope.drawLineModeLine(
     dynamicY: Float,
     config: RenderConfig,
 ) {
-    // Reference gradient stops are fixed for every state; only lineGradientPercent moves.
+    val paintPlan = lyricPaintPlan(lineAnim.state, lineAnim.isBackground, lineAnim.opacity, lineAnim.blur, config)
+    // Reference gradient stops are fixed for the active state; inactive lines are shadow-only.
     val dim = config.lineGradientAlphaDim * lineAnim.opacity
     val bright = config.gradientAlphaBright * lineAnim.opacity
 
@@ -398,7 +413,7 @@ internal fun DrawScope.drawLineModeLine(
             color = Color.White.copy(alpha = glowAlpha * lineAnim.opacity),
             blurRadius = 4f + 8f * lineAnim.lineGlow,
         )
-        else -> blurShadow(lineAnim, config.lineGradientAlphaDim)
+        else -> null
     }
     val lineWidth = layout.maxRowWidth.coerceAtLeast(1f)
 
@@ -416,7 +431,9 @@ internal fun DrawScope.drawLineModeLine(
             val yPos = dynamicY + wLayout.relativeOffset.y + scrollOffset
             val textWidth = wLayout.textLayoutResult.size.width.toFloat()
             val textHeight = wLayout.textLayoutResult.size.height.toFloat()
-            if (layout.isRtl) {
+            if (paintPlan is LyricPaintPlan.InactiveShadow) {
+                drawInactiveText(wLayout.textLayoutResult, xPos, yPos, paintPlan, lineAnim.suppressShadows)
+            } else if (layout.isRtl) {
                 // RTL lines keep the horizontal right→left sweep (.line.rtl -90deg !important).
                 drawWipeText(
                     layoutResult = wLayout.textLayoutResult,

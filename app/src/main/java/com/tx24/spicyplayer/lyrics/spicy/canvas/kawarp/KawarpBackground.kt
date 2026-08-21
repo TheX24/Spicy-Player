@@ -150,6 +150,7 @@ private val SPICY_OPTIONS = KawarpOptions(
 /** dynamicBackground.ts: after transitionDuration*2 ms, bump to 1000ms. */
 private const val KAWARP_TRANSITION_DURATION_MS = 1000f
 
+@RequiresApi(Build.VERSION_CODES.O)
 private fun floatsToF16Bitmap(pixels: FloatArray, size: Int): Bitmap {
     val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.RGBA_F16)
     // Same Color.argb(float...) conversion as before, but built into one IntArray and written
@@ -213,7 +214,7 @@ fun KawarpBackground(
     var nextAlbum by remember { mutableStateOf(blackAlbum) }
     var frameTick by remember { mutableLongStateOf(0L) }
 
-    // playpause handler from dynamicBackground.ts: paused → 0.1, playing → 1
+    // playpause handler from dynamicBackground.ts: paused -> 0.1, playing -> 1
     LaunchedEffect(isPlaying) {
         engine.targetAnimationSpeed = if (isPlaying) 1f else 0.1f
     }

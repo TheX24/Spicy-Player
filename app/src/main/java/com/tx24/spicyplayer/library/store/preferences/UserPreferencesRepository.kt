@@ -22,6 +22,11 @@ import com.tx24.spicyplayer.model.prefs.PlayerSettings
 import com.tx24.spicyplayer.model.prefs.PlayerTheme
 import com.tx24.spicyplayer.model.prefs.UiSettings
 import com.tx24.spicyplayer.model.prefs.UserPreferences
+import com.tx24.spicyplayer.lyrics.LYRICS_OFFSET_CONVENTION_VERSION
+import com.tx24.spicyplayer.lyrics.LYRICS_MODE_MIGRATION_VERSION
+import com.tx24.spicyplayer.lyrics.migrateLyricsOffset
+import com.tx24.spicyplayer.lyrics.migrateLegacyLyricsMode
+import com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +39,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,6 +52,32 @@ class UserPreferencesRepository @Inject constructor(
 ) {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    init {
+        scope.launch {
+            context.datastore.edit { prefs ->
+                val version = prefs[LYRICS_OFFSET_VERSION_KEY] ?: 0
+                if (version < LYRICS_OFFSET_CONVENTION_VERSION) {
+                    prefs[LYRICS_OFFSET_KEY] = migrateLyricsOffset(prefs[LYRICS_OFFSET_KEY] ?: 0, version)
+                    prefs[LYRICS_OFFSET_VERSION_KEY] = LYRICS_OFFSET_CONVENTION_VERSION
+                }
+                val modeVersion = prefs[LYRICS_MODE_VERSION_KEY] ?: 0
+                if (modeVersion < LYRICS_MODE_MIGRATION_VERSION) {
+                    val migrated = migrateLegacyLyricsMode(prefs[LYRICS_QUALITY_MODE_KEY])
+                    if (prefs[SIMPLE_LYRICS_MODE_KEY] == null) {
+                        prefs[SIMPLE_LYRICS_MODE_KEY] = migrated.simple
+                    }
+                    if (prefs[MINIMAL_LYRICS_MODE_KEY] == null) {
+                        prefs[MINIMAL_LYRICS_MODE_KEY] = migrated.minimal
+                    }
+                    if (prefs[SIMPLE_ANIMATION_STYLE_KEY] == null) {
+                        prefs[SIMPLE_ANIMATION_STYLE_KEY] = migrated.animationStyle.name
+                    }
+                    prefs[LYRICS_MODE_VERSION_KEY] = LYRICS_MODE_MIGRATION_VERSION
+                }
+            }
+        }
+    }
 
     // Shared so the DataStore read + blacklist Room query run once for all
     // collectors (PlaybackManager, PlaybackService, MainActivity, widgets)
@@ -201,8 +233,16 @@ class UserPreferencesRepository @Inject constructor(
         context.datastore.edit { it[BACKGROUND_BLUR_KEY] = blur }
     }
 
-    suspend fun setLyricsQualityMode(mode: String) {
-        context.datastore.edit { it[LYRICS_QUALITY_MODE_KEY] = mode }
+    suspend fun setSimpleLyricsMode(enabled: Boolean) {
+        context.datastore.edit { it[SIMPLE_LYRICS_MODE_KEY] = enabled }
+    }
+
+    suspend fun setMinimalLyricsMode(enabled: Boolean) {
+        context.datastore.edit { it[MINIMAL_LYRICS_MODE_KEY] = enabled }
+    }
+
+    suspend fun setSimpleAnimationStyle(style: SimpleAnimationStyle) {
+        context.datastore.edit { it[SIMPLE_ANIMATION_STYLE_KEY] = style.name }
     }
 
     suspend fun setLyricsBackgroundEngine(engine: String) {
@@ -290,11 +330,17 @@ class UserPreferencesRepository @Inject constructor(
         val accentColor = this[ACCENT_COLOR_KEY] ?: DEFAULT_ACCENT_COLOR
         val miniPlayerExtraControls = this[MINI_PLAYER_EXTRA_CONTROLS] ?: false
         
-        val lyricsOffsetMs = this[LYRICS_OFFSET_KEY] ?: 0
+        val offsetVersion = this[LYRICS_OFFSET_VERSION_KEY] ?: 0
+        val lyricsOffsetMs = migrateLyricsOffset(this[LYRICS_OFFSET_KEY] ?: 0, offsetVersion)
         val lyricsFontSize = this[LYRICS_FONT_SIZE_KEY] ?: "MEDIUM"
         val backgroundBlur = this[BACKGROUND_BLUR_KEY] ?: 60
         val keepScreenOn = this[KEEP_SCREEN_ON_KEY] ?: false
-        val lyricsQualityMode = this[LYRICS_QUALITY_MODE_KEY] ?: "FULL"
+        val legacyModes = migrateLegacyLyricsMode(this[LYRICS_QUALITY_MODE_KEY])
+        val simpleLyricsMode = this[SIMPLE_LYRICS_MODE_KEY] ?: legacyModes.simple
+        val minimalLyricsMode = this[MINIMAL_LYRICS_MODE_KEY] ?: legacyModes.minimal
+        val simpleAnimationStyle = safeEnumValueOf(
+            this[SIMPLE_ANIMATION_STYLE_KEY], SimpleAnimationStyle.CALCULATE,
+        )
         val lyricsBackgroundEngine = this[LYRICS_BG_ENGINE_KEY] ?: "AUTO"
         val lyricsRomanize = this[LYRICS_ROMANIZE_KEY] ?: false
 
@@ -310,7 +356,9 @@ class UserPreferencesRepository @Inject constructor(
             lyricsFontSize,
             backgroundBlur,
             keepScreenOn,
-            lyricsQualityMode,
+            simpleLyricsMode,
+            minimalLyricsMode,
+            simpleAnimationStyle,
             lyricsBackgroundEngine,
             lyricsRomanize
         )
@@ -370,10 +418,15 @@ class UserPreferencesRepository @Inject constructor(
         val ALBUMS_GRID_SIZE_KEY = intPreferencesKey("ALBUMS_GRID_SIZE")
 
         val LYRICS_OFFSET_KEY = intPreferencesKey("LYRICS_OFFSET")
+        val LYRICS_OFFSET_VERSION_KEY = intPreferencesKey("LYRICS_OFFSET_CONVENTION_VERSION")
         val LYRICS_FONT_SIZE_KEY = stringPreferencesKey("LYRICS_FONT_SIZE")
         val BACKGROUND_BLUR_KEY = intPreferencesKey("BACKGROUND_BLUR")
         val KEEP_SCREEN_ON_KEY = booleanPreferencesKey("KEEP_SCREEN_ON")
         val LYRICS_QUALITY_MODE_KEY = stringPreferencesKey("LYRICS_QUALITY_MODE")
+        val LYRICS_MODE_VERSION_KEY = intPreferencesKey("LYRICS_MODE_MIGRATION_VERSION")
+        val SIMPLE_LYRICS_MODE_KEY = booleanPreferencesKey("SIMPLE_LYRICS_MODE")
+        val MINIMAL_LYRICS_MODE_KEY = booleanPreferencesKey("MINIMAL_LYRICS_MODE")
+        val SIMPLE_ANIMATION_STYLE_KEY = stringPreferencesKey("SIMPLE_ANIMATION_STYLE")
         val LYRICS_BG_ENGINE_KEY = stringPreferencesKey("LYRICS_BG_ENGINE")
         val LYRICS_ROMANIZE_KEY = booleanPreferencesKey("LYRICS_ROMANIZE")
 

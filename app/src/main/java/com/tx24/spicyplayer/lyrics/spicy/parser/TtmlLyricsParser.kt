@@ -1,7 +1,9 @@
 package com.tx24.spicyplayer.lyrics.spicy.parser
 
 import com.tx24.spicyplayer.lyrics.spicy.models.Line
+import com.tx24.spicyplayer.lyrics.spicy.models.LineRole
 import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsFooter
 import com.tx24.spicyplayer.lyrics.spicy.models.ParsedLyrics
 import com.tx24.spicyplayer.lyrics.spicy.models.Word
 import org.xmlpull.v1.XmlPullParser
@@ -29,6 +31,7 @@ object TtmlLyricsParser {
     private data class ParagraphResult(
         val lines: List<Line>,
         val sawTimedSpan: Boolean,
+        val sawParagraphTiming: Boolean,
     )
 
     private const val ITUNES_NS = "http://music.apple.com/lyric-ttml-internal"
@@ -68,9 +71,11 @@ object TtmlLyricsParser {
         val songwriters = mutableListOf<String>()
         var eventType = parser.eventType
         var defaultAgent: String? = null
+        var nextGroupId = 0
 
         var inSongwriters = false
         var sawTimedSpan = false
+        var sawParagraphTiming = false
         // Explicit document timing granularity, if declared on <tt itunes:timing="…">.
         var declaredTiming: String? = null
 
@@ -135,9 +140,12 @@ object TtmlLyricsParser {
                                 ?: parser.getAttributeValue(null, "key")
                                 ?: parser.getAttributeValue("http://www.w3.org/XML/1998/namespace", "id")
                             // Parse the paragraph into one or more Line objects.
-                            val result = parseParagraph(parser, agent, defaultAgent, parentStart, parentEnd, key,
-                                transliterations, translations)
+                            val result = parseParagraph(
+                                parser, agent, defaultAgent, parentStart, parentEnd, key,
+                                transliterations, translations, nextGroupId++,
+                            )
                             if (result.sawTimedSpan) sawTimedSpan = true
+                            if (result.sawParagraphTiming) sawParagraphTiming = true
                             lines.addAll(result.lines)
                         }
                         "agent" -> {
@@ -183,52 +191,6 @@ object TtmlLyricsParser {
             eventType = parser.next()
         }
 
-        // Create a special line at the end for songwriter credits.
-        if (songwriters.isNotEmpty()) {
-            val lastLineEnd = lines.maxOfOrNull { it.endMs } ?: 0L
-            val text = "Written by ${songwriters.joinToString(", ")}"
-            val tokens = text.split(" ")
-            
-            val words = mutableListOf<Word>()
-            for (i in tokens.indices) {
-                words.add(Word(tokens[i], lastLineEnd, lastLineEnd + 1000L, isPartOfWord = false))
-            }
-            
-            lines.add(
-                Line(
-                    words = words,
-                    startMs = lastLineEnd,
-                    isSongwriter = true
-                )
-            )
-        }
-
-        // Inject instrumental interlude placeholders for significant gaps (>= 3s) between main lines.
-        val mainLines = lines.filter { !it.isSongwriter }
-            .sortedBy { it.startMs }
-        val interludes = mutableListOf<Line>()
-        for (i in 0 until mainLines.size - 1) {
-            val gapStart = mainLines[i].endMs
-            val gapEnd = mainLines[i + 1].startMs
-            if (gapEnd - gapStart >= 3000L) {
-                interludes.add(Line(
-                    words = emptyList(),
-                    startMs = gapStart,
-                    interludeEndMs = gapEnd,
-                    isInterlude = true,
-                ))
-            }
-        }
-        // Handle initial gap before the first line.
-        if (mainLines.isNotEmpty() && mainLines.first().startMs >= 3000L) {
-            interludes.add(Line(
-                words = emptyList(),
-                startMs = 0L,
-                interludeEndMs = mainLines.first().startMs,
-                isInterlude = true,
-            ))
-        }
-        lines.addAll(interludes)
         lines.sortBy { it.startMs }
 
         // Determine synchronization granularity. An explicit itunes:timing wins; otherwise a
@@ -237,14 +199,14 @@ object TtmlLyricsParser {
             "word" -> LyricsType.Syllable
             "line" -> LyricsType.Line
             "none" -> LyricsType.Static
-            else -> if (!sawTimedSpan && lines.any { !it.isInterlude && !it.isSongwriter }) {
-                LyricsType.Line
-            } else {
-                LyricsType.Syllable
+            else -> when {
+                sawTimedSpan -> LyricsType.Syllable
+                sawParagraphTiming -> LyricsType.Line
+                else -> LyricsType.Static
             }
         }
 
-        return ParsedLyrics(lines, songwriters, type)
+        return ParsedLyrics(lines = lines, footer = LyricsFooter(songwriters), type = type)
     }
 
     /** Reads and returns the concatenated text content of the current element, consuming its END_TAG. */
@@ -277,7 +239,10 @@ object TtmlLyricsParser {
         key: String?,
         transliterations: Map<String, List<String>>,
         translations: Map<String, StringBuilder>,
+        groupId: Int,
     ): ParagraphResult {
+        val sawParagraphTiming = parser.getAttributeValue(null, "begin") != null ||
+            parser.getAttributeValue(null, "end") != null
         val pBegin = parser.getAttributeValue(null, "begin")?.let { parseTimeMs(it) } ?: parentStart
         val pEnd = parser.getAttributeValue(null, "end")?.let { parseTimeMs(it) } ?: parentEnd ?: (pBegin + 5000L)
 
@@ -428,20 +393,19 @@ object TtmlLyricsParser {
                 leadWords[i] = leadWords[i].copy(romanizedText = romanizedTokens[i])
             }
         }
-        val translated = key?.let { translations[it]?.toString()?.trim()?.takeIf { t -> t.isNotEmpty() } }
-        val inlineRoman = inlineRomanText.toString().trim().takeIf { it.isNotEmpty() }
-
         val result = mutableListOf<Line>()
         // Add the primary lead line.
-        result.add(Line(leadWords, pBegin, agent = agent, isBackground = false,
-            oppositeAligned = isOppositeAligned, translatedText = translated, romanizedFull = inlineRoman))
+        result.add(Line(leadWords, pBegin, endMs = pEnd, agent = agent, role = LineRole.LEAD, groupId = groupId,
+            oppositeAligned = isOppositeAligned))
         // Add any associated background lines.
         for (bgGroup in backgroundGroups) {
             val bgStart = bgGroup.firstOrNull()?.startMs ?: pBegin
-            result.add(Line(bgGroup, bgStart, agent = agent, isBackground = true, oppositeAligned = isOppositeAligned))
+            val bgEnd = bgGroup.lastOrNull()?.endMs ?: pEnd
+            result.add(Line(bgGroup, bgStart, endMs = bgEnd, agent = agent, role = LineRole.BACKGROUND,
+                groupId = groupId, oppositeAligned = isOppositeAligned))
         }
 
-        return ParagraphResult(result, sawTimedSpan)
+        return ParagraphResult(result, sawTimedSpan, sawParagraphTiming)
     }
 
     /**

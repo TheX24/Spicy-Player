@@ -255,7 +255,7 @@ fun SettingsList(
                     value = userPreferences.uiSettings.lyricsOffsetMs,
                     onValueChange = { settingsCallbacks.setLyricsOffsetMs(it) },
                     valueRange = -5000..5000,
-                    step = 50,
+                    step = 10,
                     suffix = "ms"
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
@@ -267,13 +267,29 @@ fun SettingsList(
                     onSelect = { settingsCallbacks.setLyricsFontSize(when (it) { 0 -> "SMALL"; 2 -> "LARGE"; else -> "MEDIUM" }) }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                SegmentedSettingItem(
+                SwitchSettingItem(
                     icon = Icons.Rounded.AutoAwesome,
-                    title = "Quality",
-                    subtitle = "Full has all effects; Minimal fades sung lines",
-                    options = listOf("Full", "Simple", "Minimal"),
-                    selectedIndex = when (userPreferences.uiSettings.lyricsQualityMode) { "SIMPLE" -> 1; "MINIMAL" -> 2; else -> 0 },
-                    onSelect = { settingsCallbacks.setLyricsQualityMode(when (it) { 1 -> "SIMPLE"; 2 -> "MINIMAL"; else -> "FULL" }) }
+                    title = "Simple Lyrics Mode",
+                    subtitle = "Reduces word and dot effects while retaining line blur",
+                    checked = userPreferences.uiSettings.simpleLyricsMode,
+                    onCheckedChange = settingsCallbacks::setSimpleLyricsMode,
+                )
+                if (userPreferences.uiSettings.simpleLyricsMode) {
+                    SegmentedSettingItem(
+                        icon = Icons.Rounded.Animation,
+                        title = "Simple Text Animation",
+                        options = listOf("Calculate", "Animate"),
+                        selectedIndex = if (userPreferences.uiSettings.simpleAnimationStyle == com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle.ANIMATE) 1 else 0,
+                        onSelect = { settingsCallbacks.setSimpleAnimationStyle(if (it == 1) com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle.ANIMATE else com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle.CALCULATE) },
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                SwitchSettingItem(
+                    icon = Icons.Rounded.VisibilityOff,
+                    title = "Minimal Lyrics Mode",
+                    subtitle = "Fades sung lines in full-screen lyrics; can combine with Simple",
+                    checked = userPreferences.uiSettings.minimalLyricsMode,
+                    onCheckedChange = settingsCallbacks::setMinimalLyricsMode,
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 SegmentedSettingItem(

@@ -27,6 +27,7 @@ class PlaybackClock {
     private var anchorMs = 0.0
     private var anchorAtMs = 0L
     private var lastMeasuredMs = Long.MIN_VALUE
+    private var lastPlaybackSpeed = Float.NaN
 
     // Stage 2: predicted clock.
     private var predictedMs = 0.0
@@ -43,6 +44,7 @@ class PlaybackClock {
     fun reset() {
         initialized = false
         lastMeasuredMs = Long.MIN_VALUE
+        lastPlaybackSpeed = Float.NaN
     }
 
     /**
@@ -51,30 +53,46 @@ class PlaybackClock {
      * @param nowMs a monotonic wall-clock timestamp in ms (frame time).
      * @return the smoothed position, with the +100ms lead applied while playing.
      */
-    fun positionMs(measuredMs: Long, isPlaying: Boolean, nowMs: Long): Long {
+    fun positionMs(
+        measuredMs: Long,
+        isPlaying: Boolean,
+        playbackSpeed: Float,
+        nowMs: Long,
+        durationMs: Long,
+    ): Long {
+        val speed = playbackSpeed.coerceAtLeast(0f).toDouble()
+        fun clamp(position: Long): Long = if (durationMs > 0L) position.coerceIn(0L, durationMs)
+        else position.coerceAtLeast(0L)
+
         if (!isPlaying) {
             reset()
-            return measuredMs
+            return clamp(measuredMs)
         }
 
-        // Stage 1: re-anchor whenever the measurement moves; extrapolate in between.
-        if (lastMeasuredMs == Long.MIN_VALUE || measuredMs != lastMeasuredMs) {
+        // A speed change invalidates both predictors. Re-anchor at the measured media position.
+        if (lastPlaybackSpeed.isNaN() || playbackSpeed != lastPlaybackSpeed) {
+            initialized = false
+            anchorMs = measuredMs.toDouble()
+            anchorAtMs = nowMs
+            lastMeasuredMs = measuredMs
+            lastPlaybackSpeed = playbackSpeed
+        } else if (lastMeasuredMs == Long.MIN_VALUE || measuredMs != lastMeasuredMs) {
             anchorMs = measuredMs.toDouble()
             anchorAtMs = nowMs
             lastMeasuredMs = measuredMs
         }
-        val extrapolated = anchorMs + (nowMs - anchorAtMs).coerceAtLeast(0L)
+        val extrapolated = anchorMs + (nowMs - anchorAtMs).coerceAtLeast(0L) * speed
 
         // Stage 2: predicted clock pulled toward the extrapolated measurement.
         if (!initialized) {
             predictedMs = extrapolated
             updatedAtMs = nowMs
             initialized = true
-            return predictedMs.toLong() + PROGRESS_POSITION_OFFSET_MS
+            return clamp(predictedMs.toLong() + PROGRESS_POSITION_OFFSET_MS)
         }
 
         val elapsed = (nowMs - updatedAtMs).coerceAtLeast(0L).toDouble()
-        var predicted = predictedMs + elapsed
+        var predicted = predictedMs + elapsed * speed
 
         val error = extrapolated - predicted
         if (abs(error) > JITTER_RESYNC_THRESHOLD_MS) {
@@ -90,6 +108,6 @@ class PlaybackClock {
 
         predictedMs = predicted.coerceAtLeast(0.0)
         updatedAtMs = nowMs
-        return predictedMs.toLong() + PROGRESS_POSITION_OFFSET_MS
+        return clamp(predictedMs.toLong() + PROGRESS_POSITION_OFFSET_MS)
     }
 }

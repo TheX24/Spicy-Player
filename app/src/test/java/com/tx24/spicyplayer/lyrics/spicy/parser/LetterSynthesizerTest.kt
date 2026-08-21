@@ -61,11 +61,11 @@ class LetterSynthesizerTest {
     }
 
     @Test
-    fun `minimal mode disables letters entirely`() {
+    fun `minimal mode preserves held letter animation`() {
         val word = Word("Yeah", 16_000L, 17_500L)
         val out = LetterSynthesizer.apply(listOf(lineOf(word)), RenderConfig.MINIMAL, romanized = false)
             .single().words.single()
-        assertFalse(out.isLetterGroup)
+        assertTrue(out.isLetterGroup)
     }
 
     @Test
@@ -77,5 +77,13 @@ class LetterSynthesizerTest {
         assertTrue(out.isLetterGroup)
         assertEquals(4, out.letters.size)
         assertEquals("k", out.letters[0].char)
+    }
+
+    @Test
+    fun `held emoji is timed by extended grapheme cluster`() {
+        val word = Word("👩🏽‍🎤!", 0L, 2_000L)
+        val out = LetterSynthesizer.apply(listOf(lineOf(word)), RenderConfig.FULL, romanized = false)
+            .single().words.single()
+        assertEquals(listOf("👩🏽‍🎤", "!"), out.letters.map { it.char })
     }
 }

@@ -2,7 +2,10 @@ package com.tx24.spicyplayer.lyrics.spicy.animation
 
 import androidx.compose.runtime.MonotonicFrameClock
 import com.tx24.spicyplayer.lyrics.spicy.RenderConfig
+import com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle
 import com.tx24.spicyplayer.lyrics.spicy.models.Line
+import com.tx24.spicyplayer.lyrics.spicy.models.LineRole
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
 import com.tx24.spicyplayer.lyrics.spicy.models.Word
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +32,9 @@ class LyricsAnimatorTest {
 
     private fun animator() =
         LyricsAnimator(CoroutineScope(Dispatchers.Unconfined + TestFrameClock()), RenderConfig.FULL)
+
+    private fun animator(config: RenderConfig) =
+        LyricsAnimator(CoroutineScope(Dispatchers.Unconfined + TestFrameClock()), config)
 
     private val lines = listOf(
         Line(words = listOf(Word("Hello", 0L, 1000L)), startMs = 0L),
@@ -93,5 +99,42 @@ class LyricsAnimatorTest {
         val states = a.animate(lines, 500L, frameDt)
         assertEquals(0f, states[0].blur, 0.001f)
         assertEquals(1.25f, states[1].blur, 0.001f)  // distance 1 × BlurMultiplier
+    }
+
+    @Test
+    fun `simple mode preserves the exact 33 point 5 millisecond lead shift`() {
+        val line = listOf(Line(listOf(Word("lead", 1_000L, 2_000L)), 1_000L))
+        val a = animator(RenderConfig.SIMPLE)
+
+        assertEquals(ElementState.NotSung, a.animate(line, 1_033L, frameDt).single().state)
+        assertEquals(ElementState.Active, a.animate(line, 1_034L, frameDt).single().state)
+    }
+
+    @Test
+    fun `simple line mode fills immediately without glow`() {
+        val line = listOf(Line(listOf(Word("line", 0L, 1_000L)), 0L))
+        val state = animator(RenderConfig.SIMPLE)
+            .animate(line, 500L, frameDt, lyricsType = LyricsType.Line)
+            .single()
+
+        assertEquals(100f, state.lineGradientPercent, 0.001f)
+        assertEquals(0f, state.lineGlow, 0.001f)
+    }
+
+    @Test
+    fun `simple interlude dots animate opacity only`() {
+        val interlude = listOf(
+            Line(emptyList(), 0L, 3_000L, role = LineRole.INTERLUDE),
+        )
+        val state = animator(RenderConfig(true, false, SimpleAnimationStyle.ANIMATE))
+            .animate(interlude, 1_000L, frameDt)
+            .single().wordStates
+
+        assertTrue(state.isNotEmpty())
+        state.forEach { dot ->
+            assertEquals(1f, dot.scale, 0.001f)
+            assertEquals(0f, dot.yOffset, 0.001f)
+            assertEquals(0f, dot.dotGlow, 0.001f)
+        }
     }
 }

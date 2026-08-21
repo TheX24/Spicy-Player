@@ -12,15 +12,24 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.platform.LocalDensity
 import com.tx24.spicyplayer.lyrics.fadingEdge
 import com.tx24.spicyplayer.lyrics.spicy.RenderConfig
 import com.tx24.spicyplayer.lyrics.spicy.animation.LineAnimState
 import com.tx24.spicyplayer.lyrics.spicy.animation.LyricsAnimator
 import com.tx24.spicyplayer.lyrics.spicy.models.Line
 import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
+import com.tx24.spicyplayer.lyrics.spicy.models.LyricsFooter
 import com.tx24.spicyplayer.lyrics.spicy.parser.LetterSynthesizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 /**
  * The main lyrics display component representing the split architecture.
@@ -35,6 +44,8 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SpicyLyricsView(
     lines: List<Line>,
+    documentId: String,
+    footer: LyricsFooter = LyricsFooter(),
     currentTimeMs: () -> Long,
     onSeekWord: (Long) -> Unit,
     modifier: Modifier = Modifier,
@@ -51,7 +62,8 @@ fun SpicyLyricsView(
     onFrameTick: ((Long) -> Unit)? = null,
 ) {
     val textMeasurer = rememberTextMeasurer()
-    var lineLayouts by remember { mutableStateOf<List<LineLayout>>(emptyList()) }
+    var lineLayouts by remember(documentId) { mutableStateOf<List<LineLayout>>(emptyList()) }
+    val layoutGeneration = remember(documentId) { LayoutGenerationGate() }
     val coroutineScope = rememberCoroutineScope()
 
     // Synthesize per-letter emphasis for held words using the active config (mode-dependent
@@ -60,9 +72,9 @@ fun SpicyLyricsView(
         if (lyricsType == LyricsType.Syllable) LetterSynthesizer.apply(lines, config, romanize) else lines
     }
 
-    val animator = remember { LyricsAnimator(coroutineScope, config) }
+    val animator = remember(documentId) { LyricsAnimator(coroutineScope, config) }
     LaunchedEffect(config) { animator.config = config }
-    LaunchedEffect(lines) { animator.reset() }
+    LaunchedEffect(documentId) { animator.reset() }
     val isStatic = lyricsType == LyricsType.Static
 
     // Keep the latest time provider without recomposing on every position tick: the frame loop
@@ -73,21 +85,49 @@ fun SpicyLyricsView(
     val lineLayoutsUpdated by rememberUpdatedState(lineLayouts)
     val onFrameTickUpdated by rememberUpdatedState(onFrameTick)
 
-    val scrollManager = remember { ScrollManager() }
+    val scrollManager = remember(documentId) { ScrollManager().also { it.reset() } }
+    val scrollPolicy = remember(documentId) { ScrollPolicyController() }
+    val density = LocalDensity.current
 
     BoxWithConstraints(modifier = modifier.fillMaxSize().clipToBounds()) {
         val canvasWidth = constraints.maxWidth.toFloat()
         val canvasHeight = constraints.maxHeight.toFloat()
-        // Anchor the active line from the top (reference: margin-top 25cqh; callers with a
-        // taller, dedicated lyrics viewport — e.g. landscape's split pane — may override this).
-        val centerY = canvasHeight * focusAnchorFraction
-        val horizontalPadding = 40f
-        val hasDuet = remember(displayLines) { displayLines.any { it.oppositeAligned } }
-
+        // Compact fullscreen keeps the active lyric in the upper portion of the viewport.
+        val centerY = ScrollPolicyController.anchorY(canvasHeight, focusAnchorFraction)
+        val footerMetrics = remember(canvasWidth, density.density, fontSizeScale, lyricsType) {
+            LyricsLayoutMetrics(canvasWidth, density.density, lyricsType, fontSizeScale)
+        }
+        val footerSlot = footerMetrics.contentSlot(false, false, false)
+        val footerLayouts = remember(footer, footerMetrics.baseFontSizeSp, footerSlot.widthPx) {
+            val constraints = Constraints(maxWidth = footerSlot.widthPx.roundToInt().coerceAtLeast(1))
+            buildList {
+                if (footer.songwriters.isNotEmpty()) {
+                    add(textMeasurer.measure(
+                        AnnotatedString("Written by: ${footer.songwriters.joinToString(", ")}"),
+                        TextStyle(fontSize = (footerMetrics.baseFontSizeSp * 0.47f).sp, fontWeight = FontWeight.Medium),
+                        constraints = constraints,
+                    ) to 0.6f)
+                }
+                footer.provenance?.let { provenance ->
+                    val contributor = provenance.contributor?.takeIf { it.isNotBlank() }?.let { " • $it" }.orEmpty()
+                    add(textMeasurer.measure(
+                        AnnotatedString("Lyrics: ${provenance.provider}$contributor"),
+                        TextStyle(fontSize = (footerMetrics.baseFontSizeSp * 0.38f).sp, fontWeight = FontWeight.Normal),
+                        constraints = constraints,
+                    ) to 0.45f)
+                }
+            }
+        }
         // Recalculate layouts whenever the lyrics, dimensions, or font size change.
-        LaunchedEffect(displayLines, canvasWidth, fontSizeScale, romanize) {
-            withContext(Dispatchers.Default) {
-                lineLayouts = LyricsLayoutCalculator.calculateLineLayouts(displayLines, canvasWidth, textMeasurer, fontSizeScale, romanize)
+        LaunchedEffect(displayLines, canvasWidth, fontSizeScale, romanize, documentId) {
+            val generation = layoutGeneration.next()
+            val measured = withContext(Dispatchers.Default) {
+                LyricsLayoutCalculator.calculateLineLayouts(
+                    displayLines, canvasWidth, textMeasurer, density.density, lyricsType, fontSizeScale, romanize,
+                )
+            }
+            if (layoutGeneration.isCurrent(generation)) {
+                lineLayouts = measured
             }
         }
 
@@ -154,46 +194,18 @@ fun SpicyLyricsView(
                             dynamicYOffsets = newDynamicYOffsets.copyOf()
                         }
 
-                        // 2. Identify all active lines and update the scroll target to center on
-                        // them. Done with plain index loops to avoid allocating intermediate
-                        // lists on every frame.
-                        var minY = Float.MAX_VALUE
-                        var maxY = -Float.MAX_VALUE
-                        var hasActive = false
-                        for (i in currentLayouts.indices) {
-                            val layout = currentLayouts[i]
-                            if (layout.isBackground || layout.isSongwriter) continue
-                            val line = currentLines[i]
-                            if (line.startMs <= currentTime && currentTime <= line.endMs) {
-                                hasActive = true
-                                val top = newDynamicYOffsets[i]
-                                val bottom = top + layout.height
-                                if (top < minY) minY = top
-                                if (bottom > maxY) maxY = bottom
-                            }
+                        // 2. Resolve the reference lead/background overlap policy, then anchor
+                        // that one line at viewport center minus 30dp.
+                        val decision = scrollPolicy.decide(currentLines, currentTime)
+                        val targetIndex = decision.targetIndex
+                        var targetY: Float? = targetIndex?.let { index ->
+                            -(newDynamicYOffsets[index] + currentLayouts[index].height / 2f)
                         }
-
-                        var targetY: Float? = null
-                        if (hasActive) {
-                            // Center on the combined Y-range of all active lines.
-                            val clusterCenterY = (minY + maxY) / 2f
-                            targetY = -clusterCenterY
-                        } else {
-                            // Fallback: center on the latest line that has already started.
-                            var lastStartedIdx = -1
-                            for (i in currentLayouts.indices) {
-                                val layout = currentLayouts[i]
-                                if (layout.isBackground || layout.isSongwriter) continue
-                                if (currentLines[i].startMs <= currentTime) lastStartedIdx = i
-                            }
-                            if (lastStartedIdx < 0) lastStartedIdx = 0
-
-                            if (lastStartedIdx < currentLayouts.size) {
-                                val fallbackLayout = currentLayouts[lastStartedIdx]
-                                val fallbackDynamicY = newDynamicYOffsets[lastStartedIdx]
-                                targetY = -(fallbackDynamicY + fallbackLayout.height / 2f)
-                            }
-                        }
+                        val targetVisiblePx = targetIndex?.let { index ->
+                            val top = centerY + scrollManager.animScrollY + newDynamicYOffsets[index]
+                            val bottom = top + currentLayouts[index].height
+                            (minOf(bottom, canvasHeight) - maxOf(top, 0f)).coerceAtLeast(0f)
+                        } ?: Float.POSITIVE_INFINITY
 
                         // 3. Step the scroll spring and handle user overrides.
                         val lastLayout = currentLayouts.lastOrNull()
@@ -201,19 +213,26 @@ fun SpicyLyricsView(
 
                         // Static lyrics have no timing to follow: leave scrolling entirely to the user.
                         if (isStatic) targetY = null
-                        scrollManager.updateScroll(currentTime, deltaTime, totalContentHeight, targetY)
+                        scrollManager.updateScroll(
+                            currentTime, deltaTime, totalContentHeight, targetY,
+                            snap = decision.motion == ScrollMotion.SNAP,
+                            targetVisiblePx = targetVisiblePx,
+                        )
                     }
                 }
             }
         }
 
-        // Top/bottom fade mask (reference: 64px --ImageMask fade on the lyrics content).
-        val fadeFraction = if (canvasHeight > 0f) (64f / canvasHeight).coerceIn(0f, 0.45f) else 0f
-        val fadeBrush = remember(fadeFraction) {
+        // The sole renderer mask: transparent through 16dp, ramping to opaque at 64dp,
+        // with a symmetric bottom edge.
+        val maskStops = lyricsMaskStops(canvasHeight, density.density)
+        val fadeBrush = remember(maskStops) {
             Brush.verticalGradient(
                 0f to Color.Transparent,
-                fadeFraction to Color.Black,
-                1f - fadeFraction to Color.Black,
+                maskStops.outerTop to Color.Transparent,
+                maskStops.innerTop to Color.Black,
+                maskStops.innerBottom to Color.Black,
+                maskStops.outerBottom to Color.Transparent,
                 1f to Color.Transparent,
             )
         }
@@ -271,13 +290,28 @@ fun SpicyLyricsView(
                     return@forEachIndexed
                 }
 
-                val lineStartX = getLineStartX(layout, size.width, horizontalPadding, hasDuet)
+                val lineStartX = getLineStartX(layout)
 
                 when {
                     layout.isInterlude -> drawInterludeGroup(layout, lineAnim, lineStartX, scrollOffset, dynamicY)
                     lyricsType == LyricsType.Static -> drawStaticLine(layout, lineAnim, lineStartX, scrollOffset, dynamicY)
                     lyricsType == LyricsType.Line -> drawLineModeLine(layout, lineAnim, lineStartX, scrollOffset, dynamicY, config)
                     else -> drawStandardLine(layout, lineAnim, lineStartX, scrollOffset, dynamicY, config)
+                }
+            }
+
+            if (footerLayouts.isNotEmpty()) {
+                var footerY = (lineLayouts.lastOrNull()?.let { layout ->
+                    dynamicYOffsets.getOrElse(lineLayouts.lastIndex) { layout.yOffset } + layout.height
+                } ?: 0f) + footerMetrics.lineGapPx * 3f + scrollOffset
+                footerLayouts.forEach { (textLayout, alpha) ->
+                    drawText(
+                        textLayoutResult = textLayout,
+                        color = Color.White,
+                        alpha = alpha,
+                        topLeft = androidx.compose.ui.geometry.Offset(footerSlot.startPx, footerY),
+                    )
+                    footerY += textLayout.size.height + footerMetrics.lineGapPx
                 }
             }
         }
@@ -289,16 +323,10 @@ fun SpicyLyricsView(
  */
 private fun getLineStartX(
     layout: LineLayout,
-    canvasWidth: Float,
-    horizontalPadding: Float,
-    hasDuet: Boolean,
 ): Float {
-    if (layout.isSongwriter) {
-        return horizontalPadding
-    }
     return if (layout.isRightAligned) {
-        canvasWidth - horizontalPadding - layout.totalWidth
+        layout.contentStartX + layout.contentWidth - layout.totalWidth
     } else {
-        horizontalPadding
+        layout.contentStartX
     }
 }

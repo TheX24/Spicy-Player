@@ -3,8 +3,10 @@ package com.tx24.spicyplayer.lyrics.spicy.animation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.tween
 import com.tx24.spicyplayer.lyrics.spicy.RenderConfig
+import com.tx24.spicyplayer.lyrics.spicy.SimpleAnimationStyle
 import com.tx24.spicyplayer.lyrics.spicy.models.Line
 import com.tx24.spicyplayer.lyrics.spicy.models.LyricsType
 import com.tx24.spicyplayer.lyrics.spicy.models.Word
@@ -121,7 +123,24 @@ class LyricsAnimator(
         val OPACITY_EASING = CubicBezierEasing(0.61f, 1f, 0.88f, 1f)
         val SCALE_EASING = CubicBezierEasing(0.37f, 0f, 0.63f, 1f)
         /** Reference dot-group collapse (Mixed.css .pre-hidden .dotGroup): 0.4s w/ dip-then-overshoot. */
-        val DOT_GROUP_COLLAPSE_EASING = CubicBezierEasing(0.68f, -0.6f, 0.32f, 1.6f)
+        val DOT_COLLAPSE_STOPS = floatArrayOf(
+            0f, 0f, 0.094f, -0.006f, 0.18f, -0.029f, 0.433f, -0.157f,
+            0.514f, -0.185f, 0.559f, -0.189f, 0.6f, -0.182f, 0.639f, -0.163f,
+            0.676f, -0.133f, 0.723f, -0.074f, 0.767f, 0.006f, 0.85f, 0.238f,
+            0.927f, 0.566f, 1f, 1f,
+        )
+        val DOT_GROUP_COLLAPSE_EASING = Easing { fraction ->
+            val stops = DOT_COLLAPSE_STOPS
+            var index = 0
+            while (index < stops.size - 4 && fraction > stops[index + 2]) index += 2
+            val x0 = stops[index]
+            val y0 = stops[index + 1]
+            val x1 = stops[index + 2]
+            val y1 = stops[index + 3]
+            y0 + (y1 - y0) * ((fraction - x0) / (x1 - x0).coerceAtLeast(0.0001f))
+        }
+        const val MUSICAL_LINE_TRANSITION_MS = 140
+        const val DOT_GROUP_EXPANSION_MS = 300
         const val DOT_GROUP_COLLAPSE_MS = 400
 
         fun spline(vararg points: Pair<Float, Float>) =
@@ -201,12 +220,13 @@ class LyricsAnimator(
                 LineAnimState(
                     opacity = 1f, blur = 0f, scale = 1f, isActive = false,
                     wordStates = emptyList(), isBackground = false, isSongwriter = false,
+                    state = ElementState.NotSung,
                 )
             }
         }
 
-        val processedPosition = if (config.isSimple)
-            currentTimeMs - SIMPLE_MODE_POSITION_SHIFT_MS.toLong() else currentTimeMs
+        val processedPosition = currentTimeMs.toDouble() -
+            if (config.isSimple) SIMPLE_MODE_POSITION_SHIFT_MS.toDouble() else 0.0
 
         if (blurAmounts.size != lines.size) blurAmounts = FloatArray(lines.size)
 
@@ -231,6 +251,11 @@ class LyricsAnimator(
             val opacity = animateLineOpacity(lineIdx, line, lineState, isActive)
             val lineScale = when {
                 line.isInterlude -> animateInterludeScale(lineIdx, line, processedPosition, isActive)
+                config.isMinimal -> animateTweenScale(lineIdx, when (lineState) {
+                    ElementState.Active -> 1f
+                    ElementState.Sung -> 0.95f
+                    ElementState.NotSung -> 0.965f
+                })
                 // Line-mode active line scales to 1.05 (CSS: data-lyrics-type="Line" .line.Active).
                 lyricsType == LyricsType.Line && !line.isSongwriter ->
                     animateTweenScale(lineIdx, if (isActive) 1.05f else 1f)
@@ -246,14 +271,18 @@ class LyricsAnimator(
                 when (lineState) {
                     ElementState.Active -> {
                         val pct = progress(processedPosition, line.startMs, line.endMs)
-                        lineGradient = pct * 100f
-                        val spring = lineGlowSprings.getOrPut(lineIdx) {
-                            SpringSimulation(lineGlowSpline.at(0f), LINE_GLOW_FREQUENCY, LINE_GLOW_DAMPING)
+                        lineGradient = if (config.isSimple) 100f else pct * 100f
+                        if (config.isSimple) {
+                            lineGlow = 0f
+                        } else {
+                            val spring = lineGlowSprings.getOrPut(lineIdx) {
+                                SpringSimulation(lineGlowSpline.at(0f), LINE_GLOW_FREQUENCY, LINE_GLOW_DAMPING)
+                            }
+                            spring.setGoal(lineGlowSpline.at(pct))
+                            lineGlow = spring.step(deltaTime)
                         }
-                        spring.setGoal(lineGlowSpline.at(pct))
-                        lineGlow = spring.step(deltaTime)
                     }
-                    ElementState.NotSung -> lineGradient = -20f
+                    ElementState.NotSung -> lineGradient = if (config.isSimple) 100f else -20f
                     ElementState.Sung -> lineGradient = 100f
                 }
                 cachedLineGradient[lineIdx] = lineGradient
@@ -308,6 +337,7 @@ class LyricsAnimator(
                 lineGradientPercent = lineGradient,
                 lineGlow = lineGlow,
                 suppressShadows = suppressBlur,
+                state = lineState,
             )
         }
     }
@@ -322,7 +352,7 @@ class LyricsAnimator(
     ): Float {
         val target = when {
             line.isSongwriter -> 0.6f
-            line.isInterlude -> 1.0f  // dots manage their own visibility
+            line.isInterlude -> if (isActive) 1f else 0f
             // Reference: bg-lines have NO opacity override — they use the standard .line state
             // opacities; only their gradient alphas differ (0.6/0.3, applied in the renderer).
             else -> when (lineState) {
@@ -334,7 +364,8 @@ class LyricsAnimator(
         val animatable = lineOpacityAnims.getOrPut(lineIdx) { Animatable(target) }
         if (animatable.targetValue != target) {
             coroutineScope.launch {
-                animatable.animateTo(target, tween(config.lineTransitionMs, easing = OPACITY_EASING))
+                val duration = if (line.isInterlude) MUSICAL_LINE_TRANSITION_MS else config.lineTransitionMs
+                animatable.animateTo(target, tween(duration, easing = OPACITY_EASING))
             }
         }
         return animatable.value
@@ -348,7 +379,7 @@ class LyricsAnimator(
     private fun animateInterludeScale(
         lineIdx: Int,
         line: Line,
-        processedPosition: Long,
+        processedPosition: Double,
         isActive: Boolean,
     ): Float {
         if (!line.isInterlude) return 1f
@@ -358,7 +389,7 @@ class LyricsAnimator(
         if (animatable.targetValue != target) {
             // The collapse (1→0, at pre-hidden) uses the reference's slower 0.4s dip-then-overshoot
             // curve; expansion (0→1, on activation) keeps the default line-transition tween.
-            val duration = if (target == 0f) DOT_GROUP_COLLAPSE_MS else config.lineTransitionMs
+            val duration = if (target == 0f) DOT_GROUP_COLLAPSE_MS else DOT_GROUP_EXPANSION_MS
             val easing = if (target == 0f) DOT_GROUP_COLLAPSE_EASING else SCALE_EASING
             coroutineScope.launch {
                 animatable.animateTo(target, tween(duration, easing = easing))
@@ -378,7 +409,7 @@ class LyricsAnimator(
         return animatable.value
     }
 
-    private fun applyBlur(lines: List<Line>, activeIndex: Int, processedPosition: Long) {
+    private fun applyBlur(lines: List<Line>, activeIndex: Int, processedPosition: Double) {
         for (i in lines.indices) {
             val state = elementState(processedPosition, lines[i].startMs, lines[i].endMs)
             val distance = abs(i - activeIndex)
@@ -388,7 +419,7 @@ class LyricsAnimator(
     }
 
     /** A Sung line keeps stepping while the next line is NotSung/Active, or when it's the last line. */
-    private fun shouldFinalize(lines: List<Line>, lineIdx: Int, processedPosition: Long): Boolean {
+    private fun shouldFinalize(lines: List<Line>, lineIdx: Int, processedPosition: Double): Boolean {
         val next = lines.getOrNull(lineIdx + 1) ?: return true
         return elementState(processedPosition, next.startMs, next.endMs) != ElementState.Sung
     }
@@ -411,7 +442,7 @@ class LyricsAnimator(
 
     private fun animateWord(
         word: Word,
-        processedPosition: Long,
+        processedPosition: Double,
         deltaTime: Float,
         lineIndex: Int,
         wordIndex: Int,
@@ -431,7 +462,8 @@ class LyricsAnimator(
                 targetScale = scaleSpline.at(percentage)
                 targetYOffset = yOffsetSpline.at(percentage)
                 targetGlow = glowSpline.at(percentage)
-                targetGradientPos = gradientBase + 120f * percentage
+                targetGradientPos = if (simple && config.simpleAnimationStyle == SimpleAnimationStyle.ANIMATE)
+                    -27.5f + 127.5f * percentage else gradientBase + 120f * percentage
             }
             ElementState.NotSung -> {
                 targetScale = scaleSpline.at(0f)
@@ -474,7 +506,7 @@ class LyricsAnimator(
     private fun animateLetters(
         word: Word,
         wordState: ElementState,
-        processedPosition: Long,
+        processedPosition: Double,
         deltaTime: Float,
         lineIndex: Int,
         wordIndex: Int,
@@ -629,7 +661,7 @@ class LyricsAnimator(
 
     private fun animateInterludeDots(
         line: Line,
-        processedPosition: Long,
+        processedPosition: Double,
         deltaTime: Float,
         lineIndex: Int,
         finalize: Boolean,
@@ -657,10 +689,10 @@ class LyricsAnimator(
             springs.opacity.setGoal(sample(dotOpacitySpline))
 
             WordAnimState(
-                scale = springs.scale.step(deltaTime),
-                yOffset = springs.yOffset.step(deltaTime),
+                scale = if (config.isSimple) 1f else springs.scale.step(deltaTime),
+                yOffset = if (config.isSimple) 0f else springs.yOffset.step(deltaTime),
                 glow = springs.opacity.step(deltaTime),   // 'glow' carries dot opacity for the base draw
-                dotGlow = springs.glow.step(deltaTime),    // 'dotGlow' carries the halo intensity
+                dotGlow = if (config.isSimple) 0f else springs.glow.step(deltaTime),
                 gradientPosition = if (state == ElementState.Sung) 100f else 0f,
                 state = state,
             )
@@ -715,13 +747,13 @@ class LyricsAnimator(
 
     // ── Helpers ─────────────────────────────────────────────────────────────────────
 
-    private fun elementState(t: Long, startMs: Long, endMs: Long): ElementState = when {
+    private fun elementState(t: Double, startMs: Long, endMs: Long): ElementState = when {
         t < startMs -> ElementState.NotSung
         t >= endMs -> ElementState.Sung
         else -> ElementState.Active
     }
 
-    private fun progress(t: Long, startMs: Long, endMs: Long): Float {
+    private fun progress(t: Double, startMs: Long, endMs: Long): Float {
         if (t <= startMs) return 0f
         if (t >= endMs) return 1f
         return (t - startMs).toFloat() / (endMs - startMs).toFloat()

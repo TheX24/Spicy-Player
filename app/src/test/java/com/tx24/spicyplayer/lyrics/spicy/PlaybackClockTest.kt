@@ -6,6 +6,13 @@ import org.junit.Test
 import kotlin.math.abs
 
 class PlaybackClockTest {
+    private fun PlaybackClock.positionMs(
+        measuredMs: Long,
+        isPlaying: Boolean,
+        nowMs: Long,
+        speed: Float = 1f,
+        durationMs: Long = 120_000L,
+    ) = positionMs(measuredMs, isPlaying, speed, nowMs, durationMs)
 
     @Test
     fun `advances smoothly on wall clock while measured input is coarse`() {
@@ -91,5 +98,21 @@ class PlaybackClockTest {
         }
         // Predicted should sit on the measured clock (+lead), within a couple of ms.
         assertTrue(abs(out - (now + 100L)) <= 3L)
+    }
+
+    @Test
+    fun `extrapolation follows playback speed and reanchors on a rate change`() {
+        val clock = PlaybackClock()
+        assertEquals(1_100L, clock.positionMs(1_000L, true, 0L, speed = 2f))
+        assertEquals(2_100L, clock.positionMs(1_000L, true, 500L, speed = 2f))
+        assertEquals(1_600L, clock.positionMs(1_500L, true, 500L, speed = 0.5f))
+        assertEquals(1_850L, clock.positionMs(1_500L, true, 1_000L, speed = 0.5f))
+    }
+
+    @Test
+    fun `known duration clamps prediction and perceptual lead`() {
+        val clock = PlaybackClock()
+        assertEquals(2_000L, clock.positionMs(1_980L, true, 0L, durationMs = 2_000L))
+        assertEquals(2_000L, clock.positionMs(1_980L, true, 1_000L, durationMs = 2_000L))
     }
 }
